@@ -1,148 +1,284 @@
 import 'package:flutter/material.dart';
-import 'placeholders.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  final List<Map<String, dynamic>> _categories = [
-    {'title': 'السوبرماركت', 'icon': Icons.local_grocery_store, 'color': Colors.green, 'route': '/supermarket'},
-    {'title': 'المطاعم والوجبات', 'icon': Icons.restaurant, 'color': Colors.orange, 'route': '/restaurants'},
-    {'title': 'أدوات التجميل', 'icon': Icons.face_retouching_natural, 'color': Colors.purple, 'route': '/beauty'},
-    {'title': 'الملابس والأزياء', 'icon': Icons.checkroom, 'color': Colors.blue, 'route': '/fashion'},
-    {'title': 'التوصيل والطلبات', 'icon': Icons.local_shipping, 'color': Colors.teal, 'route': '/delivery'},
-    {'title': 'الصيدليات والأدوية', 'icon': Icons.local_hospital, 'color': Colors.red, 'route': '/pharmacy'},
-    {'title': 'المراكز الطبية', 'icon': Icons.medical_services, 'color': Colors.indigo, 'route': '/medical'},
-    {'title': 'الفنادق والحجوزات', 'icon': Icons.hotel, 'color': Colors.brown, 'route': '/hotels'},
-  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: Colors.grey[50], // لون خلفية هادئ ومريح
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A365D),
-        elevation: 2,
+        backgroundColor: Colors.white,
+        elevation: 0,
         title: Row(
           children: [
-            const CircleAvatar(
-              backgroundColor: Colors.amber,
-              child: Icon(Icons.person, color: Color(0xFF1A365D)),
+            CircleAvatar(
+              backgroundColor: const Color(0xFF1A365D).withOpacity(0.1),
+              child: const Icon(Icons.person, color: Color(0xFF1A365D)),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  CurrentUser.name, // ظهور اسمك صفوت محمد حسان
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                const Row(
-                  children: [
-                    Icon(Icons.location_on, color: Colors.amber, size: 12),
-                    SizedBox(width: 2),
-                    Text('عدن - خور مكسر', style: TextStyle(fontSize: 11, color: Colors.white70)),
-                  ],
-                ),
+              children: const [
+                Text('مرحباً بك، محمد', style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold)),
+                Text('📍 مأرب، المجمع', style: TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_none, color: Colors.black87, size: 28),
+            onPressed: () {},
+          ),
+        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // بنر ترحيبي
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF1A365D), Color(0xFF2B6CB0)]),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('أهلاً بك ${CurrentUser.name}', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 16)),
-                        const SizedBox(height: 4),
-                        const Text('تطبيق سوق اليمن الشامل للمتاجر والتوصيل', style: TextStyle(color: Colors.white, fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.storefront, size: 50, color: Colors.white30),
-                ],
-              ),
-            ),
+            // 1. محفظة الفائق (نموذج Gojek)
+            _buildSuperWalletCard(),
+            
+            const SizedBox(height: 20),
+
+            // 2. شبكة الخدمات الشاملة (Mini-Apps)
+            _buildServicesGrid(context),
 
             const SizedBox(height: 20),
-            const Text('الأقسام الرئيسية', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A365D))),
-            const SizedBox(height: 10),
 
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                childAspectRatio: 0.85,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-              ),
-              itemCount: _categories.length,
-              itemBuilder: (context, index) {
-                final cat = _categories[index];
-                return InkWell(
-                  onTap: () => Navigator.pushNamed(context, cat['route']),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(cat['icon'], color: cat['color'], size: 28),
-                        const SizedBox(height: 6),
-                        Text(cat['title'], style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+            // 3. البطاقة الذكية (الابتكار الاستراتيجي: ربط السفر بالطعام)
+            _buildSmartTripCard(),
 
             const SizedBox(height: 20),
-            const Text('المنتجات المضافة حديثاً 🔥', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A365D))),
-            const SizedBox(height: 10),
 
-            // إظهار منتج راني المضاف والمنتجات الأخرى
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: globalProducts.length,
-              itemBuilder: (context, index) {
-                final prod = globalProducts[index];
-                return Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.local_drink, color: Colors.orange, size: 32),
-                    title: Text(prod.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('المتجر: ${prod.storeName} | القسم: ${prod.category}'),
-                    trailing: Text('${prod.price} ر.ي', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 15)),
-                  ),
-                );
-              },
-            ),
+            // 4. العروض الترويجية
+            _buildPromotionsSection(),
+            
+            const SizedBox(height: 30),
           ],
         ),
       ),
     );
   }
+
+  // --- قسم بناء المحفظة العلوية ---
+  Widget _buildSuperWalletCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A365D), // اللون الأزرق الداكن الخاص بعلامتك
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF1A365D).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text('رصيد الفائق', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  SizedBox(height: 4),
+                  Text('150,000 ر.ي', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              ElevatedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.add, size: 18, color: Color(0xFF1A365D)),
+                label: const Text('شحن', style: TextStyle(color: Color(0xFF1A365D), fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              )
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildWalletAction(Icons.qr_code_scanner, 'مسح الدفع'),
+              _buildWalletAction(Icons.send_to_mobile, 'تحويل'),
+              _buildWalletAction(Icons.history, 'السجل'),
+              _buildWalletAction(Icons.more_horiz, 'المزيد'),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWalletAction(IconData icon, String label) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, color: Colors.white, size: 24),
+        ),
+        const SizedBox(height: 8),
+        Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+      ],
+    );
+  }
+
+  // --- قسم شبكة الخدمات (Super App Grid) ---
+  Widget _buildServicesGrid(BuildContext context) {
+    List<Map<String, dynamic>> services = [
+      {'icon': Icons.directions_bus, 'title': 'الرحلات والسفر', 'color': Colors.orange, 'route': '/travel'},
+      {'icon': Icons.restaurant, 'title': 'المطاعم', 'color': Colors.redAccent, 'route': '/restaurants'},
+      {'icon': Icons.shopping_basket, 'title': 'السوبرماركت', 'color': Colors.green, 'route': '/supermarket'},
+      {'icon': Icons.local_shipping, 'title': 'شحن بين المدن', 'color': Colors.brown, 'route': '/cargo'},
+      {'icon': Icons.local_pharmacy, 'title': 'صيدليات', 'color': Colors.teal, 'route': '/pharmacy'},
+      {'icon': Icons.two_wheeler, 'title': 'توصيل مشاوير', 'color': Colors.blue, 'route': '/ride'},
+      {'icon': Icons.hotel, 'title': 'حجز فنادق', 'color': Colors.purple, 'route': '/hotels'},
+      {'icon': Icons.grid_view, 'title': 'كل الخدمات', 'color': Colors.grey[700], 'route': '/more'},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: services.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          childAspectRatio: 0.85,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 15,
+        ),
+        itemBuilder: (context, index) {
+          return GestureDetector(
+            onTap: () {
+              // إذا كان هناك مسار مبرمج، ننتقل إليه، غير ذلك نظهر رسالة
+              if(services[index]['route'] == '/travel' || services[index]['route'] == '/restaurants' || services[index]['route'] == '/supermarket'){
+                  Navigator.pushNamed(context, services[index]['route']);
+              } else {
+                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سيتم تفعيل هذا القسم قريباً')));
+              }
+            },
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: services[index]['color'].withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(services[index]['icon'], color: services[index]['color'], size: 28),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  services[index]['title'],
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
+                  overflow: TextOverflow.ellipsis,
+                )
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // --- البطاقة الذكية (ميزة ربط السفر بالطعام) ---
+  Widget _buildSmartTripCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange[50],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.directions_bus, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('رحلتك القادمة: مأرب ➔ عدن', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text('تتوقف الحافلة في استراحة شبوة بعد ساعتين.', style: TextStyle(color: Colors.black54, fontSize: 12)),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('اطلب وجبتك الآن لتجهز قبل وصولك! 🍽️', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  // --- قسم العروض الترويجية ---
+  Widget _buildPromotionsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Text('عروض الفائق 🚀', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 130,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: 3,
+            itemBuilder: (context, index) {
+              List<Color> cardColors = [Colors.blueAccent, Colors.pinkAccent, Colors.green];
+              List<String> titles = ['توصيل مجاني\nلأول 3 طلبات!', 'خصم 20%\nعلى حجوزات صنعاء', 'وجبتك تسبقك\nاحجز باصك واطلب'];
+              return Container(
+                width: 260,
+                margin: const EdgeInsets.only(left: 12), // left because Arabic is RTL
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cardColors[index],
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(titles[index], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                            child: Text('اكتشف الآن', style: TextStyle(color: cardColors[index], fontSize: 10, fontWeight: FontWeight.bold)),
+                          )
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.local_offer, color: Colors.white54, size: 50),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 }
+

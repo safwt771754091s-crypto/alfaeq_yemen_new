@@ -22,7 +22,8 @@ class AlfaeqYemenApp extends StatelessWidget {
       routes: {
         '/': (context) => const MainNavigationScreen(),
         '/add_product': (context) => const VendorAddProductScreen(),
-        '/admin_panel': (context) => const AdminPanelScreen(),
+       '/travel': (context) => const CategoryScreen(categoryName: 'الرحلات والسفر'),
+ '/admin_panel': (context) => const AdminPanelScreen(),
       },
     );
   }
