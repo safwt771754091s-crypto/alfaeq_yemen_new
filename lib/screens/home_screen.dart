@@ -6,7 +6,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50], // لون خلفية هادئ ومريح
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -20,7 +20,7 @@ class HomeScreen extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                Text('مرحباً بك، محمد', style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold)),
+                Text('مرحباً بك، صفوت', style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold)),
                 Text('📍 مأرب، المجمع', style: TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
@@ -36,22 +36,22 @@ class HomeScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // 1. محفظة الفائق (نموذج Gojek)
-            _buildSuperWalletCard(),
+            // 1. محفظة الفائق (نموذج المحفظة أولاً كـ Super App)
+            _buildSuperWalletCard(context),
             
             const SizedBox(height: 20),
 
-            // 2. شبكة الخدمات الشاملة (Mini-Apps)
+            // 2. شبكة الخدمات الشاملة (12 خدمة متكاملة على طراز WeChat / Gojek)
             _buildServicesGrid(context),
 
             const SizedBox(height: 20),
 
-            // 3. البطاقة الذكية (الابتكار الاستراتيجي: ربط السفر بالطعام)
+            // 3. البطاقة الذكية (الابتكار الاستراتيجي: ربط السفر بالطعام مسبقاً)
             _buildSmartTripCard(),
 
             const SizedBox(height: 20),
 
-            // 4. العروض الترويجية
+            // 4. العروض الترويجية والإعلانات
             _buildPromotionsSection(),
             
             const SizedBox(height: 30),
@@ -61,13 +61,13 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // --- قسم بناء المحفظة العلوية ---
-  Widget _buildSuperWalletCard() {
+  // --- 1. قسم المحفظة الإلكترونية العلوية ---
+  Widget _buildSuperWalletCard(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A365D), // اللون الأزرق الداكن الخاص بعلامتك
+        color: const Color(0xFF1A365D),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(color: const Color(0xFF1A365D).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5)),
@@ -81,13 +81,15 @@ class HomeScreen extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
-                  Text('رصيد الفائق', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  Text('رصيد الفائق المتاح', style: TextStyle(color: Colors.white70, fontSize: 14)),
                   SizedBox(height: 4),
                   Text('150,000 ر.ي', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                 ],
               ),
               ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.pushNamed(context, '/wallet');
+                },
                 icon: const Icon(Icons.add, size: 18, color: Color(0xFF1A365D)),
                 label: const Text('شحن', style: TextStyle(color: Color(0xFF1A365D), fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
@@ -101,10 +103,10 @@ class HomeScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildWalletAction(Icons.qr_code_scanner, 'مسح الدفع'),
-              _buildWalletAction(Icons.send_to_mobile, 'تحويل'),
-              _buildWalletAction(Icons.history, 'السجل'),
-              _buildWalletAction(Icons.more_horiz, 'المزيد'),
+              _buildWalletAction(Icons.qr_code_scanner, 'مسح الدفع', () {}),
+              _buildWalletAction(Icons.send_to_mobile, 'تحويل', () {}),
+              _buildWalletAction(Icons.history, 'السجل', () {}),
+              _buildWalletAction(Icons.account_balance_wallet, 'الخدمات المالية', () {}),
             ],
           )
         ],
@@ -112,31 +114,38 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildWalletAction(IconData icon, String label) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
-          child: Icon(icon, color: Colors.white, size: 24),
-        ),
-        const SizedBox(height: 8),
-        Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
-      ],
+  Widget _buildWalletAction(IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: Colors.white, size: 24),
+          ),
+          const SizedBox(height: 8),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 11)),
+        ],
+      ),
     );
   }
 
-  // --- قسم شبكة الخدمات (Super App Grid) ---
+  // --- 2. شبكة الخدمات الشاملة (12 خدمة كبرى بنظام الـ Super App) ---
   Widget _buildServicesGrid(BuildContext context) {
     List<Map<String, dynamic>> services = [
-      {'icon': Icons.directions_bus, 'title': 'الرحلات والسفر', 'color': Colors.orange, 'route': '/travel'},
-      {'icon': Icons.restaurant, 'title': 'المطاعم', 'color': Colors.redAccent, 'route': '/restaurants'},
+      {'icon': Icons.restaurant, 'title': 'المطاعم والوجبات', 'color': Colors.redAccent, 'route': '/restaurants'},
       {'icon': Icons.shopping_basket, 'title': 'السوبرماركت', 'color': Colors.green, 'route': '/supermarket'},
-      {'icon': Icons.local_shipping, 'title': 'شحن بين المدن', 'color': Colors.brown, 'route': '/cargo'},
-      {'icon': Icons.local_pharmacy, 'title': 'صيدليات', 'color': Colors.teal, 'route': '/pharmacy'},
+      {'icon': Icons.directions_bus, 'title': 'الرحلات والسفر', 'color': Colors.orange, 'route': '/travel'},
+      {'icon': Icons.local_pharmacy, 'title': 'الصيدليات والأدوية', 'color': Colors.teal, 'route': '/pharmacy'},
+      {'icon': Icons.local_shipping, 'title': 'الشحن بين المدن', 'color': Colors.brown, 'route': '/cargo'},
       {'icon': Icons.two_wheeler, 'title': 'توصيل مشاوير', 'color': Colors.blue, 'route': '/ride'},
-      {'icon': Icons.hotel, 'title': 'حجز فنادق', 'color': Colors.purple, 'route': '/hotels'},
-      {'icon': Icons.grid_view, 'title': 'كل الخدمات', 'color': Colors.grey[700], 'route': '/more'},
+      {'icon': Icons.checkroom, 'title': 'الملابس والأزياء', 'color': Colors.pink, 'route': '/fashion'},
+      {'icon': Icons.face, 'title': 'أدوات التجميل', 'color': Colors.purple, 'route': '/beauty'},
+      {'icon': Icons.local_hospital, 'title': 'المراكز الطبية', 'color': Colors.red, 'route': '/medical'},
+      {'icon': Icons.hotel, 'title': 'حجز الفنادق', 'color': Colors.indigo, 'route': '/hotels'},
+      {'icon': Icons.payment, 'title': 'التوصيل والمالية', 'color': Colors.amber.shade800, 'route': '/finance'},
+      {'icon': Icons.grid_view, 'title': 'كل الخدمات', 'color': Colors.grey.shade700, 'route': '/more'},
     ];
 
     return Padding(
@@ -147,36 +156,41 @@ class HomeScreen extends StatelessWidget {
         itemCount: services.length,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 4,
-          childAspectRatio: 0.85,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 15,
+          childAspectRatio: 0.80,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 12,
         ),
         itemBuilder: (context, index) {
           return GestureDetector(
             onTap: () {
-              // إذا كان هناك مسار مبرمج، ننتقل إليه، غير ذلك نظهر رسالة
-              if(services[index]['route'] == '/travel' || services[index]['route'] == '/restaurants' || services[index]['route'] == '/supermarket'){
-                  Navigator.pushNamed(context, services[index]['route']);
+              if (services[index]['route'] != '/more') {
+                // محاولة التنقل أو عرض تنبيه القسم
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('الانتقال إلى قسم: ${services[index]['title']}')),
+                );
               } else {
-                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سيتم تفعيل هذا القسم قريباً')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const NavMessage('جميع الخدمات مفعلة بنظام الـ Super App'),
+                );
               }
             },
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: services[index]['color'].withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(services[index]['icon'], color: services[index]['color'], size: 28),
+                  child: Icon(services[index]['icon'], color: services[index]['color'], size: 26),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   services[index]['title'],
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
                   overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                 )
               ],
             ),
@@ -186,13 +200,13 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // --- البطاقة الذكية (ميزة ربط السفر بالطعام) ---
+  // --- 3. البطاقة الذكية (الربط الاستراتيجي بين السفر والطعام) ---
   Widget _buildSmartTripCard() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.orange[50],
+        color: Colors.orange.shade50,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.orange.withOpacity(0.3)),
       ),
@@ -226,7 +240,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // --- قسم العروض الترويجية ---
+  // --- 4. العروض الترويجية والإعلانات ---
   Widget _buildPromotionsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,10 +258,14 @@ class HomeScreen extends StatelessWidget {
             itemCount: 3,
             itemBuilder: (context, index) {
               List<Color> cardColors = [Colors.blueAccent, Colors.pinkAccent, Colors.green];
-              List<String> titles = ['توصيل مجاني\nلأول 3 طلبات!', 'خصم 20%\nعلى حجوزات صنعاء', 'وجبتك تسبقك\nاحجز باصك واطلب'];
+              List<String> titles = [
+                'توصيل مجاني\nلأول 3 طلبات!',
+                'خصم 20%\nعلى حجوزات السفر',
+                'وجبتك تسبقك\nاحجز باصك واطلب'
+              ];
               return Container(
                 width: 260,
-                margin: const EdgeInsets.only(left: 12), // left because Arabic is RTL
+                margin: const EdgeInsets.only(left: 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: cardColors[index],
@@ -260,7 +278,7 @@ class HomeScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(titles[index], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text(titles[index], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
                           const SizedBox(height: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -270,7 +288,7 @@ class HomeScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const Icon(Icons.local_offer, color: Colors.white54, size: 50),
+                    const Icon(Icons.local_offer, color: Colors.white54, size: 45),
                   ],
                 ),
               );
