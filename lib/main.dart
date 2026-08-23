@@ -21,5 +21,3 @@ class AlfaeqYemenApp extends StatelessWidget {
     );
   }
 }
-	
-
