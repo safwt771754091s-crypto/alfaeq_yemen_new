@@ -112,7 +112,7 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(context, MaterialPageRoute(builder: (context) => const WalletHistoryScreen()));
               }),
               _buildWalletAction(Icons.local_shipping, 'التتبع', () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const TrackingScreen()));
+                Navigator.push(context, MaterialPageRoute(builder: (context) => TrackingScreen()));
               }),
             ],
           )
@@ -233,7 +233,7 @@ class HomeScreen extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const TrackingScreen()));
+                Navigator.push(context, MaterialPageRoute(builder: (context) => TrackingScreen()));
               },
               icon: const Icon(Icons.map, size: 16),
               label: const Text('تتبع خط السير على الخريطة', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -249,5 +249,4 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-	
 
