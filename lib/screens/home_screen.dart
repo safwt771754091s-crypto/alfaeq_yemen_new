@@ -94,7 +94,7 @@ class HomeScreen extends StatelessWidget {
 _buildWalletAction(Icons.history, 'السجل', () {
   Navigator.push(
     context,
-    MaterialPageRoute(builder: (context) => const WalletHistoryScreen()),
+    MaterialPageRoute(builder: (context) => WalletHistoryScreen()),
   );
 }),
               _buildWalletAction(Icons.account_balance_wallet, 'الخدمات المالية', () {}),
