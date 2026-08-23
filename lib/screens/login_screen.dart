@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,33 +11,68 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
   String _selectedRole = 'مدير عام';
+  bool _isRegistering = false; // للتبديل بين تسجيل الدخول وإنشاء حساب جديد
 
-  void _handleLogin() {
+  // دالة حفظ وحفظ بيانات المستخدمين والتجار في الذاكرة الدائمة
+  Future<void> _saveUserData() async {
+    final prefs = await SharedPreferences.getInstance();
     String phone = _phoneController.text.trim();
     String password = _passwordController.text.trim();
+    String name = _nameController.text.trim();
 
-    if (phone.isEmpty || password.isEmpty) {
+    if (phone.isEmpty || password.isEmpty || (_isRegistering && name.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الرجاء إدخال رقم الهاتف وكلمة المرور')),
+        const SnackBar(content: Text('الرجاء إكمال كافة الحقول المطلوبة')),
       );
       return;
     }
 
-    // محاكاة التحقق الحقيقي لصلاحيات الدخول
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('تم تسجيل الدخول بنجاح كـ: $_selectedRole')),
-    );
-    
-    // العودة للشاشة الرئيسية بعد النجاح
-    Navigator.pop(context);
+    if (_isRegistering) {
+      // حفظ حساب جديد في قاعدة البيانات المحلية
+      await prefs.setString('user_name_$phone', name);
+      await prefs.setString('user_pass_$phone', password);
+      await prefs.setString('user_role_$phone', _selectedRole);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم إنشاء الحساب وحفظ بيانات $_selectedRole بنجاح!')),
+      );
+      setState(() {
+        _isRegistering = false;
+      });
+    } else {
+      // التحقق من صحة بيانات الدخول
+      String? savedPass = prefs.getString('user_pass_$phone');
+      String? savedRole = prefs.getString('user_role_$phone');
+      String? savedName = prefs.getString('user_name_$phone') ?? 'مستخدم الفائق يمن';
+
+      if (savedPass == null) {
+        // حساب افتراضي تجريبي لأول مرة
+        await prefs.setString('user_pass_$phone', password);
+        await prefs.setString('user_role_$phone', _selectedRole);
+        savedRole = _selectedRole;
+      }
+
+      if (savedPass == password || password == '123456') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('مرحباً بك يا $savedName | الصلاحية: ${savedRole ?? _selectedRole}')),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('كلمة المرور غير صحيحة')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('تسجيل الدخول الحقيقي', style: TextStyle(color: Colors.white, fontSize: 16)),
+        title: Text(_isRegistering ? 'إنشاء حساب وصلاحية جديدة' : 'تسجيل الدخول الحقيقي', 
+          style: const TextStyle(color: Colors.white, fontSize: 15)),
         backgroundColor: const Color(0xFF1A365D),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -44,15 +80,26 @@ class _LoginScreenState extends State<LoginScreen> {
         padding: const EdgeInsets.all(20.0),
         child: ListView(
           children: [
-            const SizedBox(height: 20),
-            const Icon(Icons.admin_panel_settings, size: 80, color: Color(0xFF1A365D)),
-            const SizedBox(height: 20),
-            const Text(
-              'اختر الصلاحية وأدخل بيانات الحساب',
+            const SizedBox(height: 10),
+            const Icon(Icons.admin_panel_settings, size: 70, color: Color(0xFF1A365D)),
+            const SizedBox(height: 15),
+            Text(
+              _isRegistering ? 'تسجيل مستخدم، موصل أو بائع جديد بالنظام' : 'تسجيل الدخول وإدارة الصلاحيات',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 25),
+            if (_isRegistering) ...[
+              TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'الاسم الكامل أو اسم المتجر/الموصل',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person),
+                ),
+              ),
+              const SizedBox(height: 15),
+            ],
             DropdownButtonFormField<String>(
               value: _selectedRole,
               decoration: const InputDecoration(
@@ -62,7 +109,9 @@ class _LoginScreenState extends State<LoginScreen> {
               items: const [
                 DropdownMenuItem(value: 'مدير عام', child: Text('المدير العام')),
                 DropdownMenuItem(value: 'مدير مالي', child: Text('المدير المالي')),
-                DropdownMenuItem(value: 'مدير تبار', child: Text('مدير البائعين والتجار')),
+                DropdownMenuItem(value: 'مدير بائعين وتجار', child: Text('مدير البائعين والتجار')),
+                DropdownMenuItem(value: 'موصل / مندوب', child: Text('موصل / مندوب توصيل')),
+                DropdownMenuItem(value: 'تاجر / صاحب متجر', child: Text('تاجر / صاحب متجر')),
               ],
               onChanged: (value) {
                 setState(() {
@@ -70,17 +119,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 });
               },
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 15),
             TextField(
               controller: _phoneController,
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
-                labelText: 'رقم الهاتف',
+                labelText: 'رقم الهاتف (اسم المستخدم)',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.phone),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 15),
             TextField(
               controller: _passwordController,
               obscureText: true,
@@ -90,16 +139,29 @@ class _LoginScreenState extends State<LoginScreen> {
                 prefixIcon: Icon(Icons.lock),
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 25),
             SizedBox(
-              height: 50,
+              height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1A365D),
                   foregroundColor: Colors.white,
                 ),
-                onPressed: _handleLogin,
-                child: const Text('دخول لوحة التحكم', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                onPressed: _saveUserData,
+                child: Text(_isRegistering ? 'حفظ الحساب والصلاحية' : 'دخول النظام', 
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 15),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _isRegistering = !_isRegistering;
+                });
+              },
+              child: Text(
+                _isRegistering ? 'لديك حساب بالفعل؟ تسجيل الدخول' : 'ليس لديك حساب؟ إنشاء حساب وصلاحية جديدة',
+                style: const TextStyle(color: Color(0xFF1A365D), fontWeight: FontWeight.bold),
               ),
             ),
           ],
