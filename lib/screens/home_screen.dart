@@ -36,24 +36,13 @@ class HomeScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // 1. محفظة الفائق (نموذج المحفظة أولاً كـ Super App)
             _buildSuperWalletCard(context),
-            
             const SizedBox(height: 20),
-
-            // 2. شبكة الخدمات الشاملة (12 خدمة متكاملة على طراز WeChat / Gojek)
             _buildServicesGrid(context),
-
             const SizedBox(height: 20),
-
-            // 3. البطاقة الذكية (الابتكار الاستراتيجي: ربط السفر بالطعام مسبقاً)
             _buildSmartTripCard(),
-
             const SizedBox(height: 20),
-
-            // 4. العروض الترويجية والإعلانات
             _buildPromotionsSection(),
-            
             const SizedBox(height: 30),
           ],
         ),
@@ -61,7 +50,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // --- 1. قسم المحفظة الإلكترونية العلوية ---
   Widget _buildSuperWalletCard(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -87,9 +75,7 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
               ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/wallet');
-                },
+                onPressed: () {},
                 icon: const Icon(Icons.add, size: 18, color: Color(0xFF1A365D)),
                 label: const Text('شحن', style: TextStyle(color: Color(0xFF1A365D), fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
@@ -131,21 +117,20 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // --- 2. شبكة الخدمات الشاملة (12 خدمة كبرى بنظام الـ Super App) ---
   Widget _buildServicesGrid(BuildContext context) {
     List<Map<String, dynamic>> services = [
-      {'icon': Icons.restaurant, 'title': 'المطاعم والوجبات', 'color': Colors.redAccent, 'route': '/restaurants'},
-      {'icon': Icons.shopping_basket, 'title': 'السوبرماركت', 'color': Colors.green, 'route': '/supermarket'},
-      {'icon': Icons.directions_bus, 'title': 'الرحلات والسفر', 'color': Colors.orange, 'route': '/travel'},
-      {'icon': Icons.local_pharmacy, 'title': 'الصيدليات والأدوية', 'color': Colors.teal, 'route': '/pharmacy'},
-      {'icon': Icons.local_shipping, 'title': 'الشحن بين المدن', 'color': Colors.brown, 'route': '/cargo'},
-      {'icon': Icons.two_wheeler, 'title': 'توصيل مشاوير', 'color': Colors.blue, 'route': '/ride'},
-      {'icon': Icons.checkroom, 'title': 'الملابس والأزياء', 'color': Colors.pink, 'route': '/fashion'},
-      {'icon': Icons.face, 'title': 'أدوات التجميل', 'color': Colors.purple, 'route': '/beauty'},
-      {'icon': Icons.local_hospital, 'title': 'المراكز الطبية', 'color': Colors.red, 'route': '/medical'},
-      {'icon': Icons.hotel, 'title': 'حجز الفنادق', 'color': Colors.indigo, 'route': '/hotels'},
-      {'icon': Icons.payment, 'title': 'التوصيل والمالية', 'color': Colors.amber.shade800, 'route': '/finance'},
-      {'icon': Icons.grid_view, 'title': 'كل الخدمات', 'color': Colors.grey.shade700, 'route': '/more'},
+      {'icon': Icons.restaurant, 'title': 'المطاعم والوجبات', 'color': Colors.redAccent},
+      {'icon': Icons.shopping_basket, 'title': 'السوبرماركت', 'color': Colors.green},
+      {'icon': Icons.directions_bus, 'title': 'الرحلات والسفر', 'color': Colors.orange},
+      {'icon': Icons.local_pharmacy, 'title': 'الصيدليات والأدوية', 'color': Colors.teal},
+      {'icon': Icons.local_shipping, 'title': 'الشحن بين المدن', 'color': Colors.brown},
+      {'icon': Icons.two_wheeler, 'title': 'توصيل مشاوير', 'color': Colors.blue},
+      {'icon': Icons.checkroom, 'title': 'الملابس والأزياء', 'color': Colors.pink},
+      {'icon': Icons.face, 'title': 'أدوات التجميل', 'color': Colors.purple},
+      {'icon': Icons.local_hospital, 'title': 'المراكز الطبية', 'color': Colors.red},
+      {'icon': Icons.hotel, 'title': 'حجز الفنادق', 'color': Colors.indigo},
+      {'icon': Icons.payment, 'title': 'التوصيل والمالية', 'color': Colors.amber.shade800},
+      {'icon': Icons.grid_view, 'title': 'كل الخدمات', 'color': Colors.grey.shade700},
     ];
 
     return Padding(
@@ -163,16 +148,9 @@ class HomeScreen extends StatelessWidget {
         itemBuilder: (context, index) {
           return GestureDetector(
             onTap: () {
-              if (services[index]['route'] != '/more') {
-                // محاولة التنقل أو عرض تنبيه القسم
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('الانتقال إلى قسم: ${services[index]['title']}')),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const NavMessage('جميع الخدمات مفعلة بنظام الـ Super App'),
-                );
-              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('الانتقال إلى قسم: ${services[index]['title']}')),
+              );
             },
             child: Column(
               children: [
@@ -200,7 +178,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // --- 3. البطاقة الذكية (الربط الاستراتيجي بين السفر والطعام) ---
   Widget _buildSmartTripCard() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -240,7 +217,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // --- 4. العروض الترويجية والإعلانات ---
   Widget _buildPromotionsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -299,5 +275,5 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-
+	
 

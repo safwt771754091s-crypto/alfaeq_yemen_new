@@ -17,7 +17,9 @@ class AlfaeqYemenApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         fontFamily: 'Roboto',
       ),
-      // جعل الواجهة الرئيسية هي الـ Super App مباشرة
       home: const HomeScreen(),
     );
   }
+}
+	
+
