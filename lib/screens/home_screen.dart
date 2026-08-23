@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'wallet_history_screen.dart';
+import 'vendors_screen.dart';
+import 'wallets_screen.dart';
+import 'tracking_screen.dart';
+import 'cart_screen.dart';
+import 'admin_dashboard_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -13,24 +18,36 @@ class HomeScreen extends StatelessWidget {
         elevation: 0,
         title: Row(
           children: [
-            CircleAvatar(
-              backgroundColor: const Color(0xFF1A365D).withOpacity(0.1),
-              child: const Icon(Icons.person, color: Color(0xFF1A365D)),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A365D).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.flash_on, color: Color(0xFF1A365D), size: 22),
             ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                Text('مرحباً بك، صفوت', style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold)),
-                Text('📍 مأرب، المجمع', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                Text('الفائق يمن', style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold)),
+                Text('الفائق.. يوصل للي ما يوصل!', style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold)),
               ],
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.black87, size: 28),
-            onPressed: () {},
+            icon: const Icon(Icons.admin_panel_settings, color: Color(0xFF1A365D), size: 26),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminDashboardScreen()));
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.shopping_cart, color: Color(0xFF1A365D), size: 26),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const CartScreen()));
+            },
           ),
         ],
       ),
@@ -41,9 +58,7 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 20),
             _buildServicesGrid(context),
             const SizedBox(height: 20),
-            _buildSmartTripCard(),
-            const SizedBox(height: 20),
-            _buildPromotionsSection(),
+            _buildSmartTripCard(context),
             const SizedBox(height: 30),
           ],
         ),
@@ -58,9 +73,7 @@ class HomeScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF1A365D),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: const Color(0xFF1A365D).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5)),
-        ],
+        boxShadow: [BoxShadow(color: const Color(0xFF1A365D).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))],
       ),
       child: Column(
         children: [
@@ -76,13 +89,12 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
               ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.add, size: 18, color: Color(0xFF1A365D)),
-                label: const Text('شحن', style: TextStyle(color: Color(0xFF1A365D), fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const WalletsScreen()));
+                },
+                icon: const Icon(Icons.account_balance, size: 16, color: Color(0xFF1A365D)),
+                label: const Text('المحافظ', style: TextStyle(color: Color(0xFF1A365D), fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
               )
             ],
           ),
@@ -90,15 +102,18 @@ class HomeScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildWalletAction(Icons.qr_code_scanner, 'مسح الدفع', () {}),
-              _buildWalletAction(Icons.send_to_mobile, 'تحويل', () {}),
-              _buildWalletAction(Icons.history, 'السجل', () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => WalletHistoryScreen()),
-                );
+              _buildWalletAction(Icons.admin_panel_settings, 'الإدارة', () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminDashboardScreen()));
               }),
-              _buildWalletAction(Icons.account_balance_wallet, 'الخدمات المالية', () {}),
+              _buildWalletAction(Icons.shopping_cart, 'السلة', () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const CartScreen()));
+              }),
+              _buildWalletAction(Icons.history, 'السجل', () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const WalletHistoryScreen()));
+              }),
+              _buildWalletAction(Icons.local_shipping, 'التتبع', () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const TrackingScreen()));
+              }),
             ],
           )
         ],
@@ -152,10 +167,18 @@ class HomeScreen extends StatelessWidget {
           mainAxisSpacing: 12,
         ),
         itemBuilder: (context, index) {
+          final service = services[index];
           return GestureDetector(
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('الانتقال إلى قسم: ${services[index]['title']}')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => VendorsScreen(
+                    categoryTitle: service['title'],
+                    categoryIcon: service['icon'],
+                    categoryColor: service['color'],
+                  ),
+                ),
               );
             },
             child: Column(
@@ -163,14 +186,14 @@ class HomeScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: services[index]['color'].withOpacity(0.1),
+                    color: service['color'].withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(services[index]['icon'], color: services[index]['color'], size: 26),
+                  child: Icon(service['icon'], color: service['color'], size: 26),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  services[index]['title'],
+                  service['title'],
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
                   overflow: TextOverflow.ellipsis,
@@ -184,7 +207,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSmartTripCard() {
+  Widget _buildSmartTripCard(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -208,76 +231,21 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {},
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const TrackingScreen()));
+              },
+              icon: const Icon(Icons.map, size: 16),
+              label: const Text('تتبع خط السير على الخريطة', style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text('اطلب وجبتك الآن لتجهز قبل وصولك! 🍽️', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           )
         ],
       ),
-    );
-  }
-
-  Widget _buildPromotionsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text('عروض الفائق 🚀', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 130,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: 3,
-            itemBuilder: (context, index) {
-              List<Color> cardColors = [Colors.blueAccent, Colors.pinkAccent, Colors.green];
-              List<String> titles = [
-                'توصيل مجاني\nلأول 3 طلبات!',
-                'خصم 20%\nعلى حجوزات السفر',
-                'وجبتك تسبقك\nاحجز باصك واطلب'
-              ];
-              return Container(
-                width: 260,
-                margin: const EdgeInsets.only(left: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cardColors[index],
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(titles[index], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-                            child: Text('اكتشف الآن', style: TextStyle(color: cardColors[index], fontSize: 10, fontWeight: FontWeight.bold)),
-                          )
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.local_offer, color: Colors.white54, size: 45),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
     );
   }
 }
