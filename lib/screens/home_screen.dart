@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'wallet_history_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -91,12 +92,12 @@ class HomeScreen extends StatelessWidget {
             children: [
               _buildWalletAction(Icons.qr_code_scanner, 'مسح الدفع', () {}),
               _buildWalletAction(Icons.send_to_mobile, 'تحويل', () {}),
-_buildWalletAction(Icons.history, 'السجل', () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(builder: (context) => WalletHistoryScreen()),
-  );
-}),
+              _buildWalletAction(Icons.history, 'السجل', () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => WalletHistoryScreen()),
+                );
+              }),
               _buildWalletAction(Icons.account_balance_wallet, 'الخدمات المالية', () {}),
             ],
           )
