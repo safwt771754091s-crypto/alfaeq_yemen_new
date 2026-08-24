@@ -1,21 +1,2 @@
-# alfaeq_yemen
-
-قمت بإضافة دعم للتعريب (العربية والإنجليزية) كمثال تشغيل سريع باستخدام package `easy_localization` و `intl`.
-
-ما قمت به:
-- أضفت `pubspec.yaml` مع تبعيات `easy_localization` و `intl`.
-- أضفت `lib/main.dart` كمثال يهيّئ EasyLocalization ويعرض واجهة بسيطة تدعم التبديل بين العربية والإنجليزية.
-- أضفت ملفات الترجمة في `assets/translations/en.json` و `assets/translations/ar.json`.
-
-كيفية التشغيل محليًا:
-1. ثبت Flutter إن لم يكن مثبتًا.
-2. من جذر المشروع شغّل: `flutter pub get`.
-3. ثم شغّل التطبيق: `flutter run`.
-
-التالي الذي أقترح فعله بعد هذا:
-- دمج هذا `main.dart` مع ملفات الواجهة الحالية (`lib/` الموجودة عندك) أو استبدالها إذا رغبت.
-- دعم المزيد من المفاتيح في ملفات الترجمة ورفع النصوص الحرفية من باقي الشيفرة إلى ملفات ARB/JSON.
-- إضافة صفحة الإعدادات لتمكين المستخدم من اختيار اللغة والعملة.
-- ربط Firebase وتهيئة إعدادات النشر إلى Google Play.
-
-أخبرني إن أردت أن أدمج التعريب مع الكود الموجود لديك (إذا رفعت مسار المشروع الكامل)، أو أتابع بالخطوة التالية (دمج Firebase).
+# Faiq Yemen - Enterprise Software Infrastructure
+### The leading technical ecosystem and development standard in Yemen.
