@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'dart:async';
 
 void main() {
@@ -50,6 +51,36 @@ class CartModel extends ChangeNotifier {
   void clear() {
     items.clear();
     notifyListeners();
+  }
+}
+
+// شاشة الكاميرا الحقيقية لمسح QR Code
+class QRScanScreen extends StatelessWidget {
+  final Function(String) onScanned;
+  const QRScanScreen({super.key, required this.onScanned});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('مسح كود QR للمحفظة', style: TextStyle(color: Colors.white, fontSize: 14)),
+        backgroundColor: const Color(0xFF1A365D),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: MobileScanner(
+        onDetect: (capture) {
+          final List<Barcode> barcodes = capture.barcodes;
+          for (final barcode in barcodes) {
+            if (barcode.rawValue != null) {
+              final code = barcode.rawValue!;
+              onScanned(code);
+              Navigator.pop(context);
+              break;
+            }
+          }
+        },
+      ),
+    );
   }
 }
 
@@ -256,41 +287,8 @@ class HomeScreen extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 15),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.orange.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.directions_bus, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Text('رحلات السفر والمسافرين: مأرب ➔ عدن', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                const Text('تتوقف الحافلة في استراحة شبوة بعد ساعتين.', style: TextStyle(fontSize: 11, color: Colors.black54)),
-                const SizedBox(height: 10),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const TrackingMapScreen()));
-                  },
-                  icon: const Icon(Icons.map, size: 16),
-                  label: const Text('تتبع خط السير على الخريطة الحية', style: TextStyle(fontSize: 11)),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
-      // زر السلة العائم أسفل يمين الشاشة مع عرض عدد الأصناف والسعر
       floatingActionButton: AnimatedBuilder(
         animation: CartModel.instance,
         builder: (context, child) {
@@ -397,37 +395,6 @@ class ProductsScreen extends StatelessWidget {
           );
         },
       ),
-      // زر السلة العائم أسفل يمين الشاشة في صفحة المنتجات أيضاً
-      floatingActionButton: AnimatedBuilder(
-        animation: CartModel.instance,
-        builder: (context, child) {
-          if (CartModel.instance.items.isEmpty) {
-            return const SizedBox.shrink();
-          }
-          return FloatingActionButton.extended(
-            backgroundColor: const Color(0xFF1A365D),
-            foregroundColor: Colors.white,
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const CartScreen()));
-            },
-            icon: const Icon(Icons.shopping_cart, color: Colors.amber),
-            label: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${CartModel.instance.items.length} أصناف في السلة',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'الإجمالي: ${CartModel.instance.totalAmount} ر.ي',
-                  style: const TextStyle(fontSize: 10, color: Colors.amberAccent),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
     );
   }
 }
@@ -502,12 +469,25 @@ class _CartScreenState extends State<CartScreen> {
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('تم فتح الكاميرا لمسح رمز QR الخاص بالمحفظة بنجاح')),
+                    // فتح شاشة كاميرا QR الحقيقية
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => QRScanScreen(
+                          onScanned: (scannedCode) {
+                            setState(() {
+                              accountController.text = scannedCode;
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('تم مسح الكود بنجاح: $scannedCode')),
+                            );
+                          },
+                        ),
+                      ),
                     );
                   },
                   icon: const Icon(Icons.qr_code_scanner, size: 18),
-                  label: const Text('أو مسح كود QR للمحفظة', style: TextStyle(fontSize: 11)),
+                  label: const Text('فتح الكاميرا لمسح كود QR', style: TextStyle(fontSize: 11)),
                 ),
               ],
             ),
@@ -685,97 +665,6 @@ class WalletScreen extends StatelessWidget {
             const ListTile(leading: Icon(Icons.verified, color: Colors.green), title: Text('حساب تاجر معتمد'), subtitle: Text('تم تفعيل امتيازات المنصة الشاملة والمحافظ اليمنية')),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class TrackingMapScreen extends StatelessWidget {
-  const TrackingMapScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('خريطة تتبع خط السير الحي', style: TextStyle(color: Colors.white, fontSize: 14)),
-        backgroundColor: const Color(0xFF1A365D),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Stack(
-        children: [
-          Container(
-            color: const Color(0xFFE2E8F0),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.map, size: 70, color: Color(0xFF2B6CB0)),
-                  const SizedBox(height: 12),
-                  const Text('نظام تتبع الرحلات المباشر (مأرب ➔ عدن)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1A365D))),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 30),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Column(
-                          children: [
-                            CircleAvatar(backgroundColor: Colors.green, radius: 12, child: Icon(Icons.check, size: 14, color: Colors.white)),
-                            SizedBox(height: 4),
-                            Text('مأرب', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                          ],
-                        ),
-                        Expanded(child: Divider(color: Colors.green, thickness: 3)),
-                        Column(
-                          children: [
-                            CircleAvatar(backgroundColor: Colors.orange, radius: 12, child: Icon(Icons.directions_bus, size: 14, color: Colors.white)),
-                            SizedBox(height: 4),
-                            Text('استراحة شبوة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                          ],
-                        ),
-                        Expanded(child: Divider(color: Colors.grey, thickness: 3)),
-                        Column(
-                          children: [
-                            CircleAvatar(backgroundColor: Colors.grey, radius: 12, child: Icon(Icons.location_on, size: 14, color: Colors.white)),
-                            SizedBox(height: 4),
-                            Text('عدن', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 20,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('الحافلة تسير بانتظام 🟢', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.green)),
-                      SizedBox(height: 2),
-                      Text('السرعة الحالية: 90 كم/س', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                    ],
-                  ),
-                  Text('السائق: أبو محمد\nهاتف: 77...00', style: TextStyle(fontSize: 10, color: Colors.black87), textAlign: TextAlign.right),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

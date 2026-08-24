@@ -1,38 +1,21 @@
 name: alfaeq_yemen
-description: "Alfaeq Yemen - Flutter app (localization sample)"
+description: "الفائق يمن - منصة الخدمات الشاملة"
 publish_to: 'none'
-version: 0.1.0+1
+version: 1.0.0+1
+
 environment:
-  sdk: ">=2.18.0 <3.0.0"
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
-  geolocator: ^12.0.0
-  firebase_storage: any
-  cloud_firestore: ^5.0.1
-  firebase_auth: any
-  flutter_map: ^6.1.0
-  latlong2: ^0.9.0
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.2
-  easy_localization: ^3.0.1
-  intl: ^0.20.3
-  shared_preferences: ^2.1.0
-  firebase_core: any
-  firebase_analytics: any
-  firebase_crashlytics: any
+  mobile_scanner: ^3.5.6
 
 dev_dependencies:
-  geolocator: ^12.0.0
-  firebase_storage: any
-  cloud_firestore: ^5.0.1
-  firebase_auth: any
-  flutter_map: ^6.1.0
-  latlong2: ^0.9.0
   flutter_test:
     sdk: flutter
+  flutter_lints: ^2.0.0
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/translations/
