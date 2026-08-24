@@ -23,14 +23,33 @@ class AlfaeqYemenApp extends StatelessWidget {
   }
 }
 
-class CartModel {
-  static final List<Map<String, dynamic>> items = [];
-  static double get totalAmount {
+class CartModel extends ChangeNotifier {
+  static final CartModel instance = CartModel._internal();
+  CartModel._internal();
+
+  final List<Map<String, dynamic>> items = [];
+
+  double get totalAmount {
     double sum = 0;
     for (var item in items) {
       sum += (item['price'] as num).toDouble();
     }
     return sum;
+  }
+
+  void addItem(Map<String, dynamic> item) {
+    items.add(item);
+    notifyListeners();
+  }
+
+  void removeItem(int index) {
+    items.removeAt(index);
+    notifyListeners();
+  }
+
+  void clear() {
+    items.clear();
+    notifyListeners();
   }
 }
 
@@ -152,26 +171,6 @@ class HomeScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            icon: Stack(
-              children: [
-                const Icon(Icons.shopping_cart, color: Colors.white),
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)),
-                    constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                    child: Text('${CartModel.items.length}', style: const TextStyle(color: Colors.white, fontSize: 8), textAlign: TextAlign.center),
-                  ),
-                )
-              ],
-            ),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const CartScreen()));
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.admin_panel_settings, color: Colors.white),
             onPressed: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
@@ -182,7 +181,6 @@ class HomeScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          // شريط الإعلانات المتحرك الجديد
           const AdsBannerSlider(),
           const SizedBox(height: 12),
           InkWell(
@@ -292,31 +290,57 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
+      // زر السلة العائم أسفل يمين الشاشة مع عرض عدد الأصناف والسعر
+      floatingActionButton: AnimatedBuilder(
+        animation: CartModel.instance,
+        builder: (context, child) {
+          if (CartModel.instance.items.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          return FloatingActionButton.extended(
+            backgroundColor: const Color(0xFF1A365D),
+            foregroundColor: Colors.white,
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const CartScreen()));
+            },
+            icon: const Icon(Icons.shopping_cart, color: Colors.amber),
+            label: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${CartModel.instance.items.length} أصناف في السلة',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'الإجمالي: ${CartModel.instance.totalAmount} ر.ي',
+                  style: const TextStyle(fontSize: 10, color: Colors.amberAccent),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
 
-class ProductsScreen extends StatefulWidget {
+class ProductsScreen extends StatelessWidget {
   final String categoryName;
   const ProductsScreen({super.key, required this.categoryName});
 
   @override
-  State<ProductsScreen> createState() => _ProductsScreenState();
-}
-
-class _ProductsScreenState extends State<ProductsScreen> {
-  @override
   Widget build(BuildContext context) {
     final List<Map<String, dynamic>> vendors = List.generate(10, (vIndex) {
       return {
-        'name': 'متجر رقم (${vIndex + 1}) لـ ${widget.categoryName}',
+        'name': 'متجر رقم (${vIndex + 1}) لـ $categoryName',
         'rating': '4.${5 - (vIndex % 3)}',
         'time': '${10 + (vIndex * 3)} دقيقة',
         'products': List.generate(10, (pIndex) {
           return {
             'name': 'منتج أصلي (${pIndex + 1})',
             'price': (pIndex + 1) * 350 + 200,
-            'desc': 'وصف عالي الجودة معتمد من متجر ${widget.categoryName} المميز',
+            'desc': 'وصف عالي الجودة معتمد من متجر $categoryName المميز',
           };
         }),
       };
@@ -324,7 +348,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('أسواق ${widget.categoryName}', style: const TextStyle(fontSize: 14, color: Colors.white)),
+        title: Text('أسواق $categoryName', style: const TextStyle(fontSize: 14, color: Colors.white)),
         backgroundColor: const Color(0xFF1A365D),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -353,15 +377,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     trailing: ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A365D), foregroundColor: Colors.white),
                       onPressed: () {
-                        setState(() {
-                          CartModel.items.add({
-                            'name': '${prod['name']} (${vendor['name']})',
-                            'price': prod['price'],
-                          });
+                        CartModel.instance.addItem({
+                          'name': '${prod['name']} (${vendor['name']})',
+                          'price': prod['price'],
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('تمت إضافة (${prod['name']}) إلى السلة. إجمالي السلة: ${CartModel.items.length} منتجات (${CartModel.totalAmount} ر.ي)'),
+                            content: Text('تمت إضافة (${prod['name']}) إلى السلة. الإجمالي: ${CartModel.instance.totalAmount} ر.ي'),
                             duration: const Duration(seconds: 2),
                           ),
                         );
@@ -370,6 +392,37 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     ),
                   );
                 }),
+              ],
+            ),
+          );
+        },
+      ),
+      // زر السلة العائم أسفل يمين الشاشة في صفحة المنتجات أيضاً
+      floatingActionButton: AnimatedBuilder(
+        animation: CartModel.instance,
+        builder: (context, child) {
+          if (CartModel.instance.items.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          return FloatingActionButton.extended(
+            backgroundColor: const Color(0xFF1A365D),
+            foregroundColor: Colors.white,
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const CartScreen()));
+            },
+            icon: const Icon(Icons.shopping_cart, color: Colors.amber),
+            label: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${CartModel.instance.items.length} أصناف في السلة',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'الإجمالي: ${CartModel.instance.totalAmount} ر.ي',
+                  style: const TextStyle(fontSize: 10, color: Colors.amberAccent),
+                ),
               ],
             ),
           );
@@ -388,6 +441,119 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   String selectedPaymentMethod = 'cash_wallet';
+  final TextEditingController accountController = TextEditingController();
+  final TextEditingController pinController = TextEditingController();
+
+  void _processPayment() {
+    if (CartModel.instance.items.isEmpty) return;
+
+    if (selectedPaymentMethod == 'cash') {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('تأكيد الطلب النقدي'),
+          content: Text('تم تأكيد طلبك بنجاح بمبلغ ${CartModel.instance.totalAmount} ر.ي. الدفع سيكون نقداً عند الاستلام.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                CartModel.instance.clear();
+                Navigator.pop(context);
+                Navigator.pop(context);
+              },
+              child: const Text('حسناً'),
+            )
+          ],
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('التحقق من بيانات المحفظة الإلكترونية', style: TextStyle(fontSize: 14)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('أدخل رقم الحساب أو الهاتف المرتبط بالمحفظة والرمز السري للسحب الآمن:', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: accountController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'رقم الحساب / رقم الهاتف (مثل: 77xxxxxxx)',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: pinController,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'الرمز السري للمحفظة (PIN)',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('تم فتح الكاميرا لمسح رمز QR الخاص بالمحفظة بنجاح')),
+                    );
+                  },
+                  icon: const Icon(Icons.qr_code_scanner, size: 18),
+                  label: const Text('أو مسح كود QR للمحفظة', style: TextStyle(fontSize: 11)),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء', style: TextStyle(color: Colors.red)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+              onPressed: () {
+                if (accountController.text.isEmpty || pinController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('الرجاء إدخال رقم الحساب والرمز السري للمحفظة')),
+                  );
+                  return;
+                }
+                Navigator.pop(context);
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('تم الدفع بنجاح ✅'),
+                    content: Text('تم خصم مبلغ ${CartModel.instance.totalAmount} ر.ي بنجاح من الحساب (${accountController.text}) وإرسال سند الصرف للمتجر!'),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          CartModel.instance.clear();
+                          accountController.clear();
+                          pinController.clear();
+                          Navigator.pop(context);
+                          Navigator.pop(context);
+                        },
+                        child: const Text('حسناً'),
+                      )
+                    ],
+                  ),
+                );
+              },
+              child: const Text('تأكيد وسحب المبلغ', style: TextStyle(fontSize: 11)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -397,110 +563,93 @@ class _CartScreenState extends State<CartScreen> {
         backgroundColor: const Color(0xFF1A365D),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: CartModel.items.isEmpty
-          ? const Center(
+      body: AnimatedBuilder(
+        animation: CartModel.instance,
+        builder: (context, child) {
+          if (CartModel.instance.items.isEmpty) {
+            return const Center(
               child: Text(
                 'السلة فارغة حالياً. أضف منتجات وابدأ التسوق!',
                 style: TextStyle(color: Colors.grey, fontSize: 13),
               ),
-            )
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: CartModel.items.length,
-                    itemBuilder: (context, index) {
-                      final item = CartModel.items[index];
-                      return ListTile(
-                        leading: const Icon(Icons.shopping_bag, color: Color(0xFF1A365D)),
-                        title: Text(item['name'], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        subtitle: Text('السعر: ${item['price']} ر.ي', style: const TextStyle(fontSize: 11)),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-                          onPressed: () {
-                            setState(() {
-                              CartModel.items.removeAt(index);
-                            });
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.white,
-                  child: Column(
-                    children: [
-                      DropdownButtonFormField<String>(
-                        value: selectedPaymentMethod,
-                        decoration: const InputDecoration(
-                          labelText: 'اختر المحفظة أو البنك اليمني للدفع',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'wallet_alfaeq', child: Text('محفظة الفائق الامتيازات (150,000 ر.ي)')),
-                          DropdownMenuItem(value: 'kuraimi', child: Text('محفظة الكريمي بلس / الحساب الإلكتروني')),
-                          DropdownMenuItem(value: 'jaib', child: Text('محفظة جيب (Jaib - بنك القطيبي)')),
-                          DropdownMenuItem(value: 'cash_wallet', child: Text('محفظة كاش (Cash Wallet)')),
-                          DropdownMenuItem(value: 'flous', child: Text('محفظة فلوس (Flous)')),
-                          DropdownMenuItem(value: 'paisa', child: Text('محفظة بيس (Paisa / بيس)')),
-                          DropdownMenuItem(value: 'shilin', child: Text('محفظة شلن (Shilin)')),
-                          DropdownMenuItem(value: 'jawali', child: Text('محفظة جوالي / سبأفون كاش')),
-                          DropdownMenuItem(value: 'yib', child: Text('موبايل موني - بنك اليمن الدولي (YIB)')),
-                          DropdownMenuItem(value: 'tadamon', child: Text('فلوسك - البنك التضامن')),
-                          DropdownMenuItem(value: 'cash', child: Text('الدفع النقدي عند الاستلام')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() {
-                              selectedPaymentMethod = val;
-                            });
-                          }
+            );
+          }
+          return Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  itemCount: CartModel.instance.items.length,
+                  itemBuilder: (context, index) {
+                    final item = CartModel.instance.items[index];
+                    return ListTile(
+                      leading: const Icon(Icons.shopping_bag, color: Color(0xFF1A365D)),
+                      title: Text(item['name'], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      subtitle: Text('السعر: ${item['price']} ر.ي', style: const TextStyle(fontSize: 11)),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                        onPressed: () {
+                          CartModel.instance.removeItem(index);
                         },
                       ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'العدد: ${CartModel.items.length} | الإجمالي: ${CartModel.totalAmount} ر.ي',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                          ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('تأكيد الدفع الآمن'),
-                                  content: Text(
-                                      'تم خصم مبلغ ${CartModel.totalAmount} ر.ي بنجاح عبر المحفظة المختارة وإرسال الطلب للمتجر والمندوب!'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          CartModel.items.clear();
-                                        });
-                                        Navigator.pop(context);
-                                        Navigator.pop(context);
-                                      },
-                                      child: const Text('حسناً'),
-                                    )
-                                  ],
-                                ),
-                              );
-                            },
-                            child: const Text('تأكيد وإتمام الدفع', style: TextStyle(fontSize: 11)),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              ],
-            ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                color: Colors.white,
+                child: Column(
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: selectedPaymentMethod,
+                      decoration: const InputDecoration(
+                        labelText: 'اختر المحفظة أو البنك اليمني للدفع',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'wallet_alfaeq', child: Text('محفظة الفائق الامتيازات (150,000 ر.ي)')),
+                        DropdownMenuItem(value: 'kuraimi', child: Text('محفظة الكريمي بلس / الحساب الإلكتروني')),
+                        DropdownMenuItem(value: 'jaib', child: Text('محفظة جيب (Jaib - بنك القطيبي)')),
+                        DropdownMenuItem(value: 'cash_wallet', child: Text('محفظة كاش (Cash Wallet)')),
+                        DropdownMenuItem(value: 'flous', child: Text('محفظة فلوس (Flous)')),
+                        DropdownMenuItem(value: 'paisa', child: Text('محفظة بيس (Paisa / بيس)')),
+                        DropdownMenuItem(value: 'shilin', child: Text('محفظة شلن (Shilin)')),
+                        DropdownMenuItem(value: 'jawali', child: Text('محفظة جوالي / سبأفون كاش')),
+                        DropdownMenuItem(value: 'yib', child: Text('موبايل موني - بنك اليمن الدولي (YIB)')),
+                        DropdownMenuItem(value: 'tadamon', child: Text('فلوسك - البنك التضامن')),
+                        DropdownMenuItem(value: 'cash', child: Text('الدفع النقدي عند الاستلام')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            selectedPaymentMethod = val;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'العدد: ${CartModel.instance.items.length} | الإجمالي: ${CartModel.instance.totalAmount} ر.ي',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                          onPressed: _processPayment,
+                          child: const Text('متابعة الدفع الآمن', style: TextStyle(fontSize: 11)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -541,7 +690,6 @@ class WalletScreen extends StatelessWidget {
   }
 }
 
-// شاشة خريطة التتبّع الحية المطورة
 class TrackingMapScreen extends StatelessWidget {
   const TrackingMapScreen({super.key});
 
@@ -555,7 +703,6 @@ class TrackingMapScreen extends StatelessWidget {
       ),
       body: Stack(
         children: [
-          // خلفية تفاعلية تمثل الخريطة مع خط السير بين المحافظات
           Container(
             color: const Color(0xFFE2E8F0),
             child: Center(
@@ -566,7 +713,6 @@ class TrackingMapScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   const Text('نظام تتبع الرحلات المباشر (مأرب ➔ عدن)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1A365D))),
                   const SizedBox(height: 20),
-                  // محاكاة مسار الحافلة المحطات
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 30),
                     child: Row(
