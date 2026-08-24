@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 void main() {
   runApp(const AlfaeqYemenApp());
@@ -30,6 +31,92 @@ class CartModel {
       sum += (item['price'] as num).toDouble();
     }
     return sum;
+  }
+}
+
+// شريط الإعلانات المتحركة (Banner Slider)
+class AdsBannerSlider extends StatefulWidget {
+  const AdsBannerSlider({super.key});
+
+  @override
+  State<AdsBannerSlider> createState() => _AdsBannerSliderState();
+}
+
+class _AdsBannerSliderState extends State<AdsBannerSlider> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+  late Timer _timer;
+
+  final List<Map<String, String>> ads = [
+    {'title': 'عروض رحلات مأرب ➔ عدن', 'subtitle': 'احجز مقعدك الآن واحصل على خصم 20%'},
+    {'title': 'توصيل مجاني للصيدليات', 'subtitle': 'أسرع خدمة توصيل أدوية في اليمن طوال الـ 24 ساعة'},
+    {'title': 'محفظة الفائق الامتيازات', 'subtitle': 'ادفع بكل سهولة عبر جميع المحافظ اليمنية المعتمدة'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
+      if (_currentPage < ads.length - 1) {
+        _currentPage++;
+      } else {
+        _currentPage = 0;
+      }
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          _currentPage,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 110,
+      child: PageView.builder(
+        controller: _pageController,
+        itemCount: ads.length,
+        itemBuilder: (context, index) {
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1A365D), Color(0xFF2B6CB0)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.local_offer, color: Colors.amber, size: 18),
+                    const SizedBox(width: 8),
+                    Text(ads[index]['title']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(ads[index]['subtitle']!, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -95,6 +182,9 @@ class HomeScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          // شريط الإعلانات المتحرك الجديد
+          const AdsBannerSlider(),
+          const SizedBox(height: 12),
           InkWell(
             onTap: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => const WalletScreen()));
@@ -451,6 +541,7 @@ class WalletScreen extends StatelessWidget {
   }
 }
 
+// شاشة خريطة التتبّع الحية المطورة
 class TrackingMapScreen extends StatelessWidget {
   const TrackingMapScreen({super.key});
 
@@ -458,23 +549,55 @@ class TrackingMapScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('تتبع الرحلة وخط السير الحي', style: TextStyle(color: Colors.white, fontSize: 14)),
+        title: const Text('خريطة تتبع خط السير الحي', style: TextStyle(color: Colors.white, fontSize: 14)),
         backgroundColor: const Color(0xFF1A365D),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Stack(
         children: [
+          // خلفية تفاعلية تمثل الخريطة مع خط السير بين المحافظات
           Container(
-            color: Colors.blue.shade50,
-            child: const Center(
+            color: const Color(0xFFE2E8F0),
+            child: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.map, size: 80, color: Colors.blue),
-                  SizedBox(height: 10),
-                  Text('جاري الاتصال بالأقمار الاصطناعية لتتبع الحافلة...', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                  SizedBox(height: 5),
-                  Text('خط السير: مأرب ➔ استراحة شبوة ➔ عدن', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                  const Icon(Icons.map, size: 70, color: Color(0xFF2B6CB0)),
+                  const SizedBox(height: 12),
+                  const Text('نظام تتبع الرحلات المباشر (مأرب ➔ عدن)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1A365D))),
+                  const SizedBox(height: 20),
+                  // محاكاة مسار الحافلة المحطات
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 30),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: const [
+                        Column(
+                          children: [
+                            CircleAvatar(backgroundColor: Colors.green, radius: 12, child: Icon(Icons.check, size: 14, color: Colors.white)),
+                            SizedBox(height: 4),
+                            Text('مأرب', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                          ],
+                        ),
+                        Expanded(child: Divider(color: Colors.green, thickness: 3)),
+                        Column(
+                          children: [
+                            CircleAvatar(backgroundColor: Colors.orange, radius: 12, child: Icon(Icons.directions_bus, size: 14, color: Colors.white)),
+                            SizedBox(height: 4),
+                            Text('استراحة شبوة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                          ],
+                        ),
+                        Expanded(child: Divider(color: Colors.grey, thickness: 3)),
+                        Column(
+                          children: [
+                            CircleAvatar(backgroundColor: Colors.grey, radius: 12, child: Icon(Icons.location_on, size: 14, color: Colors.white)),
+                            SizedBox(height: 4),
+                            Text('عدن', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -484,13 +607,24 @@ class TrackingMapScreen extends StatelessWidget {
             left: 20,
             right: 20,
             child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)]),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
+              ),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('حالة الرحلة: تسير بانتظام 🟢', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  Text('السائق: أبو محمد', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('الحافلة تسير بانتظام 🟢', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.green)),
+                      SizedBox(height: 2),
+                      Text('السرعة الحالية: 90 كم/س', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    ],
+                  ),
+                  Text('السائق: أبو محمد\nهاتف: 77...00', style: TextStyle(fontSize: 10, color: Colors.black87), textAlign: TextAlign.right),
                 ],
               ),
             ),
