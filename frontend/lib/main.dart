@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'services/api_service.dart';
 
 void main() {
   runApp(const AlfaeqYemenApp());
@@ -22,8 +23,34 @@ class AlfaeqYemenApp extends StatelessWidget {
   }
 }
 
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  String _serverStatus = 'جاري الاتصال بالخادم...';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _connectToBackend();
+  }
+
+  Future<void> _connectToBackend() async {
+    final result = await ApiService.checkServerStatus();
+    setState(() {
+      _isLoading = false;
+      if (result['status'] == 'success' || result['service'] != null) {
+        _serverStatus = 'الخادم متصل وبحالة ممتازة 🟢';
+      } else {
+        _serverStatus = 'وضع العمل بدون اتصال 🟡';
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,9 +92,13 @@ class SplashScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 48),
-              const CircularProgressIndicator(
-                color: Colors.cyanAccent,
-              ),
+              if (_isLoading)
+                const CircularProgressIndicator(color: Colors.cyanAccent)
+              else
+                Text(
+                  _serverStatus,
+                  style: const TextStyle(color: Colors.white70, fontSize: 16),
+                ),
             ],
           ),
         ),
