@@ -13,38 +13,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: zulu
-          java-version: '17'
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.35.7'
-          channel: stable
-          cache: true
-
-      - name: Recreate Android platform
+      - name: Set Android SDK versions
         run: |
-          rm -rf android
-          flutter create --platforms=android .
+          echo "Android files:"
+          find android -maxdepth 3 -type f -print
 
-      - name: Set Android compile SDK
-        run: |
-          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
-          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' android/app/build.gradle.kts
+          echo "Gradle compileSdk before:"
+          grep -R "compileSdk" android -n || true
 
-      - name: Install dependencies
-        run: flutter pub get
+          find android -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) -exec sed -i \
+            -e 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' \
+            -e 's/compileSdk flutter.compileSdkVersion/compileSdk 36/g' \
+            -e 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/g' \
+            -e 's/compileSdk = [0-9][0-9]*/compileSdk = 36/g' \
+            -e 's/compileSdk [0-9][0-9]*/compileSdk 36/g' \
+            -e 's/compileSdkVersion [0-9][0-9]*/compileSdkVersion 36/g' {} \;
 
-      - name: Build APK
-        run: flutter build apk --debug --no-tree-shake-icons
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: alfaeq-yemen-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          echo "Gradle compileSdk after:"
+          grep -R "compileSdk" android -n || true
