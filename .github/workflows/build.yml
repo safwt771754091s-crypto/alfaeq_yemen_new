@@ -16,36 +16,22 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
           
-      - name: Set up Flutter
+      - name: Set up Flutter (Stable 3.16.5)
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.16.5'
           channel: 'stable'
           
-      - name: Regenerate Android and Fix Gradle Version
+      - name: Ensure MinSdk is 21
         run: |
-          rm -rf android
-          flutter create . --platforms=android --org com.alfaeq.yemen
-          
-          # ضبط الـ minSdkVersion إلى 21
           GRADLE_FILE="android/app/build.gradle"
           if [ -f "$GRADLE_FILE" ]; then
             sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' $GRADLE_FILE
             sed -i 's/minSdkVersion\s\+[0-9]*/minSdkVersion 21/g' $GRADLE_FILE
           fi
-          
-          # تثبيت إصدار Gradle 7.5
-          mkdir -p android/gradle/wrapper
-          cat << 'PROPS' > android/gradle/wrapper/gradle-wrapper.properties
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-7.5-bin.zip
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-PROPS
 
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Build Debug APK with Stacktrace
-        run: flutter build apk --debug --stacktrace --info
+      - name: Build Debug APK
+        run: flutter build apk --debug
