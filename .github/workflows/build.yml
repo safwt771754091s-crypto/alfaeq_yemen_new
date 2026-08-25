@@ -14,17 +14,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java JDK
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: zulu
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.1'
-          channel: 'stable'
+          flutter-version: '3.35.7'
+          channel: stable
           cache: true
 
       - name: Recreate Android platform
@@ -32,10 +32,15 @@ jobs:
           rm -rf android
           flutter create --platforms=android .
 
-      - name: Install Dependencies
+      - name: Set Android compile SDK
+        run: |
+          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
+          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' android/app/build.gradle.kts
+
+      - name: Install dependencies
         run: flutter pub get
 
-      - name: Build Debug APK
+      - name: Build APK
         run: flutter build apk --debug --no-tree-shake-icons
 
       - name: Upload APK
