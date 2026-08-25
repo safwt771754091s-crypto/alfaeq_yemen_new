@@ -25,11 +25,18 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Fix Android SDK Versions Manually
+      - name: Prepare Android and Fix SDK Versions
         run: |
+          # التأكد من وجود مجلد الأندرويد وإلا إنشاؤه
+          if [ ! -d "android" ]; then
+            flutter create . --platforms=android --org com.alfaeq.yemen
+          fi
+          
+          # إنشاء مجلد android إذا لم يكن موجوداً والتأكد من ملفات الإعدادات
+          mkdir -p android/app
+          
           GRADLE_FILE="android/app/build.gradle"
           if [ -f "$GRADLE_FILE" ]; then
-            # تثبيت أرقام الإصدارات بشكل صريح ونهائي لمنع أي خطأ في القراءة
             sed -i 's/minSdkVersion.*/minSdkVersion 21/g' $GRADLE_FILE
             sed -i 's/minSdk =.*/minSdk = 21/g' $GRADLE_FILE
             sed -i 's/targetSdkVersion.*/targetSdkVersion 34/g' $GRADLE_FILE
@@ -38,8 +45,8 @@ jobs:
             sed -i 's/compileSdk =.*/compileSdk = 34/g' $GRADLE_FILE
           fi
           
-          # التأكد من وجود الخصائص بالقيم الصحيحة
-          echo "android.enableJetifier=true" >> android/gradle.properties
+          # إنشاء ملف gradle.properties وضمان وجود القيم
+          echo "android.enableJetifier=true" > android/gradle.properties
           echo "android.useAndroidX=true" >> android/gradle.properties
 
       - name: Build Debug APK
