@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Set up Java JDK
-        uses: setup-java@v4
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -21,11 +21,6 @@ jobs:
         with:
           flutter-version: '3.19.0'
           channel: 'stable'
-          
-      - name: Generate Clean Android Embedding v2
-        run: |
-          rm -rf android
-          flutter create . --platforms=android --org com.alfaeq.yemen
 
       - name: Install Dependencies
         run: flutter pub get
