@@ -22,10 +22,8 @@ jobs:
           flutter-version: '3.19.0'
           channel: 'stable'
           
-      - name: Get Dependencies
+      - name: Install Dependencies
         run: flutter pub get
 
-      - name: Build APK Release/Debug with Gradle Wrapper Fix
-        run: |
-          # بناء التطبيق مباشرة مع السماح لـ Flutter بإنشاء ملفات Gradle المتوافقة تلقائياً
-          flutter build apk --debug --verbose
+      - name: Build Debug APK Standard
+        run: flutter build apk --debug
