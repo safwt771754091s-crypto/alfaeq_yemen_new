@@ -22,20 +22,13 @@ jobs:
           flutter-version: '3.19.0'
           channel: 'stable'
           
-      - name: Fix Android SDK Versions & Gradle
+      - name: Update Gradle Settings Safely
         run: |
-          # إعادة توليد هيكل نظيف
-          rm -rf android
-          flutter create . --platforms=android --org com.alfaeq.yemen
-          
-          # تعديل ملف build.gradle لرفع compileSdk و targetSdk و minSdkVersion لضمان توافق الحزم
           GRADLE_FILE="android/app/build.gradle"
           if [ -f "$GRADLE_FILE" ]; then
-            sed -i 's/compileSdkVersion.*/compileSdkVersion 34/g' $GRADLE_FILE
+            # التأكد من ضبط الـ minSdkVersion و targetSdkVersion بالشكل الصحيح
             sed -i 's/minSdkVersion.*/minSdkVersion 21/g' $GRADLE_FILE
             sed -i 's/targetSdkVersion.*/targetSdkVersion 34/g' $GRADLE_FILE
-            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' $GRADLE_FILE
-            sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/g' $GRADLE_FILE
           fi
 
       - name: Install Dependencies
