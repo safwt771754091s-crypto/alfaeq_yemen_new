@@ -24,6 +24,21 @@ jobs:
           
       - name: Install Dependencies
         run: flutter pub get
+
+      - name: Fix Android SDK Versions
+        run: |
+          GRADLE_FILE="android/app/build.gradle"
+          if [ -f "$GRADLE_FILE" ]; then
+            sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 35/g' $GRADLE_FILE
+            sed -i 's/compileSdk = [0-9]*/compileSdk = 35/g' $GRADLE_FILE
+            sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 35/g' $GRADLE_FILE
+            sed -i 's/targetSdk = [0-9]*/targetSdk = 35/g' $GRADLE_FILE
+            echo "Updated $GRADLE_FILE successfully"
+          else
+            flutter create . --platforms=android
+            sed -i 's/compileSdk = [0-9]*/compileSdk = 35/g' $GRADLE_FILE || true
+            sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 35/g' $GRADLE_FILE || true
+          fi
         
       - name: Build Debug APK
         run: flutter build apk --debug
