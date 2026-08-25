@@ -22,6 +22,21 @@ jobs:
           flutter-version: '3.19.0'
           channel: 'stable'
           
+      - name: Force Android Embedding V2 Migration
+        run: |
+          # حذف مجلد الأندرويد القديم الذي يحتوي على Embedding v1
+          rm -rf android
+          
+          # إعادة توليد هيكل أندرويد جديد بالكامل يدعم Embedding v2 تلقائياً
+          flutter create . --platforms=android --org com.alfaeq.yemen
+          
+          # ضبط الـ minSdkVersion إلى 21 في ملف build.gradle الجديد
+          GRADLE_FILE="android/app/build.gradle"
+          if [ -f "$GRADLE_FILE" ]; then
+            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' $GRADLE_FILE
+            sed -i 's/minSdkVersion\s\+[0-9]*/minSdkVersion 21/g' $GRADLE_FILE
+          fi
+
       - name: Install Dependencies
         run: flutter pub get
 
