@@ -25,10 +25,30 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Regenerate Android Project to Match Current Flutter
+      - name: Configure Flutter SDK Properties
         run: |
+          # إعادة إنشاء مجلد الأندرويد نظيفاً
           rm -rf android
           flutter create . --platforms=android --org com.alfaeq.yemen
+          
+          # كتابة إعدادات الـ SDK في local.properties لضمان قرائتها بقوة النظام
+          PROP_FILE="android/local.properties"
+          echo "flutter.sdk=$FLUTTER_ROOT" > $PROP_FILE
+          
+          # تعديل ملف build.gradle الرئيسي أو الخاص بالـ app لتثبيت القيم
+          GRADLE_FILE="android/app/build.gradle"
+          if [ -f "$GRADLE_FILE" ]; then
+            sed -i 's/minSdkVersion.*/minSdkVersion 21/g' $GRADLE_FILE
+            sed -i 's/minSdk =.*/minSdk = 21/g' $GRADLE_FILE
+            sed -i 's/compileSdkVersion.*/compileSdkVersion 35/g' $GRADLE_FILE
+            sed -i 's/compileSdk =.*/compileSdk = 35/g' $GRADLE_FILE
+            sed -i 's/targetSdkVersion.*/targetSdkVersion 35/g' $GRADLE_FILE
+            sed -i 's/targetSdk =.*/targetSdk = 35/g' $GRADLE_FILE
+          fi
+          
+          # إضافة minSdk صراحة إذا لم تكن موجودة في ملفات الإعدادات الحديثة
+          echo "android.defaultConfig.minSdkVersion=21" >> android/gradle.properties
+          echo "android.defaultConfig.compileSdkVersion=35" >> android/gradle.properties
 
       - name: Build Debug APK
         run: flutter build apk --debug
