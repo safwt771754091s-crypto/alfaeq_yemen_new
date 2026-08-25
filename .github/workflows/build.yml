@@ -19,35 +19,18 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.x'
+          flutter-version: '3.19.0'
           channel: 'stable'
+          
+      - name: Clean and Recreate Android Project
+        run: |
+          # حذف مجلد الأندرويد القديم بالكامل لضمان عدم وجود أي ملفات تالفة
+          rm -rf android
+          # إنشاء مشروع أندرويد جديد ومتوافق تماماً مع النسخة الحالية
+          flutter create . --platforms=android --org com.alfaeq.yemen
           
       - name: Install Dependencies
         run: flutter pub get
-
-      - name: Prepare Android and Fix SDK Versions
-        run: |
-          # التأكد من وجود مجلد الأندرويد وإلا إنشاؤه
-          if [ ! -d "android" ]; then
-            flutter create . --platforms=android --org com.alfaeq.yemen
-          fi
-          
-          # إنشاء مجلد android إذا لم يكن موجوداً والتأكد من ملفات الإعدادات
-          mkdir -p android/app
-          
-          GRADLE_FILE="android/app/build.gradle"
-          if [ -f "$GRADLE_FILE" ]; then
-            sed -i 's/minSdkVersion.*/minSdkVersion 21/g' $GRADLE_FILE
-            sed -i 's/minSdk =.*/minSdk = 21/g' $GRADLE_FILE
-            sed -i 's/targetSdkVersion.*/targetSdkVersion 34/g' $GRADLE_FILE
-            sed -i 's/targetSdk =.*/targetSdk = 34/g' $GRADLE_FILE
-            sed -i 's/compileSdkVersion.*/compileSdkVersion 34/g' $GRADLE_FILE
-            sed -i 's/compileSdk =.*/compileSdk = 34/g' $GRADLE_FILE
-          fi
-          
-          # إنشاء ملف gradle.properties وضمان وجود القيم
-          echo "android.enableJetifier=true" > android/gradle.properties
-          echo "android.useAndroidX=true" >> android/gradle.properties
 
       - name: Build Debug APK
         run: flutter build apk --debug
