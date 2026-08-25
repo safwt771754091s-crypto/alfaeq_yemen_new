@@ -25,22 +25,22 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Clean and Fix Android SDK Configuration
+      - name: Fix Android SDK Versions Manually
         run: |
-          # إزالة السطور الخاطئة من gradle.properties إن وجدت
-          rm -f android/gradle.properties
-          flutter create . --platforms=android --org com.alfaeq.yemen
-          
           GRADLE_FILE="android/app/build.gradle"
           if [ -f "$GRADLE_FILE" ]; then
-            # استبدال القيم بطريقة آمنة وصريحة
-            sed -i 's/minSdkVersion.*/minSdkVersion flutter.minSdkVersion/g' $GRADLE_FILE
-            sed -i 's/targetSdkVersion.*/targetSdkVersion 35/g' $GRADLE_FILE
-            sed -i 's/compileSdkVersion.*/compileSdkVersion 35/g' $GRADLE_FILE
-            
-            # إضافة القيم بشكل مباشر كأرقام صحيحة داخل ملف الـ gradle إن لم تتغير
-            echo "flutter.minSdkVersion=21" >> android/gradle.properties
+            # تثبيت أرقام الإصدارات بشكل صريح ونهائي لمنع أي خطأ في القراءة
+            sed -i 's/minSdkVersion.*/minSdkVersion 21/g' $GRADLE_FILE
+            sed -i 's/minSdk =.*/minSdk = 21/g' $GRADLE_FILE
+            sed -i 's/targetSdkVersion.*/targetSdkVersion 34/g' $GRADLE_FILE
+            sed -i 's/targetSdk =.*/targetSdk = 34/g' $GRADLE_FILE
+            sed -i 's/compileSdkVersion.*/compileSdkVersion 34/g' $GRADLE_FILE
+            sed -i 's/compileSdk =.*/compileSdk = 34/g' $GRADLE_FILE
           fi
+          
+          # التأكد من وجود الخصائص بالقيم الصحيحة
+          echo "android.enableJetifier=true" >> android/gradle.properties
+          echo "android.useAndroidX=true" >> android/gradle.properties
 
       - name: Build Debug APK
         run: flutter build apk --debug
