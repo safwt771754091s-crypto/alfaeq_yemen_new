@@ -24,18 +24,17 @@ jobs:
           
       - name: Regenerate Android and Fix Gradle Version
         run: |
-          # حذف مجلد الأندرويد القديم وتوليد هيكل نظيف يدعم Embedding v2
           rm -rf android
           flutter create . --platforms=android --org com.alfaeq.yemen
           
-          # ضبط الـ minSdkVersion إلى 21 صراحة
+          # ضبط الـ minSdkVersion إلى 21
           GRADLE_FILE="android/app/build.gradle"
           if [ -f "$GRADLE_FILE" ]; then
             sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' $GRADLE_FILE
             sed -i 's/minSdkVersion\s\+[0-9]*/minSdkVersion 21/g' $GRADLE_FILE
           fi
           
-          # تثبيت إصدار Gradle Wrapper متوافق ومستقر (7.5) لمنع أخطاء الـ Classpath
+          # تثبيت إصدار Gradle 7.5
           mkdir -p android/gradle/wrapper
           cat << 'PROPS' > android/gradle/wrapper/gradle-wrapper.properties
 distributionBase=GRADLE_USER_HOME
@@ -48,5 +47,5 @@ PROPS
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Build Debug APK
-        run: flutter build apk --debug
+      - name: Build Debug APK with Stacktrace
+        run: flutter build apk --debug --stacktrace --info
