@@ -22,8 +22,13 @@ jobs:
           flutter-version: '3.19.0'
           channel: 'stable'
           
+      - name: Upgrade Gradle and Project Structure
+        run: |
+          # تحديث هيكل المشروع وملفات الأندرويد لتتوافق مع الإصدار الحديث
+          flutter create . --platforms=android --org com.alfaeq.yemen
+          
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Build Debug APK Standard
+      - name: Build Debug APK
         run: flutter build apk --debug
