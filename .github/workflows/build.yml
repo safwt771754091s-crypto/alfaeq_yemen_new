@@ -25,8 +25,22 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Clean Build Files
-        run: flutter clean
+      - name: Ensure Android Build Gradle Exists and Configure SDKs
+        run: |
+          GRADLE_PATH="android/app/build.gradle"
+          if [ -f "$GRADLE_PATH" ]; then
+            echo "Configuring existing build.gradle..."
+            # التأكد من عدم وجود قيم فارغة وتحديثها بقيم صريحة
+            sed -i 's/compileSdkVersion.*/compileSdkVersion 35/g' $GRADLE_PATH
+            sed -i 's/compileSdk =.*/compileSdk = 35/g' $GRADLE_PATH
+            sed -i 's/targetSdkVersion.*/targetSdkVersion 35/g' $GRADLE_PATH
+            sed -i 's/targetSdk =.*/targetSdk = 35/g' $GRADLE_PATH
+            sed -i 's/minSdkVersion.*/minSdkVersion 21/g' $GRADLE_PATH
+            sed -i 's/minSdk =.*/minSdk = 21/g' $GRADLE_PATH
+          else
+            echo "Creating android platform files..."
+            flutter create . --platforms=android --org com.alfaeq.yemen
+          fi
 
-      - name: Build Debug APK Directly
+      - name: Build Debug APK
         run: flutter build apk --debug
