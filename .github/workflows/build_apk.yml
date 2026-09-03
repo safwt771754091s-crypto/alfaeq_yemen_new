@@ -30,6 +30,13 @@ jobs:
             flutter create . --platforms=android --org com.alfaeq
           fi
 
+      - name: Set final Android application ID
+        run: |
+          test -f android/app/build.gradle.kts
+          sed -i 's/applicationId = "[^"]*"/applicationId = "com.alfaeq.yemen"/' android/app/build.gradle.kts
+          echo "Android applicationId set to com.alfaeq.yemen"
+          grep -n "applicationId" android/app/build.gradle.kts
+
       - name: Inject Firebase configuration when provided
         env:
           FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
