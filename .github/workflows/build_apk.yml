@@ -30,6 +30,17 @@ jobs:
             flutter create . --platforms=android --org com.alfaeq
           fi
 
+      - name: Inject Firebase configuration when provided
+        env:
+          FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
+        run: |
+          if [ -n "$FIREBASE_OPTIONS_DART" ]; then
+            printf '%s' "$FIREBASE_OPTIONS_DART" > lib/core/firebase/firebase_options.dart
+            echo "Firebase configuration injected for this build."
+          else
+            echo "FIREBASE_OPTIONS_DART is not configured; building with the repository placeholder."
+          fi
+
       - name: Install dependencies
         run: flutter pub get
 
