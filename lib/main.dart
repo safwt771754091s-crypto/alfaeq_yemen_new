@@ -30,7 +30,13 @@ class AlfaeqYemenApp extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
-          return snapshot.hasData ? const HomeScreen() : const LoginScreen();
+          final user = snapshot.data;
+          // Never expose authenticated app screens until Firebase confirms the email.
+          if (user != null && user.emailVerified) return const HomeScreen();
+          if (user != null && !user.emailVerified) {
+            FirebaseAuth.instance.signOut();
+          }
+          return const LoginScreen();
         },
       ),
     );
