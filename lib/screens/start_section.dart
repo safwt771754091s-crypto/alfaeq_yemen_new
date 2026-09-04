@@ -1,52 +1,58 @@
 import 'package:flutter/material.dart';
-import 'package:easy_localization/easy_localization.dart';
 import '../data/sample_data.dart';
-import 'shop_list_screen.dart';
 
 class StartSection extends StatelessWidget {
   const StartSection({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final services = SampleData.services;
     return Directionality(
-      textDirection: context.locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+      textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: Text(tr('start_section'))),
+        appBar: AppBar(title: const Text('ابدأ في الفائق يمن')),
         body: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(tr('start_intro_title'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Text(tr('start_intro_body')),
-              const SizedBox(height: 18),
+              const Text('اختر الخدمة التي تريد استخدامها', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('تصفح الخدمات والمحلات والمنتجات المتاحة.'),
+              const SizedBox(height: 16),
               Expanded(
                 child: GridView.builder(
-                  itemCount: SampleData.services.length,
+                  itemCount: services.length,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.15),
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 1.15,
+                  ),
                   itemBuilder: (context, index) {
-                    final svc = SampleData.services[index];
-                    return InkWell(
-                      onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => ShopListScreen(service: svc)));
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6),
-                        ]),
-                        padding: const EdgeInsets.all(12),
-                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                          CircleAvatar(backgroundColor: svc.color.withOpacity(0.12), child: Icon(svc.icon, color: svc.color)),
-                          const SizedBox(height: 8),
-                          Text(svc.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ]),
+                    final service = services[index];
+                    return Card(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('تم اختيار ${service.title}')),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: service.color.withValues(alpha: 0.12),
+                              child: Icon(service.icon, color: service.color),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(service.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
                       ),
                     );
                   },
                 ),
-              )
+              ),
             ],
           ),
         ),
