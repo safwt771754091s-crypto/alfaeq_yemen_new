@@ -10,6 +10,8 @@ class FirebaseService {
       return;
     }
 
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   }
 }
