@@ -1,9 +1,7 @@
 name: Deploy Docs Pages
 
+# Documentation deployment is kept manual so it does not interfere with the Android APK build.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
