@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'core/firebase/firebase_service.dart';
+import 'login_screen.dart';
 import 'screens/home_screen.dart';
 
 Future<void> main() async {
@@ -21,7 +23,16 @@ class AlfaeqYemenApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF7FAFC),
         fontFamily: 'sans-serif',
       ),
-      home: const HomeScreen(),
+      routes: {'/home': (_) => const HomeScreen(), '/login': (_) => const LoginScreen()},
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          }
+          return snapshot.hasData ? const HomeScreen() : const LoginScreen();
+        },
+      ),
     );
   }
 }
