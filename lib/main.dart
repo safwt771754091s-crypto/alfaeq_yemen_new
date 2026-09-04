@@ -31,12 +31,20 @@ class AlfaeqYemenApp extends StatelessWidget {
             return const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
           final user = snapshot.data;
-          // Never expose authenticated app screens until Firebase confirms the email.
-          if (user != null && user.emailVerified) return const HomeScreen();
-          if (user != null && !user.emailVerified) {
-            FirebaseAuth.instance.signOut();
-          }
-          return const LoginScreen();
+          if (user == null) return const LoginScreen();
+          return FutureBuilder<IdTokenResult>(
+            future: user.getIdTokenResult(true),
+            builder: (context, tokenSnapshot) {
+              if (tokenSnapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              }
+              final claims = tokenSnapshot.data?.claims;
+              final whatsappVerified = claims?['whatsappVerified'] == true;
+              if (user.emailVerified || whatsappVerified) return const HomeScreen();
+              FirebaseAuth.instance.signOut();
+              return const LoginScreen();
+            },
+          );
         },
       ),
     );
