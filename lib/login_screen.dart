@@ -14,25 +14,93 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _isResettingPassword = false;
+
+  String get _cleanEmail => _emailController.text.trim().replaceAll(RegExp(r'\s+'), '');
 
   Future<void> _signIn() async {
-    if (_emailController.text.trim().isEmpty || _passwordController.text.isEmpty) {
+    final email = _cleanEmail;
+    if (email.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل البريد الإلكتروني وكلمة المرور')));
       return;
     }
     setState(() => _isLoading = true);
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
         password: _passwordController.text,
       );
+      final user = credential.user!;
+      await user.reload();
+      final refreshedUser = FirebaseAuth.instance.currentUser!;
+
+      if (!refreshedUser.emailVerified) {
+        await FirebaseAuth.instance.signOut();
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('البريد غير مؤكد'),
+            content: const Text('لا يمكن الدخول إلى الفائق يمن قبل تأكيد بريدك الإلكتروني. افتح رسالة التحقق من Google/Firebase ثم حاول تسجيل الدخول مرة أخرى.'),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  try {
+                    await user.sendEmailVerification();
+                    if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('تمت إعادة إرسال رسالة التأكيد')));
+                  } on FirebaseAuthException catch (e) {
+                    if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text('تعذر إرسال رسالة التأكيد: ${e.message ?? e.code}')));
+                  }
+                },
+                child: const Text('إعادة إرسال التأكيد'),
+              ),
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً')),
+            ],
+          ),
+        );
+        return;
+      }
+
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/home');
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تسجيل الدخول: ${e.message ?? e.code}')));
+      final message = switch (e.code) {
+        'invalid-email' => 'البريد الإلكتروني غير صحيح.',
+        'user-not-found' || 'wrong-password' || 'invalid-credential' => 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+        'user-disabled' => 'هذا الحساب معطل. تواصل مع الإدارة.',
+        'network-request-failed' => 'تعذر الاتصال. تحقق من الإنترنت.',
+        _ => 'تعذر تسجيل الدخول: ${e.message ?? e.code}',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final email = _cleanEmail;
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل بريدك الإلكتروني أولاً ثم اضغط نسيت كلمة المرور')));
+      return;
+    }
+    setState(() => _isResettingPassword = true);
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني')));
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      final message = switch (e.code) {
+        'invalid-email' => 'البريد الإلكتروني غير صحيح.',
+        'user-not-found' => 'لا يوجد حساب مرتبط بهذا البريد.',
+        'network-request-failed' => 'تعذر الاتصال. تحقق من الإنترنت.',
+        _ => 'تعذر إرسال رابط إعادة التعيين: ${e.message ?? e.code}',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => _isResettingPassword = false);
     }
   }
 
@@ -56,10 +124,17 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const Text('مرحباً بك في تطبيق الفائق يمن', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 24),
-              TextField(controller: _emailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'البريد الإلكتروني', border: OutlineInputBorder())),
+              TextField(controller: _emailController, keyboardType: TextInputType.emailAddress, autocorrect: false, enableSuggestions: false, decoration: const InputDecoration(labelText: 'البريد الإلكتروني', border: OutlineInputBorder())),
               const SizedBox(height: 16),
               TextField(controller: _passwordController, obscureText: true, decoration: const InputDecoration(labelText: 'كلمة المرور', border: OutlineInputBorder())),
-              const SizedBox(height: 24),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _isResettingPassword ? null : _resetPassword,
+                  child: _isResettingPassword ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('نسيت كلمة المرور؟'),
+                ),
+              ),
+              const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
                 height: 50,
