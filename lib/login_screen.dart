@@ -33,27 +33,29 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = credential.user!;
       await user.reload();
       final refreshedUser = FirebaseAuth.instance.currentUser!;
+      final tokenResult = await refreshedUser.getIdTokenResult(true);
+      final whatsappVerified = tokenResult.claims?['whatsappVerified'] == true;
 
-      if (!refreshedUser.emailVerified) {
+      if (!refreshedUser.emailVerified && !whatsappVerified) {
         await FirebaseAuth.instance.signOut();
         if (!mounted) return;
         await showDialog<void>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('البريد غير مؤكد'),
-            content: const Text('لا يمكن الدخول إلى الفائق يمن قبل تأكيد بريدك الإلكتروني. افتح رسالة التحقق من Google/Firebase ثم حاول تسجيل الدخول مرة أخرى.'),
+            title: const Text('الحساب غير مؤكد'),
+            content: const Text('أكد رقم واتساب أو البريد الإلكتروني قبل الدخول إلى الفائق يمن.'),
             actions: [
               TextButton(
                 onPressed: () async {
                   Navigator.pop(context);
                   try {
                     await user.sendEmailVerification();
-                    if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('تمت إعادة إرسال رسالة التأكيد')));
+                    if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('تمت إعادة إرسال رسالة تأكيد البريد')));
                   } on FirebaseAuthException catch (e) {
                     if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text('تعذر إرسال رسالة التأكيد: ${e.message ?? e.code}')));
                   }
                 },
-                child: const Text('إعادة إرسال التأكيد'),
+                child: const Text('إعادة إرسال البريد'),
               ),
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً')),
             ],
