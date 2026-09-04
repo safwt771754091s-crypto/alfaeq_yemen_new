@@ -139,3 +139,5 @@ jobs:
         with:
           name: alfaeq-yemen-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
+
+# Triggered after Firebase secret refresh; no project files removed.
