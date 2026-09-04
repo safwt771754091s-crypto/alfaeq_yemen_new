@@ -1,4 +1,5 @@
 const { onRequest } = require('firebase-functions/v2/https');
+const { defineSecret, defineString } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
@@ -6,6 +7,11 @@ const crypto = require('crypto');
 
 initializeApp();
 const db = getFirestore();
+
+const WHATSAPP_ACCESS_TOKEN = defineSecret('WHATSAPP_ACCESS_TOKEN');
+const WHATSAPP_PHONE_NUMBER_ID = defineSecret('WHATSAPP_PHONE_NUMBER_ID');
+const WHATSAPP_OTP_TEMPLATE = defineString('WHATSAPP_OTP_TEMPLATE', { default: 'alfaeq_otp' });
+const WHATSAPP_OTP_LANGUAGE = defineString('WHATSAPP_OTP_LANGUAGE', { default: 'ar' });
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -22,14 +28,10 @@ async function verifyBearer(req) {
 }
 
 async function sendWhatsAppTemplate(phone, code) {
-  const token = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const templateName = process.env.WHATSAPP_OTP_TEMPLATE;
-  const language = process.env.WHATSAPP_OTP_LANGUAGE || 'ar';
-
-  if (!token || !phoneNumberId || !templateName) {
-    throw new Error('WHATSAPP_NOT_CONFIGURED');
-  }
+  const token = WHATSAPP_ACCESS_TOKEN.value();
+  const phoneNumberId = WHATSAPP_PHONE_NUMBER_ID.value();
+  const templateName = WHATSAPP_OTP_TEMPLATE.value();
+  const language = WHATSAPP_OTP_LANGUAGE.value();
 
   const response = await fetch(`https://graph.facebook.com/v23.0/${phoneNumberId}/messages`, {
     method: 'POST',
@@ -61,7 +63,10 @@ async function sendWhatsAppTemplate(phone, code) {
   }
 }
 
-exports.whatsappOtp = onRequest({ region: 'me-central2' }, async (req, res) => {
+exports.whatsappOtp = onRequest({
+  region: 'me-central2',
+  secrets: [WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID],
+}, async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
