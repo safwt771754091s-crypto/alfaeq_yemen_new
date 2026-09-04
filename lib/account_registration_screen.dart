@@ -35,8 +35,18 @@ class _AccountRegistrationScreenState extends State<AccountRegistrationScreen> {
     try {
       await RoleService.instance.createAccount(name: _name.text.trim(), email: email, phone: _phone.text.trim(), password: _password.text, requestedRole: _role);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إنشاء الحساب بنجاح')));
-      Navigator.pop(context);
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('تأكيد البريد الإلكتروني'),
+          content: const Text('تم إنشاء الحساب وإرسال رسالة تأكيد إلى بريدك الإلكتروني. افتح الرسالة واضغط رابط التأكيد، ثم عد إلى شاشة تسجيل الدخول.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً')),
+          ],
+        ),
+      );
+      if (mounted) Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       final message = switch (e.code) {
@@ -70,7 +80,7 @@ class _AccountRegistrationScreenState extends State<AccountRegistrationScreen> {
         const SizedBox(height: 12), TextField(controller: _email, keyboardType: TextInputType.emailAddress, autocorrect: false, enableSuggestions: false, decoration: const InputDecoration(labelText: 'البريد الإلكتروني', hintText: 'name@gmail.com', border: OutlineInputBorder())),
         const SizedBox(height: 12), TextField(controller: _password, obscureText: true, decoration: const InputDecoration(labelText: 'كلمة المرور', border: OutlineInputBorder())),
         const SizedBox(height: 20), SizedBox(height: 52, child: _loading ? const Center(child: CircularProgressIndicator()) : ElevatedButton(onPressed: _register, child: const Text('إنشاء الحساب', style: TextStyle(fontSize: 18)))),
-        const SizedBox(height: 12), const Text('صلاحيات المدير ومدير النظام لا تُمنح من التسجيل العام.', textAlign: TextAlign.center),
+        const SizedBox(height: 12), const Text('يجب تأكيد البريد الإلكتروني قبل الدخول إلى التطبيق. صلاحيات المدير ومدير النظام لا تُمنح من التسجيل العام.', textAlign: TextAlign.center),
       ]),
     ),
   );
