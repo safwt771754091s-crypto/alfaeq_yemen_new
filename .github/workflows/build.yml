@@ -63,10 +63,29 @@ jobs:
 
           data = json.loads(Path('/tmp/google-services.json').read_text())
           project = data['project_info']
+          clients = data.get('client', [])
+          android_clients = [
+              c for c in clients
+              if c.get('client_info', {}).get('android_client_info', {}).get('package_name')
+          ]
+
+          target_package = 'com.alfaeq.yemen'
           client = next(
-              c for c in data['client']
-              if c.get('client_info', {}).get('android_client_info', {}).get('package_name') == 'com.alfaeq.yemen'
+              (c for c in android_clients
+               if c.get('client_info', {}).get('android_client_info', {}).get('package_name') == target_package),
+              None,
           )
+
+          if client is None:
+              packages = [
+                  c['client_info']['android_client_info']['package_name']
+                  for c in android_clients
+              ]
+              raise SystemExit(
+                  'GOOGLE_SERVICES_JSON does not contain the Android package '
+                  f'{target_package}. Found: {packages}'
+              )
+
           api_key = client['api_key'][0]['current_key']
           app_id = client['client_info']['mobilesdk_app_id']
           sender_id = project['project_number']
