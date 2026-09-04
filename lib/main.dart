@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
-import 'dart:async';
-
 import 'core/firebase/firebase_service.dart';
+import 'screens/home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,13 +25,3 @@ class AlfaeqYemenApp extends StatelessWidget {
     );
   }
 }
-
-class CartModel extends ChangeNotifier {
-  static final CartModel instance = CartModel._internal();
-  CartModel._internal();
-
-  final List<Map<String, dynamic>> items = [];
-
-  double get totalAmount {
-    double sum = 0;
-    for (var item in items) {
