@@ -32,8 +32,6 @@ class RoleService {
     required AppRole requestedRole,
     String phone = '',
   }) async {
-    // Public registration can create customer, merchant and driver accounts.
-    // Manager/admin roles are never granted from the public registration form.
     final role = switch (requestedRole) {
       AppRole.customer => AppRole.customer,
       AppRole.merchant => AppRole.merchant,
@@ -46,6 +44,10 @@ class RoleService {
       password: password,
     );
     final user = credential.user!;
+
+    // Email verification is mandatory before the account can enter the app.
+    await user.sendEmailVerification();
+
     await _db.collection('users').doc(user.uid).set({
       'uid': user.uid,
       'name': name.trim(),
@@ -53,7 +55,8 @@ class RoleService {
       'phone': phone.trim(),
       'role': role.key,
       'active': true,
-      'approved': role == AppRole.customer,
+      'approved': false,
+      'emailVerified': false,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
