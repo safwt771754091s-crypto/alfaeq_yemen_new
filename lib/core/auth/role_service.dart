@@ -45,7 +45,7 @@ class RoleService {
     );
     final user = credential.user!;
 
-    // Email verification is mandatory before the account can enter the app.
+    // Email remains the fallback verification channel.
     await user.sendEmailVerification();
 
     await _db.collection('users').doc(user.uid).set({
@@ -57,6 +57,7 @@ class RoleService {
       'active': true,
       'approved': false,
       'emailVerified': false,
+      'whatsappVerified': false,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
