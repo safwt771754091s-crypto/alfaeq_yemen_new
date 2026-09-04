@@ -13,13 +13,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set Android SDK versions
-        run: |
-          echo "Android files:"
-          find android -maxdepth 3 -type f -print
 
-          echo "Gradle compileSdk before:"
-          grep -R "compileSdk" android -n || true
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Ensure Android platform exists
+        run: |
+          if [ ! -f android/app/build.gradle.kts ]; then
+            flutter create . --platforms=android --org com.alfaeq
+          fi
+          test -f android/app/build.gradle.kts
+
+      - name: Set Android application ID and compile SDK
+        run: |
+          sed -i 's/applicationId = "[^"]*"/applicationId = "com.alfaeq.yemen"/' android/app/build.gradle.kts
 
           find android -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) -exec sed -i \
             -e 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' \
@@ -29,5 +45,78 @@ jobs:
             -e 's/compileSdk [0-9][0-9]*/compileSdk 36/g' \
             -e 's/compileSdkVersion [0-9][0-9]*/compileSdkVersion 36/g' {} \;
 
-          echo "Gradle compileSdk after:"
+          echo "Android applicationId:"
+          grep -R "applicationId" android -n || true
+          echo "Gradle compileSdk:"
           grep -R "compileSdk" android -n || true
+
+      - name: Generate Firebase options from GOOGLE_SERVICES_JSON
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > /tmp/google-services.json
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path('/tmp/google-services.json').read_text())
+          project = data['project_info']
+          client = next(
+              c for c in data['client']
+              if c.get('client_info', {}).get('android_client_info', {}).get('package_name') == 'com.alfaeq.yemen'
+          )
+          api_key = client['api_key'][0]['current_key']
+          app_id = client['client_info']['mobilesdk_app_id']
+          sender_id = project['project_number']
+          project_id = project['project_id']
+          storage_bucket = project.get('storage_bucket')
+
+          def dart_string(value):
+              return json.dumps(value if value is not None else '')
+
+          dart = f'''// Generated for the Alfaeq Yemen Android build from GOOGLE_SERVICES_JSON.
+          // Do not edit this generated file manually.
+          import 'package:firebase_core/firebase_core.dart';
+
+          class DefaultFirebaseOptions {{
+            const DefaultFirebaseOptions._();
+
+            static bool get isConfigured => true;
+
+            static FirebaseOptions get currentPlatform => android;
+
+            static const FirebaseOptions android = FirebaseOptions(
+              apiKey: {dart_string(api_key)},
+              appId: {dart_string(app_id)},
+              messagingSenderId: {dart_string(sender_id)},
+              projectId: {dart_string(project_id)},
+              storageBucket: {dart_string(storage_bucket)},
+            );
+          }}
+          '''
+          Path('lib/core/firebase/firebase_options.dart').write_text(dart)
+          print('Generated Firebase options for com.alfaeq.yemen')
+          PY
+          elif [ -n "$FIREBASE_OPTIONS_DART" ]; then
+            printf '%s' "$FIREBASE_OPTIONS_DART" > lib/core/firebase/firebase_options.dart
+            echo "Firebase options injected from FIREBASE_OPTIONS_DART."
+          else
+            echo "No Firebase secret configured; building with repository placeholder."
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Build debug APK
+        run: flutter build apk --debug --no-tree-shake-icons
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: alfaeq-yemen-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
