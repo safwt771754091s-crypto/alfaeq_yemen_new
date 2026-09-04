@@ -133,3 +133,4 @@ jobs:
           if-no-files-found: error
 
 # Build-only Firebase fallback. No project files are deleted.
+# Triggered after source repairs so the next run validates the current main branch.
