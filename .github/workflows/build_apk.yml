@@ -33,11 +33,20 @@ jobs:
           fi
           test -f android/app/build.gradle.kts
 
-      - name: Set final Android application ID
+      - name: Set final Android application ID and compile SDK
         run: |
           sed -i 's/applicationId = "[^"]*"/applicationId = "com.alfaeq.yemen"/' android/app/build.gradle.kts
-          echo "Android applicationId set to com.alfaeq.yemen"
-          grep -n "applicationId" android/app/build.gradle.kts
+          find android -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) -exec sed -i \
+            -e 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' \
+            -e 's/compileSdk flutter.compileSdkVersion/compileSdk 36/g' \
+            -e 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/g' \
+            -e 's/compileSdk = [0-9][0-9]*/compileSdk = 36/g' \
+            -e 's/compileSdk [0-9][0-9]*/compileSdk 36/g' \
+            -e 's/compileSdkVersion [0-9][0-9]*/compileSdkVersion 36/g' {} \;
+          echo "Android applicationId:"
+          grep -R "applicationId" android -n || true
+          echo "Gradle compileSdk:"
+          grep -R "compileSdk" android -n || true
 
       - name: Generate Firebase options from google-services.json
         env:
@@ -68,6 +77,8 @@ jobs:
           )
           selected_package = client['client_info']['android_client_info']['package_name']
           print(f'Using Firebase Android client: {selected_package}')
+          if selected_package != target_package:
+              print('Firebase JSON has no com.alfaeq.yemen client; using the first available Firebase client for this build.')
 
           api_key = client['api_key'][0]['current_key']
           app_id = client['client_info']['mobilesdk_app_id']
@@ -118,3 +129,5 @@ jobs:
         with:
           name: alfaeq-yemen-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
+
+# Build trigger refreshed after Firebase secret update; no project files are deleted.
