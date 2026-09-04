@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import 'account_registration_screen.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -15,9 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _signIn() async {
     if (_emailController.text.trim().isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('أدخل البريد الإلكتروني وكلمة المرور')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل البريد الإلكتروني وكلمة المرور')));
       return;
     }
     setState(() => _isLoading = true);
@@ -30,9 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.pushReplacementNamed(context, '/home');
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تسجيل الدخول: ${e.message ?? e.code}')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تسجيل الدخول: ${e.message ?? e.code}')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -68,6 +66,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : ElevatedButton(onPressed: _signIn, child: const Text('دخول', style: TextStyle(fontSize: 18))),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountRegistrationScreen())),
+                child: const Text('إنشاء حساب جديد'),
               ),
             ],
           ),
