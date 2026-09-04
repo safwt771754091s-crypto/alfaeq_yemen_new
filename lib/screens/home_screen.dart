@@ -30,10 +30,46 @@ class HomeScreen extends StatelessWidget {
             ),
           ],
         ),
-        body: SingleChildScrollView(child: Column(children: [_buildSuperWalletCard(context), const SizedBox(height: 20), _buildServicesGrid(context), const SizedBox(height: 20), _buildSmartTripCard(context), const SizedBox(height: 30)])),
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              _buildPromoBanner(context),
+              _buildSuperWalletCard(context),
+              const SizedBox(height: 20),
+              _buildServicesGrid(context),
+              const SizedBox(height: 20),
+              _buildSmartTripCard(context),
+              const SizedBox(height: 30),
+            ],
+          ),
+        ),
       ),
     );
   }
+
+  Widget _buildPromoBanner(BuildContext context) => Container(
+    height: 155,
+    margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(22),
+      gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Color(0xFF1A365D), Color(0xFF2563EB)]),
+      boxShadow: [BoxShadow(color: Colors.blueGrey.withOpacity(.18), blurRadius: 12, offset: const Offset(0, 5))],
+    ),
+    child: Stack(children: [
+      Positioned(right: -20, top: -35, child: Container(width: 130, height: 130, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(.08)))),
+      Positioned(left: -25, bottom: -55, child: Container(width: 150, height: 150, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(.07)))),
+      Padding(padding: const EdgeInsets.all(20), child: Row(children: [
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Text('عروض الفائق يمن 🔥', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 7),
+          const Text('أفضل المنتجات والخدمات في مكان واحد', style: TextStyle(color: Colors.white70, fontSize: 12)),
+          const SizedBox(height: 13),
+          ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Color(0xFF1A365D), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text('تسوق الآن', style: TextStyle(fontWeight: FontWeight.bold))),
+        ])),
+        const Padding(padding: EdgeInsets.only(left: 8), child: Icon(Icons.local_offer_rounded, color: Colors.white, size: 62)),
+      ])),
+    ]),
+  );
 
   Widget _buildSuperWalletCard(BuildContext context) => Container(
     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), padding: const EdgeInsets.all(16),
