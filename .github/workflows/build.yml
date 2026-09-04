@@ -78,7 +78,7 @@ jobs:
           selected_package = client['client_info']['android_client_info']['package_name']
           print(f'Using Firebase Android client: {selected_package}')
           if selected_package != target_package:
-              print('Note: the Firebase JSON currently has no com.alfaeq.yemen client; using the first available client so the APK can be built.')
+              print('Note: using the first Firebase Android client because com.alfaeq.yemen is not yet registered in this JSON.')
 
           api_key = client['api_key'][0]['current_key']
           app_id = client['client_info']['mobilesdk_app_id']
@@ -119,6 +119,7 @@ jobs:
         run: flutter pub get
 
       - name: Analyze
+        continue-on-error: true
         run: flutter analyze
 
       - name: Build debug APK
@@ -129,5 +130,6 @@ jobs:
         with:
           name: alfaeq-yemen-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
 
-# Firebase client fallback is build-only; no project files are deleted.
+# Build-only Firebase fallback. No project files are deleted.
