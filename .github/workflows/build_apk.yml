@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: ["main", "launch-prep-2026-09"]
+  pull_request:
+    branches: ["main"]
 
 jobs:
   build:
@@ -50,10 +52,23 @@ jobs:
 
           data = json.loads(Path('/tmp/google-services.json').read_text())
           project = data['project_info']
+          clients = data.get('client', [])
+          android_clients = [
+              c for c in clients
+              if c.get('client_info', {}).get('android_client_info', {}).get('package_name')
+          ]
+          if not android_clients:
+              raise SystemExit('GOOGLE_SERVICES_JSON contains no Android Firebase client.')
+
+          target_package = 'com.alfaeq.yemen'
           client = next(
-              c for c in data['client']
-              if c.get('client_info', {}).get('android_client_info', {}).get('package_name') == 'com.alfaeq.yemen'
+              (c for c in android_clients
+               if c.get('client_info', {}).get('android_client_info', {}).get('package_name') == target_package),
+              android_clients[0],
           )
+          selected_package = client['client_info']['android_client_info']['package_name']
+          print(f'Using Firebase Android client: {selected_package}')
+
           api_key = client['api_key'][0]['current_key']
           app_id = client['client_info']['mobilesdk_app_id']
           sender_id = project['project_number']
@@ -64,27 +79,23 @@ jobs:
               return json.dumps(value if value is not None else '')
 
           dart = f'''// Generated for the Alfaeq Yemen Android build from GOOGLE_SERVICES_JSON.
-// Do not edit this generated file manually.
-import 'package:firebase_core/firebase_core.dart';
+          // Do not edit this generated file manually.
+          import 'package:firebase_core/firebase_core.dart';
 
-class DefaultFirebaseOptions {{
-  const DefaultFirebaseOptions._();
-
-  static bool get isConfigured => true;
-
-  static FirebaseOptions get currentPlatform => android;
-
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: {dart_string(api_key)},
-    appId: {dart_string(app_id)},
-    messagingSenderId: {dart_string(sender_id)},
-    projectId: {dart_string(project_id)},
-    storageBucket: {dart_string(storage_bucket)},
-  );
-}}
-'''
+          class DefaultFirebaseOptions {{
+            const DefaultFirebaseOptions._();
+            static bool get isConfigured => true;
+            static FirebaseOptions get currentPlatform => android;
+            static const FirebaseOptions android = FirebaseOptions(
+              apiKey: {dart_string(api_key)},
+              appId: {dart_string(app_id)},
+              messagingSenderId: {dart_string(sender_id)},
+              projectId: {dart_string(project_id)},
+              storageBucket: {dart_string(storage_bucket)},
+            );
+          }}
+          '''
           Path('lib/core/firebase/firebase_options.dart').write_text(dart)
-          print('Generated Firebase options for com.alfaeq.yemen')
           PY
           elif [ -n "$FIREBASE_OPTIONS_DART" ]; then
             printf '%s' "$FIREBASE_OPTIONS_DART" > lib/core/firebase/firebase_options.dart
