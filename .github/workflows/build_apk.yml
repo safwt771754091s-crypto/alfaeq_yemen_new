@@ -37,15 +37,42 @@ jobs:
           echo "Android applicationId set to com.alfaeq.yemen"
           grep -n "applicationId" android/app/build.gradle.kts
 
-      - name: Inject Firebase configuration when provided
+      - name: Generate Firebase options from google-services.json
         env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
           FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
         run: |
-          if [ -n "$FIREBASE_OPTIONS_DART" ]; then
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > /tmp/google-services.json
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path('/tmp/google-services.json').read_text())
+          project = data['project_info']
+          client = next(
+              c for c in data['client']
+              if c.get('client_info', {}).get('android_client_info', {}).get('package_name') == 'com.alfaeq.yemen'
+          )
+          options = {
+              'apiKey': client['api_key'][0]['current_key'],
+              'appId': client['client_info']['mobilesdk_app_id'],
+              'messagingSenderId': project['project_number'],
+              'projectId': project['project_id'],
+              'storageBucket': project.get('storage_bucket'),
+          }
+          dart = """// Generated for the Alfaeq Yemen Android build from GOOGLE_SERVICES_JSON.\n// Do not edit this generated file manually.\nimport 'package:firebase_core/firebase_core.dart';\n\nclass DefaultFirebaseOptions {\n  const DefaultFirebaseOptions._();\n\n  static bool get isConfigured => true;\n\n  static FirebaseOptions get currentPlatform => android;\n\n  static const FirebaseOptions android = FirebaseOptions(\n    apiKey: %r,\n    appId: %r,\n    messagingSenderId: %r,\n    projectId: %r,\n    storageBucket: %r,\n  );\n}\n""" % (
+              options['apiKey'], options['appId'], options['messagingSenderId'],
+              options['projectId'], options['storageBucket']
+          )
+          Path('lib/core/firebase/firebase_options.dart').write_text(dart)
+          print('Generated lib/core/firebase/firebase_options.dart for com.alfaeq.yemen')
+          PY
+          elif [ -n "$FIREBASE_OPTIONS_DART" ]; then
             printf '%s' "$FIREBASE_OPTIONS_DART" > lib/core/firebase/firebase_options.dart
-            echo "Firebase configuration injected for this build."
+            echo "Firebase options injected from FIREBASE_OPTIONS_DART."
           else
-            echo "FIREBASE_OPTIONS_DART is not configured; building with the repository placeholder."
+            echo "No Firebase secret configured; building with repository placeholder."
           fi
 
       - name: Install dependencies
