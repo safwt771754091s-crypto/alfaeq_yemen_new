@@ -26,13 +26,13 @@ jobs:
 
       - name: Ensure Android platform exists
         run: |
-          if [ ! -d android ]; then
+          if [ ! -f android/app/build.gradle.kts ]; then
             flutter create . --platforms=android --org com.alfaeq
           fi
+          test -f android/app/build.gradle.kts
 
       - name: Set final Android application ID
         run: |
-          test -f android/app/build.gradle.kts
           sed -i 's/applicationId = "[^"]*"/applicationId = "com.alfaeq.yemen"/' android/app/build.gradle.kts
           echo "Android applicationId set to com.alfaeq.yemen"
           grep -n "applicationId" android/app/build.gradle.kts
@@ -54,19 +54,37 @@ jobs:
               c for c in data['client']
               if c.get('client_info', {}).get('android_client_info', {}).get('package_name') == 'com.alfaeq.yemen'
           )
-          options = {
-              'apiKey': client['api_key'][0]['current_key'],
-              'appId': client['client_info']['mobilesdk_app_id'],
-              'messagingSenderId': project['project_number'],
-              'projectId': project['project_id'],
-              'storageBucket': project.get('storage_bucket'),
-          }
-          dart = """// Generated for the Alfaeq Yemen Android build from GOOGLE_SERVICES_JSON.\n// Do not edit this generated file manually.\nimport 'package:firebase_core/firebase_core.dart';\n\nclass DefaultFirebaseOptions {\n  const DefaultFirebaseOptions._();\n\n  static bool get isConfigured => true;\n\n  static FirebaseOptions get currentPlatform => android;\n\n  static const FirebaseOptions android = FirebaseOptions(\n    apiKey: %r,\n    appId: %r,\n    messagingSenderId: %r,\n    projectId: %r,\n    storageBucket: %r,\n  );\n}\n""" % (
-              options['apiKey'], options['appId'], options['messagingSenderId'],
-              options['projectId'], options['storageBucket']
-          )
+          api_key = client['api_key'][0]['current_key']
+          app_id = client['client_info']['mobilesdk_app_id']
+          sender_id = project['project_number']
+          project_id = project['project_id']
+          storage_bucket = project.get('storage_bucket')
+
+          def dart_string(value):
+              return json.dumps(value if value is not None else '')
+
+          dart = f'''// Generated for the Alfaeq Yemen Android build from GOOGLE_SERVICES_JSON.
+// Do not edit this generated file manually.
+import 'package:firebase_core/firebase_core.dart';
+
+class DefaultFirebaseOptions {{
+  const DefaultFirebaseOptions._();
+
+  static bool get isConfigured => true;
+
+  static FirebaseOptions get currentPlatform => android;
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: {dart_string(api_key)},
+    appId: {dart_string(app_id)},
+    messagingSenderId: {dart_string(sender_id)},
+    projectId: {dart_string(project_id)},
+    storageBucket: {dart_string(storage_bucket)},
+  );
+}}
+'''
           Path('lib/core/firebase/firebase_options.dart').write_text(dart)
-          print('Generated lib/core/firebase/firebase_options.dart for com.alfaeq.yemen')
+          print('Generated Firebase options for com.alfaeq.yemen')
           PY
           elif [ -n "$FIREBASE_OPTIONS_DART" ]; then
             printf '%s' "$FIREBASE_OPTIONS_DART" > lib/core/firebase/firebase_options.dart
