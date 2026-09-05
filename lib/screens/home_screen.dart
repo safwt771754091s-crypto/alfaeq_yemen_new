@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../core/auth/app_role.dart';
+import '../core/auth/role_service.dart';
 import 'wallet_history_screen.dart';
 import 'vendors_screen.dart';
 import 'wallets_screen.dart';
@@ -39,30 +41,30 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(icon: const Icon(Icons.storefront, color: Color(0xFF1A365D)), tooltip: 'بوابة التجار', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MerchantPortalScreen()))),
           IconButton(icon: const Icon(Icons.shopping_cart, color: Color(0xFF1A365D)), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()))),
-          PopupMenuButton<String>(
-            onSelected: (v) async { if (v == 'logout') await FirebaseAuth.instance.signOut(); if (v == 'admin' && context.mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen())); },
-            itemBuilder: (_) => const [PopupMenuItem(value: 'admin', child: Text('لوحة الإدارة')), PopupMenuItem(value: 'logout', child: Text('تسجيل الخروج'))],
+          FutureBuilder<AppRole>(
+            future: RoleService.instance.currentRole(),
+            builder: (context, snapshot) {
+              final isAdmin = snapshot.data == AppRole.admin || snapshot.data == AppRole.manager;
+              if (!isAdmin) return PopupMenuButton<String>(onSelected: (v) async { if (v == 'logout') await FirebaseAuth.instance.signOut(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'logout', child: Text('تسجيل الخروج'))]);
+              return PopupMenuButton<String>(onSelected: (v) async { if (v == 'logout') await FirebaseAuth.instance.signOut(); if (v == 'admin' && context.mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen())); }, itemBuilder: (_) => const [PopupMenuItem(value: 'admin', child: Text('لوحة الإدارة والذكاء الاصطناعي')), PopupMenuItem(value: 'logout', child: Text('تسجيل الخروج'))]);
+            },
           ),
         ],
       ),
       body: SingleChildScrollView(child: Column(children: [_buildPromoBanner(context), _buildSuperWalletCard(context), const SizedBox(height: 20), _buildServicesGrid(context), const SizedBox(height: 20), _buildSmartTripCard(context), const SizedBox(height: 30)])),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _navIndex,
-        onDestinationSelected: _navigate,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'الرئيسية'),
-          NavigationDestination(icon: Icon(Icons.store_outlined), selectedIcon: Icon(Icons.store), label: 'المتاجر'),
-          NavigationDestination(icon: Icon(Icons.shopping_cart_outlined), selectedIcon: Icon(Icons.shopping_cart), label: 'السلة'),
-          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'المحافظ'),
-          NavigationDestination(icon: Icon(Icons.local_shipping_outlined), selectedIcon: Icon(Icons.local_shipping), label: 'التتبع'),
-        ],
-      ),
+      bottomNavigationBar: NavigationBar(selectedIndex: _navIndex, onDestinationSelected: _navigate, destinations: const [
+        NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'الرئيسية'),
+        NavigationDestination(icon: Icon(Icons.store_outlined), selectedIcon: Icon(Icons.store), label: 'المتاجر'),
+        NavigationDestination(icon: Icon(Icons.shopping_cart_outlined), selectedIcon: Icon(Icons.shopping_cart), label: 'السلة'),
+        NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'المحافظ'),
+        NavigationDestination(icon: Icon(Icons.local_shipping_outlined), selectedIcon: Icon(Icons.local_shipping), label: 'التتبع'),
+      ]),
     ),
   );
 
-  Widget _buildPromoBanner(BuildContext context) => Container(height: 155, margin: const EdgeInsets.fromLTRB(16, 12, 16, 4), decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Color(0xFF1A365D), Color(0xFF2563EB)]), boxShadow: [BoxShadow(color: Colors.blueGrey.withOpacity(.18), blurRadius: 12, offset: const Offset(0, 5))]), child: Stack(children: [Positioned(right: -20, top: -35, child: Container(width: 130, height: 130, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(.08)))), Positioned(left: -25, bottom: -55, child: Container(width: 150, height: 150, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(.07)))), Padding(padding: const EdgeInsets.all(20), child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [const Text('عروض الفائق يمن 🔥', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)), const SizedBox(height: 7), const Text('أفضل المنتجات والخدمات في مكان واحد', style: TextStyle(color: Colors.white70, fontSize: 12)), const SizedBox(height: 13), ElevatedButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorsScreen(categoryTitle: 'العروض', categoryIcon: Icons.local_offer, categoryColor: Colors.orange))), style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: const Color(0xFF1A365D), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text('تسوق الآن', style: TextStyle(fontWeight: FontWeight.bold)))])), const Padding(padding: EdgeInsets.only(left: 8), child: Icon(Icons.local_offer_rounded, color: Colors.white, size: 62))]))]));
+  Widget _buildPromoBanner(BuildContext context) => Container(height: 155, margin: const EdgeInsets.fromLTRB(16, 12, 16, 4), decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Color(0xFF1A365D), Color(0xFF2563EB)])), child: Padding(padding: const EdgeInsets.all(20), child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [const Text('عروض الفائق يمن 🔥', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)), const SizedBox(height: 7), const Text('أفضل المنتجات والخدمات في مكان واحد', style: TextStyle(color: Colors.white70, fontSize: 12)), const SizedBox(height: 13), ElevatedButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VendorsScreen(categoryTitle: 'العروض', categoryIcon: Icons.local_offer, categoryColor: Colors.orange))), child: const Text('تسوق الآن'))])), const Icon(Icons.local_offer_rounded, color: Colors.white, size: 62)])));
 
-  Widget _buildSuperWalletCard(BuildContext context) => Container(margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: const Color(0xFF1A365D), borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: const Color(0xFF1A365D).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))]), child: Column(children: [Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('رصيد الفائق المتاح', style: TextStyle(color: Colors.white70)), SizedBox(height: 4), Text('150,000 ر.ي', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold))]), ElevatedButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletsScreen())), icon: const Icon(Icons.account_balance, size: 16), label: const Text('المحافظ'))]), const SizedBox(height: 20), Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_buildWalletAction(Icons.storefront, 'التجار', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MerchantPortalScreen()))), _buildWalletAction(Icons.shopping_cart, 'السلة', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()))), _buildWalletAction(Icons.history, 'السجل', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletHistoryScreen()))), _buildWalletAction(Icons.local_shipping, 'التتبع', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrackingScreen())))]) ]));
+  Widget _buildSuperWalletCard(BuildContext context) => Container(margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: const Color(0xFF1A365D), borderRadius: BorderRadius.circular(20)), child: Column(children: [Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('رصيد الفائق المتاح', style: TextStyle(color: Colors.white70)), SizedBox(height: 4), Text('150,000 ر.ي', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold))]), ElevatedButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletsScreen())), icon: const Icon(Icons.account_balance, size: 16), label: const Text('المحافظ'))]), const SizedBox(height: 20), Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_buildWalletAction(Icons.storefront, 'التجار', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MerchantPortalScreen()))), _buildWalletAction(Icons.shopping_cart, 'السلة', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()))), _buildWalletAction(Icons.history, 'السجل', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletHistoryScreen()))), _buildWalletAction(Icons.local_shipping, 'التتبع', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrackingScreen()))) ]));
 
   Widget _buildWalletAction(IconData icon, String label, VoidCallback onTap) => GestureDetector(onTap: onTap, child: Column(children: [Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: Colors.white, size: 24)), const SizedBox(height: 8), Text(label, style: const TextStyle(color: Colors.white, fontSize: 11))]));
 
