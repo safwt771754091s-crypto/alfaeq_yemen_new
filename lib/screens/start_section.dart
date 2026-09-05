@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'vendors_screen.dart';
 
 /// Entry point for browsing marketplace services.
-/// Uses the same Firestore-backed merchant flow as the main home screen.
+/// All store/product browsing uses the Firestore-backed merchant flow.
 class StartSection extends StatelessWidget {
   const StartSection({super.key});
 
@@ -34,7 +34,7 @@ class StartSection extends StatelessWidget {
             children: [
               const Text('اختر الخدمة التي تريد استخدامها', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              const Text('تصفح المتاجر والمنتجات المنشورة فعلياً في Firestore.'),
+              const Text('تصفح المتاجر والمنتجات المنشورة فعلياً في Firebase.'),
               const SizedBox(height: 16),
               Expanded(
                 child: GridView.builder(
@@ -67,7 +67,7 @@ class StartSection extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             CircleAvatar(
-                              backgroundColor: color.withOpacity(.12),
+                              backgroundColor: color.withValues(alpha: 0.12),
                               child: Icon(icon, color: color),
                             ),
                             const SizedBox(height: 8),
