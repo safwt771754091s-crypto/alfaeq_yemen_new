@@ -14,11 +14,9 @@ class VendorsScreen extends StatelessWidget {
   });
 
   Query<Map<String, dynamic>> _storesQuery() {
-    final db = FirebaseFirestore.instance;
-    return db
+    return FirebaseFirestore.instance
         .collection('stores')
-        .where('active', isEqualTo: true)
-        .orderBy('createdAt', descending: true);
+        .where('active', isEqualTo: true);
   }
 
   bool _matchesCategory(Map<String, dynamic> data) {
@@ -240,8 +238,7 @@ class StoreProductsScreen extends StatelessWidget {
     final query = FirebaseFirestore.instance
         .collection('products')
         .where('storeId', isEqualTo: storeId)
-        .where('active', isEqualTo: true)
-        .orderBy('createdAt', descending: true);
+        .where('active', isEqualTo: true);
 
     return Directionality(
       textDirection: TextDirection.rtl,
