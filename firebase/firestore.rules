@@ -1,56 +1,44 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Users: each user can read/write their own profile; admin can read/write all
     match /users/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
       allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
     }
-
-    // Sellers: admin can create/modify; seller owner can modify its own doc
     match /sellers/{sellerId} {
       allow create: if isAdmin() || (request.auth != null && request.auth.token.role == 'seller');
       allow read: if true;
       allow update, delete: if isAdmin() || (request.auth != null && resource.data.ownerUserId == request.auth.uid);
     }
-
-    // Categories: read public; only admin can create/update/delete
+    match /stores/{storeId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
     match /categories/{categoryId} {
       allow read: if true;
       allow write: if isAdmin();
     }
-
-    // Products: sellers can CRUD their own products; admin can manage all; public can read
     match /products/{productId} {
       allow read: if true;
       allow create: if request.auth != null && (request.auth.token.role == 'seller' || isAdmin());
       allow update, delete: if isAdmin() || (request.auth != null && resource.data.sellerId == request.auth.uid) || (request.auth != null && request.auth.token.role == 'seller' && request.auth.uid == resource.data.ownerUserId);
     }
-
-    // Orders: customer can create and read own orders; sellers can read orders that include their products; admin can read all
     match /orders/{orderId} {
       allow create: if request.auth != null && request.auth.token.role == 'customer';
       allow read: if request.auth != null && (resource.data.customerId == request.auth.uid || isAdmin() || isSellerInOrder(resource));
       allow update: if isAdmin();
     }
-
-    // Reviews: customers can create reviews; public can read
     match /reviews/{reviewId} {
       allow read: if true;
       allow create: if request.auth != null && request.auth.token.role == 'customer';
       allow update, delete: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
     }
-
     function isAdmin() {
-      return request.auth != null && request.auth.token.role == 'admin';
+      return request.auth != null && (request.auth.token.role == 'admin' || request.auth.token.role == 'manager');
     }
-
     function isSellerInOrder(orderResource) {
-      // Very basic check: if any item has sellerId equal to requester uid
       if (request.auth == null) return false;
       return orderResource.data.items != null && orderResource.data.items.values().hasAny(item => item.sellerId == request.auth.uid);
     }
-
   }
 }
