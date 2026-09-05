@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 
+/// Compatibility layer for older screens.
+/// Store and product data must never come from this file.
 class SampleData {
   static final List<Map<String, dynamic>> _serviceDefs = [
     {'title': 'المطاعم', 'icon': Icons.restaurant, 'color': Colors.orange},
@@ -16,39 +18,17 @@ class SampleData {
     {'title': 'منتجات محلية', 'icon': Icons.cottage, 'color': Colors.deepOrange},
   ];
 
+  /// Kept only for backwards compatibility with legacy widgets.
+  /// It intentionally returns no shops or products so fake data can never appear.
   static List<Service> get services {
-    return List.generate(_serviceDefs.length, (sIndex) {
-      final def = _serviceDefs[sIndex];
-      final title = def['title'] as String;
-      final shops = List.generate(10, (shopIndex) {
-        final shopId = 's${sIndex}_sh$shopIndex';
-        final products = List.generate(10, (pIndex) {
-          final prodId = '${shopId}_p$pIndex';
-          return Product(
-            id: prodId,
-            name: '$title المحل ${shopIndex + 1} - منتج ${pIndex + 1}',
-            description: 'وصف مختصر للمنتج ${pIndex + 1} من محل ${shopIndex + 1}. جودة عالية وسعر مناسب.',
-            price: ((pIndex + 1) * 5.0) + (shopIndex % 3) * 2,
-            icon: Icons.shopping_bag,
-          );
-        });
-
-        return Shop(
-          id: shopId,
-          name: '$title المحل ${shopIndex + 1}',
-          address: 'العنوان ${shopIndex + 1}, المدينة',
-          products: products,
-          icon: Icons.storefront,
-        );
-      });
-
+    return _serviceDefs.map((def) {
       return Service(
-        id: 'svc_$sIndex',
-        title: title,
+        id: 'legacy_${def['title']}',
+        title: def['title'] as String,
         icon: def['icon'] as IconData,
         color: def['color'] as Color,
-        shops: shops,
+        shops: const [],
       );
-    });
+    }).toList(growable: false);
   }
 }
