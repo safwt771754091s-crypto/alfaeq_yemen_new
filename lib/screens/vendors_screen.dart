@@ -13,24 +13,18 @@ class VendorsScreen extends StatelessWidget {
     required this.categoryColor,
   });
 
-  Query<Map<String, dynamic>> _storesQuery() {
-    return FirebaseFirestore.instance
-        .collection('stores')
-        .where('active', isEqualTo: true);
-  }
+  static const _buildTag = 'DATA-FLOW • 07-09-2026';
+
+  Query<Map<String, dynamic>> _storesQuery() => FirebaseFirestore.instance
+      .collection('stores')
+      .where('active', isEqualTo: true);
 
   bool _matchesCategory(Map<String, dynamic> data) {
     final category = (data['category'] ?? '').toString().trim();
-    if (category.isEmpty || categoryTitle == 'كل المتاجر' || categoryTitle == 'العروض') {
-      return true;
-    }
-    final normalizedCategory = category.replaceAll('وال', '').trim();
-    final normalizedTitle = categoryTitle.replaceAll('وال', '').trim();
-    return category == categoryTitle ||
-        category.contains(categoryTitle) ||
-        categoryTitle.contains(category) ||
-        normalizedCategory.contains(normalizedTitle) ||
-        normalizedTitle.contains(normalizedCategory);
+    if (category.isEmpty || categoryTitle == 'كل المتاجر' || categoryTitle == 'العروض') return true;
+    final a = category.replaceAll('وال', '').trim();
+    final b = categoryTitle.replaceAll('وال', '').trim();
+    return category == categoryTitle || category.contains(categoryTitle) || categoryTitle.contains(category) || a.contains(b) || b.contains(a);
   }
 
   @override
@@ -39,17 +33,20 @@ class VendorsScreen extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            categoryTitle,
-            style: const TextStyle(
-              color: Colors.black87,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+          title: Text(categoryTitle),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          elevation: 0,
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(24),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: EdgeInsets.only(right: 16, bottom: 7),
+                child: Text(_buildTag, style: TextStyle(fontSize: 9, color: Colors.blueGrey)),
+              ),
             ),
           ),
-          backgroundColor: Colors.white,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.black87),
         ),
         body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _storesQuery().snapshots(),
@@ -58,11 +55,9 @@ class VendorsScreen extends StatelessWidget {
               return _MessageState(
                 icon: Icons.cloud_off,
                 title: 'تعذر تحميل المتاجر',
-                message: 'تحقق من اتصال Firebase وقواعد Firestore ثم حاول مرة أخرى.',
-                action: () => _showFirebaseError(context, snapshot.error),
+                message: 'خطأ Firebase: ${snapshot.error}',
               );
             }
-
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
@@ -72,52 +67,43 @@ class VendorsScreen extends StatelessWidget {
                 .toList();
 
             if (stores.isEmpty) {
-              return _EmptyStoresState(categoryTitle: categoryTitle);
+              return _MessageState(
+                icon: Icons.store_outlined,
+                title: 'لا توجد متاجر منشورة حالياً',
+                message: categoryTitle == 'العروض'
+                    ? 'لا توجد عروض منشورة في Firestore حالياً.'
+                    : 'لم يتم العثور على متجر نشط في Firestore لهذا القسم. لن نعرض بيانات وهمية.',
+              );
             }
 
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: categoryColor.withOpacity(0.1),
+                    color: categoryColor.withOpacity(.1),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: categoryColor.withOpacity(0.3)),
+                    border: Border.all(color: categoryColor.withOpacity(.3)),
                   ),
                   child: Row(
                     children: [
-                      Icon(categoryIcon, size: 36, color: categoryColor),
-                      const SizedBox(width: 16),
+                      Icon(categoryIcon, size: 34, color: categoryColor),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'المتاجر المنشورة في: $categoryTitle',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                color: categoryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'هذه القائمة تُقرأ مباشرة من Firestore وليست بيانات تجريبية.',
-                              style: TextStyle(color: Colors.grey, fontSize: 11),
-                            ),
+                            Text('المتاجر المنشورة: ${stores.length}', style: TextStyle(fontWeight: FontWeight.bold, color: categoryColor)),
+                            const SizedBox(height: 3),
+                            const Text('المصدر: Firestore • بدون بيانات تجريبية', style: TextStyle(color: Colors.grey, fontSize: 11)),
                           ],
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  'المتاجر المتاحة: ${stores.length}',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 ...stores.map((doc) => _StoreCard(
                       storeId: doc.id,
                       data: doc.data(),
@@ -131,12 +117,6 @@ class VendorsScreen extends StatelessWidget {
       ),
     );
   }
-
-  void _showFirebaseError(BuildContext context, Object? error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Firebase: ${error ?? 'خطأ غير معروف'}')),
-    );
-  }
 }
 
 class _StoreCard extends StatelessWidget {
@@ -145,15 +125,9 @@ class _StoreCard extends StatelessWidget {
   final IconData categoryIcon;
   final Color categoryColor;
 
-  const _StoreCard({
-    required this.storeId,
-    required this.data,
-    required this.categoryIcon,
-    required this.categoryColor,
-  });
+  const _StoreCard({required this.storeId, required this.data, required this.categoryIcon, required this.categoryColor});
 
-  String _text(String key, [String fallback = '']) =>
-      (data[key] ?? fallback).toString().trim();
+  String _text(String key, [String fallback = '']) => (data[key] ?? fallback).toString().trim();
 
   @override
   Widget build(BuildContext context) {
@@ -164,31 +138,21 @@ class _StoreCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => StoreProductsScreen(
-              storeId: storeId,
-              storeName: name,
-              categoryColor: categoryColor,
-            ),
+            builder: (_) => StoreProductsScreen(storeId: storeId, storeName: name, categoryColor: categoryColor),
           ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: categoryColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(categoryIcon, color: categoryColor, size: 26),
+              CircleAvatar(
+                backgroundColor: categoryColor.withOpacity(.12),
+                child: Icon(categoryIcon, color: categoryColor),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -196,19 +160,16 @@ class _StoreCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    if (city.isNotEmpty || address.isNotEmpty) ...[
-                      const SizedBox(height: 5),
-                      Text(
-                        [city, address].where((v) => v.isNotEmpty).join(' • '),
-                        style: const TextStyle(color: Colors.grey, fontSize: 11),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                    if (city.isNotEmpty || address.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 5),
+                        child: Text([city, address].where((v) => v.isNotEmpty).join(' • '), style: const TextStyle(color: Colors.grey, fontSize: 11)),
                       ),
-                    ],
-                    if (rating.isNotEmpty) ...[
-                      const SizedBox(height: 5),
-                      Text('التقييم: $rating', style: const TextStyle(color: Colors.amber, fontSize: 11)),
-                    ],
+                    if (rating.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 5),
+                        child: Text('التقييم: $rating', style: const TextStyle(color: Colors.amber, fontSize: 11)),
+                      ),
                   ],
                 ),
               ),
@@ -226,19 +187,11 @@ class StoreProductsScreen extends StatelessWidget {
   final String storeName;
   final Color categoryColor;
 
-  const StoreProductsScreen({
-    super.key,
-    required this.storeId,
-    required this.storeName,
-    required this.categoryColor,
-  });
+  const StoreProductsScreen({super.key, required this.storeId, required this.storeName, required this.categoryColor});
 
   @override
   Widget build(BuildContext context) {
-    final query = FirebaseFirestore.instance
-        .collection('products')
-        .where('storeId', isEqualTo: storeId)
-        .where('active', isEqualTo: true);
+    final query = FirebaseFirestore.instance.collection('products').where('storeId', isEqualTo: storeId).where('active', isEqualTo: true);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -247,18 +200,14 @@ class StoreProductsScreen extends StatelessWidget {
         body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: query.snapshots(),
           builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return const Center(child: Text('تعذر تحميل منتجات المتجر.'));
-            }
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
+            if (snapshot.hasError) return Center(child: Text('تعذر تحميل المنتجات: ${snapshot.error}'));
+            if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
             final products = snapshot.data?.docs ?? [];
             if (products.isEmpty) {
               return const _MessageState(
                 icon: Icons.inventory_2_outlined,
                 title: 'لا توجد منتجات منشورة',
-                message: 'سيظهر هنا المنتج بعد أن يضيفه التاجر ويصبح نشطاً.',
+                message: 'سيظهر المنتج هنا بعد ربطه بالمتجر ونشره في Firestore.',
               );
             }
 
@@ -273,16 +222,10 @@ class StoreProductsScreen extends StatelessWidget {
                 return Card(
                   margin: const EdgeInsets.only(bottom: 10),
                   child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: categoryColor.withOpacity(.12),
-                      child: Icon(Icons.shopping_bag, color: categoryColor),
-                    ),
+                    leading: CircleAvatar(backgroundColor: categoryColor.withOpacity(.12), child: Icon(Icons.shopping_bag, color: categoryColor)),
                     title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text(description.isEmpty ? 'منتج منشور من المتجر' : description),
-                    trailing: Text(
-                      price is num ? '${price.toStringAsFixed(0)} ر.ي' : '$price',
-                      style: TextStyle(color: categoryColor, fontWeight: FontWeight.bold),
-                    ),
+                    trailing: Text(price is num ? '${price.toStringAsFixed(0)} ر.ي' : '$price', style: TextStyle(color: categoryColor, fontWeight: FontWeight.bold)),
                   ),
                 );
               },
@@ -294,56 +237,27 @@ class StoreProductsScreen extends StatelessWidget {
   }
 }
 
-class _EmptyStoresState extends StatelessWidget {
-  final String categoryTitle;
-
-  const _EmptyStoresState({required this.categoryTitle});
-
-  @override
-  Widget build(BuildContext context) {
-    return _MessageState(
-      icon: Icons.store_outlined,
-      title: 'لا توجد متاجر منشورة حالياً',
-      message: categoryTitle == 'العروض'
-          ? 'لا توجد عروض منشورة في Firestore حالياً.'
-          : 'لم يتم نشر متجر نشط لهذا القسم بعد. لن نعرض بيانات وهمية مكانها.',
-    );
-  }
-}
-
 class _MessageState extends StatelessWidget {
   final IconData icon;
   final String title;
   final String message;
-  final VoidCallback? action;
 
-  const _MessageState({
-    required this.icon,
-    required this.title,
-    required this.message,
-    this.action,
-  });
+  const _MessageState({required this.icon, required this.title, required this.message});
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
-            if (action != null) ...[
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 64, color: Colors.grey),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: action, child: const Text('عرض الخطأ')),
+              Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
             ],
-          ],
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
