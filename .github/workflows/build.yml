@@ -9,33 +9,27 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-
       - name: Ensure Android platform exists
         run: |
-          if [ ! -f android/app/build.gradle.kts ]; then
-            flutter create . --platforms=android --org com.alfaeq
-          fi
+          if [ ! -f android/app/build.gradle.kts ]; then flutter create . --platforms=android --org com.alfaeq; fi
           test -f android/app/build.gradle.kts
-
-      - name: Set Android application ID and compile SDK
+      - name: Configure Android package and SDK
         run: |
-          sed -i 's/applicationId = "[^"]*"/applicationId = "com.alfaeq.yemen"/' android/app/build.gradle.kts
+          sed -i 's/applicationId = "[^"]*"/applicationId = "com.alfaeq.alfaeq_yemen"/' android/app/build.gradle.kts
+          sed -i 's/namespace = "[^"]*"/namespace = "com.alfaeq.alfaeq_yemen"/' android/app/build.gradle.kts
           find android -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) -exec sed -i \
             -e 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' \
             -e 's/compileSdk flutter.compileSdkVersion/compileSdk 36/g' \
@@ -43,11 +37,7 @@ jobs:
             -e 's/compileSdk = [0-9][0-9]*/compileSdk = 36/g' \
             -e 's/compileSdk [0-9][0-9]*/compileSdk 36/g' \
             -e 's/compileSdkVersion [0-9][0-9]*/compileSdkVersion 36/g' {} \;
-          echo "Android applicationId:"
-          grep -R "applicationId" android -n || true
-          echo "Gradle compileSdk:"
-          grep -R "compileSdk" android -n || true
-
+          grep -R "applicationId\|namespace\|compileSdk" android -n || true
       - name: Generate Firebase options from GOOGLE_SERVICES_JSON
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
@@ -56,77 +46,41 @@ jobs:
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             printf '%s' "$GOOGLE_SERVICES_JSON" > /tmp/google-services.json
             python3 - <<'PY'
-          import json
-          from pathlib import Path
+import json
+from pathlib import Path
 
-          data = json.loads(Path('/tmp/google-services.json').read_text())
-          project = data['project_info']
-          clients = data.get('client', [])
-          target_package = 'com.alfaeq.yemen'
-          android_clients = [
-              c for c in clients
-              if c.get('client_info', {}).get('android_client_info', {}).get('package_name')
-          ]
-          if not android_clients:
-              raise SystemExit('GOOGLE_SERVICES_JSON contains no Android Firebase client.')
-
-          client = next(
-              (c for c in android_clients
-               if c.get('client_info', {}).get('android_client_info', {}).get('package_name') == target_package),
-              None,
-          )
-          if client is None:
-              available = [c['client_info']['android_client_info']['package_name'] for c in android_clients]
-              raise SystemExit(
-                  f'Firebase package mismatch: {target_package} is not registered in GOOGLE_SERVICES_JSON. Available: {available}'
-              )
-
-          print(f'Using Firebase Android client: {target_package}')
-          api_key = client['api_key'][0]['current_key']
-          app_id = client['client_info']['mobilesdk_app_id']
-          sender_id = project['project_number']
-          project_id = project['project_id']
-          storage_bucket = project.get('storage_bucket')
-
-          def dart_string(value):
-              return json.dumps(value if value is not None else '')
-
-          dart = f'''// Generated for the Alfaeq Yemen Android build from GOOGLE_SERVICES_JSON.
-          // Do not edit this generated file manually.
-          import 'package:firebase_core/firebase_core.dart';
-
-          class DefaultFirebaseOptions {{
-            const DefaultFirebaseOptions._();
-            static bool get isConfigured => true;
-            static FirebaseOptions get currentPlatform => android;
-            static const FirebaseOptions android = FirebaseOptions(
-              apiKey: {dart_string(api_key)},
-              appId: {dart_string(app_id)},
-              messagingSenderId: {dart_string(sender_id)},
-              projectId: {dart_string(project_id)},
-              storageBucket: {dart_string(storage_bucket)},
-            );
-          }}
-          '''
-          Path('lib/core/firebase/firebase_options.dart').write_text(dart)
-          PY
+data=json.loads(Path('/tmp/google-services.json').read_text())
+project=data['project_info']
+target='com.alfaeq.alfaeq_yemen'
+clients=data.get('client',[])
+client=next((c for c in clients if c.get('client_info',{}).get('android_client_info',{}).get('package_name')==target),None)
+if client is None:
+    available=[c.get('client_info',{}).get('android_client_info',{}).get('package_name') for c in clients]
+    raise SystemExit(f'Firebase package mismatch: {target} is not registered. Available: {available}')
+api_key=client['api_key'][0]['current_key']
+app_id=client['client_info']['mobilesdk_app_id']
+sender_id=project['project_number']
+project_id=project['project_id']
+storage_bucket=project.get('storage_bucket') or ''
+def q(v): return json.dumps(v)
+dart=f'''// Generated by GitHub Actions from GOOGLE_SERVICES_JSON.\nimport 'package:firebase_core/firebase_core.dart';\n\nclass DefaultFirebaseOptions {{\n  const DefaultFirebaseOptions._();\n  static bool get isConfigured => true;\n  static FirebaseOptions get currentPlatform => android;\n  static const FirebaseOptions android = FirebaseOptions(\n    apiKey: {q(api_key)},\n    appId: {q(app_id)},\n    messagingSenderId: {q(sender_id)},\n    projectId: {q(project_id)},\n    storageBucket: {q(storage_bucket)},\n  );\n}}\n'''
+Path('lib/core/firebase/firebase_options.dart').write_text(dart)
+Path('android/app/google-services.json').write_text(Path('/tmp/google-services.json').read_text())
+print(f'Using registered Firebase Android client: {target}')
+PY
           elif [ -n "$FIREBASE_OPTIONS_DART" ]; then
             printf '%s' "$FIREBASE_OPTIONS_DART" > lib/core/firebase/firebase_options.dart
             echo "Firebase options injected from FIREBASE_OPTIONS_DART."
           else
-            echo "No Firebase secret configured; building with repository placeholder."
+            echo "No Firebase secret configured; build may use repository placeholder."
           fi
-
       - name: Install dependencies
         run: flutter pub get
-
       - name: Analyze
         continue-on-error: true
         run: flutter analyze
-
       - name: Build debug APK
         run: flutter build apk --debug --no-tree-shake-icons
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
