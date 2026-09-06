@@ -1,44 +1,136 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myUser() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function myRole() {
+      return myUser()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : null;
+    }
+
+    function isAdmin() {
+      return myRole() in ['admin', 'manager'];
+    }
+
+    function isMerchant() {
+      return myRole() == 'merchant';
+    }
+
     match /users/{userId} {
-      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role in ['customer', 'merchant', 'driver']
+        && request.resource.data.uid == userId;
+
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+
+      // A user may update profile/verification fields, but can never promote
+      // themselves to admin/manager or change their own role.
+      allow update: if isAdmin()
+        || (signedIn()
+          && request.auth.uid == userId
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'phone', 'emailVerified', 'whatsappVerified', 'updatedAt'
+          ]));
+
+      allow delete: if isAdmin();
     }
-    match /sellers/{sellerId} {
-      allow create: if isAdmin() || (request.auth != null && request.auth.token.role == 'seller');
-      allow read: if true;
-      allow update, delete: if isAdmin() || (request.auth != null && resource.data.ownerUserId == request.auth.uid);
-    }
-    match /stores/{storeId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
-    }
+
     match /categories/{categoryId} {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    match /stores/{storeId} {
+      allow read: if true;
+      allow create: if isAdmin()
+        || (isMerchant()
+          && signedIn()
+          && request.resource.data.ownerId == request.auth.uid
+          && request.resource.data.verified == false);
+      allow update: if isAdmin()
+        || (isMerchant()
+          && signedIn()
+          && resource.data.ownerId == request.auth.uid
+          && request.resource.data.ownerId == resource.data.ownerId
+          && request.resource.data.verified == resource.data.verified);
+      allow delete: if isAdmin()
+        || (isMerchant() && signedIn() && resource.data.ownerId == request.auth.uid);
+    }
+
     match /products/{productId} {
       allow read: if true;
-      allow create: if request.auth != null && (request.auth.token.role == 'seller' || isAdmin());
-      allow update, delete: if isAdmin() || (request.auth != null && resource.data.sellerId == request.auth.uid) || (request.auth != null && request.auth.token.role == 'seller' && request.auth.uid == resource.data.ownerUserId);
+      allow create: if isAdmin()
+        || (isMerchant()
+          && signedIn()
+          && request.resource.data.ownerId == request.auth.uid
+          && request.resource.data.verified == false);
+      allow update: if isAdmin()
+        || (isMerchant()
+          && signedIn()
+          && resource.data.ownerId == request.auth.uid
+          && request.resource.data.ownerId == resource.data.ownerId
+          && request.resource.data.verified == resource.data.verified);
+      allow delete: if isAdmin()
+        || (isMerchant() && signedIn() && resource.data.ownerId == request.auth.uid);
     }
+
+    match /wallets/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAdmin();
+      // Clients can never directly change the wallet balance.
+      allow update, delete: if isAdmin();
+    }
+
+    match /walletTransactions/{transactionId} {
+      allow read: if signedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    match /walletTopups/{topupId} {
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if signedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    match /paymentMethods/{methodId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /orders/{orderId} {
-      allow create: if request.auth != null && request.auth.token.role == 'customer';
-      allow read: if request.auth != null && (resource.data.customerId == request.auth.uid || isAdmin() || isSellerInOrder(resource));
+      allow create: if signedIn() && myRole() == 'customer'
+        && request.resource.data.customerId == request.auth.uid;
+      allow read: if signedIn()
+        && (resource.data.customerId == request.auth.uid || isAdmin());
       allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
+
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if request.auth != null && request.auth.token.role == 'customer';
-      allow update, delete: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow create: if signedIn() && myRole() == 'customer'
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin()
+        || (signedIn() && resource.data.userId == request.auth.uid);
     }
-    function isAdmin() {
-      return request.auth != null && (request.auth.token.role == 'admin' || request.auth.token.role == 'manager');
-    }
-    function isSellerInOrder(orderResource) {
-      if (request.auth == null) return false;
-      return orderResource.data.items != null && orderResource.data.items.values().hasAny(item => item.sellerId == request.auth.uid);
+
+    match /sellers/{sellerId} {
+      allow read: if true;
+      allow create: if isAdmin() || (isMerchant() && request.resource.data.ownerUserId == request.auth.uid);
+      allow update, delete: if isAdmin()
+        || (isMerchant() && resource.data.ownerUserId == request.auth.uid);
     }
   }
 }
