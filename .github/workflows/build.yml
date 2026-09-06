@@ -62,6 +62,7 @@ jobs:
           data = json.loads(Path('/tmp/google-services.json').read_text())
           project = data['project_info']
           clients = data.get('client', [])
+          target_package = 'com.alfaeq.yemen'
           android_clients = [
               c for c in clients
               if c.get('client_info', {}).get('android_client_info', {}).get('package_name')
@@ -69,17 +70,18 @@ jobs:
           if not android_clients:
               raise SystemExit('GOOGLE_SERVICES_JSON contains no Android Firebase client.')
 
-          target_package = 'com.alfaeq.yemen'
           client = next(
               (c for c in android_clients
                if c.get('client_info', {}).get('android_client_info', {}).get('package_name') == target_package),
-              android_clients[0],
+              None,
           )
-          selected_package = client['client_info']['android_client_info']['package_name']
-          print(f'Using Firebase Android client: {selected_package}')
-          if selected_package != target_package:
-              print('Note: using the first Firebase Android client because com.alfaeq.yemen is not yet registered in this JSON.')
+          if client is None:
+              available = [c['client_info']['android_client_info']['package_name'] for c in android_clients]
+              raise SystemExit(
+                  f'Firebase package mismatch: {target_package} is not registered in GOOGLE_SERVICES_JSON. Available: {available}'
+              )
 
+          print(f'Using Firebase Android client: {target_package}')
           api_key = client['api_key'][0]['current_key']
           app_id = client['client_info']['mobilesdk_app_id']
           sender_id = project['project_number']
@@ -131,6 +133,3 @@ jobs:
           name: alfaeq-yemen-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
-
-# Build-only Firebase fallback. No project files are deleted.
-# Triggered after source repairs so the next run validates the current main branch.
