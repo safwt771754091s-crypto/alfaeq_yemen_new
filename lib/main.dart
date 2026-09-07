@@ -10,6 +10,7 @@ import 'screens/admin_dashboard.dart';
 import 'screens/ai_assistant_page.dart';
 import 'screens/auth_gate.dart';
 import 'screens/developer_page.dart';
+import 'screens/my_orders_page.dart';
 import 'services/auth_service.dart';
 
 Future<void> main() async {
@@ -96,12 +97,14 @@ class HomePage extends StatelessWidget {
             PopupMenuButton<String>(
               onSelected: (value) {
                 if (value == 'ai') Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()));
+                if (value == 'orders') Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersPage()));
                 if (value == 'admin') _openAdmin(context);
                 if (value == 'developer') _openDeveloper(context);
                 if (value == 'logout') _signOut(context);
               },
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'ai', child: ListTile(leading: Icon(Icons.auto_awesome), title: Text('ذكاء الفائق'))),
+                PopupMenuItem(value: 'orders', child: ListTile(leading: Icon(Icons.receipt_long_outlined), title: Text('طلباتي وتتبع الطلبات'))),
                 PopupMenuItem(value: 'admin', child: ListTile(leading: Icon(Icons.admin_panel_settings_outlined), title: Text('لوحة الإدارة'))),
                 PopupMenuItem(value: 'developer', child: ListTile(leading: Icon(Icons.code), title: Text('صفحة المطور'))),
                 PopupMenuItem(value: 'logout', child: ListTile(leading: Icon(Icons.logout), title: Text('تسجيل الخروج'))),
