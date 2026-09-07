@@ -2,14 +2,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FirestoreService {
   final FirebaseFirestore db;
-  FirestoreService({FirebaseFirestore? firestore}) : db = firestore ?? FirebaseFirestore.instance;
+
+  FirestoreService({FirebaseFirestore? firestore})
+      : db = firestore ?? FirebaseFirestore.instance;
 
   Stream<QuerySnapshot<Map<String, dynamic>>> activeStores(String sectionId) {
-    return db.collection('stores').where('sectionId', isEqualTo: sectionId).where('status', isEqualTo: 'approved').snapshots();
+    return db
+        .collection('stores')
+        .where('sectionId', isEqualTo: sectionId)
+        .where('status', isEqualTo: 'approved')
+        .snapshots();
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> activeProducts(String storeId) {
-    return db.collection('products').where('storeId', isEqualTo: storeId).where('status', isEqualTo: 'active').snapshots();
+    return db
+        .collection('products')
+        .where('storeId', isEqualTo: storeId)
+        .where('status', isEqualTo: 'active')
+        .snapshots();
   }
 
   Future<DocumentReference<Map<String, dynamic>>> createOrder({
@@ -30,12 +40,13 @@ class FirestoreService {
     });
   }
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>> order(String orderId) => db.collection('orders').doc(orderId).snapshots();
+  Stream<DocumentSnapshot<Map<String, dynamic>>> order(String orderId) =>
+      db.collection('orders').doc(orderId).snapshots();
 
   Future<void> updateDelivery(String orderId, String status, {GeoPoint? location}) {
     return db.collection('orders').doc(orderId).update({
       'deliveryStatus': status,
-      if (location != null) 'deliveryLocation': location,
+      'deliveryLocation': ?location,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
