@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_sections.dart';
+import 'admin_data_entry.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -13,15 +14,21 @@ class AdminDashboard extends StatelessWidget {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text('صلاحيات الإدارة', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+            const Text('الإدارة الفعلية', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            const Text('إضافة بيانات حقيقية إلى Firestore. لا توجد منتجات أو أسعار وهمية.'),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDataEntry())),
+              icon: const Icon(Icons.add_business),
+              label: const Text('إضافة تاجر وصنف حقيقي'),
+            ),
             const SizedBox(height: 12),
-            const Text('المدير يوافق على التجار، ينشئ الأقسام، يدير المنتجات والطلبات، ويتابع التوصيل.'),
-            const SizedBox(height: 20),
-            _ActionCard(icon: Icons.store, title: 'إضافة / اعتماد تاجر', onTap: () => _message(context, 'نموذج التاجر سيرتبط بـ Firestore')),
-            _ActionCard(icon: Icons.category, title: 'إدارة الأقسام الـ16', onTap: () => _message(context, 'الأقسام مسجلة في app_sections.dart ويمكن إدارتها من Firestore')),
-            _ActionCard(icon: Icons.inventory_2, title: 'إدارة المنتجات', onTap: () => _message(context, 'المنتجات مرتبطة بالمتجر وFirestore')),
-            _ActionCard(icon: Icons.local_shipping, title: 'إدارة التوصيل', onTap: () => _message(context, 'تعيين المندوب وتحديث حالة التوصيل')),
-            _ActionCard(icon: Icons.receipt_long, title: 'الطلبات والمدفوعات', onTap: () => _message(context, 'الطلبات والمدفوعات تحفظ مع سجل زمني')),
+            _ActionCard(icon: Icons.store, title: 'اعتماد وإدارة التجار', onTap: () => _message(context, 'التجار يحفظون في مجموعة stores.')),
+            _ActionCard(icon: Icons.category, title: 'إدارة الأقسام الـ16', onTap: () => _message(context, 'الأقسام معرفة مركزيًا ويمكن نقلها إلى مجموعة sections عند تفعيل الإدارة الديناميكية.')),
+            _ActionCard(icon: Icons.inventory_2, title: 'إدارة المنتجات', onTap: () => _message(context, 'المنتجات تحفظ في products وترتبط بالمتجر.')),
+            _ActionCard(icon: Icons.local_shipping, title: 'إدارة التوصيل', onTap: () => _message(context, 'الطلب يحتوي deliveryStatus ويمكن ربطه بالمندوب والموقع.')),
+            _ActionCard(icon: Icons.receipt_long, title: 'الطلبات والمدفوعات', onTap: () => _message(context, 'الطلبات والمدفوعات تحفظ بسجل زمني في Firestore.')),
             const SizedBox(height: 18),
             const Text('الأقسام', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
