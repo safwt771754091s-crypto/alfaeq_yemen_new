@@ -21,13 +21,13 @@ Future<void> main() async {
     const siteKey = String.fromEnvironment('RECAPTCHA_V3_SITE_KEY');
     if (siteKey.isNotEmpty) {
       await FirebaseAppCheck.instance.activate(
-        webProvider: ReCaptchaV3Provider(siteKey),
+        providerWeb: ReCaptchaV3Provider(siteKey),
       );
     }
   } else {
     await FirebaseAppCheck.instance.activate(
-      androidProvider: AndroidProvider.playIntegrity,
-      appleProvider: AppleProvider.appAttest,
+      providerAndroid: const AndroidPlayIntegrityProvider(),
+      providerApple: const AppleAppAttestProvider(),
     );
   }
   runApp(const AlfaeqYemenApp());
