@@ -25,35 +25,36 @@ service cloud.firestore {
     match /stores/{id} {
       allow read: if resource.data.status == 'approved' || staff() || developer() || (merchant() && resource.data.ownerId == request.auth.uid);
       allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid);
-      allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid);
+      allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId);
       allow delete: if staff();
     }
 
     match /products/{id} {
       allow read: if resource.data.status == 'active' || staff() || developer() || (merchant() && resource.data.ownerId == request.auth.uid);
       allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid);
-      allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid);
+      allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId && request.resource.data.storeId == resource.data.storeId);
       allow delete: if staff() || (merchant() && resource.data.ownerId == request.auth.uid);
     }
 
     match /orders/{id} {
       allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
       allow read: if staff() || developer() || (signedIn() && resource.data.customerId == request.auth.uid) || (merchant() && resource.data.merchantId == request.auth.uid) || (driver() && resource.data.driverId == request.auth.uid);
-      allow update: if staff() || (driver() && resource.data.driverId == request.auth.uid) || (merchant() && resource.data.merchantId == request.auth.uid);
+      allow update: if staff()
+        || (merchant() && resource.data.merchantId == request.auth.uid && request.resource.data.customerId == resource.data.customerId && request.resource.data.merchantId == resource.data.merchantId)
+        || (driver() && resource.data.driverId == request.auth.uid && request.resource.data.customerId == resource.data.customerId && request.resource.data.driverId == resource.data.driverId);
       allow delete: if staff();
     }
 
     match /deliveryEvents/{id} {
       allow read: if staff() || developer() || (driver() && resource.data.driverId == request.auth.uid);
-      allow create: if staff() || driver();
+      allow create: if staff() || (driver() && request.resource.data.driverId == request.auth.uid);
       allow update, delete: if staff();
     }
 
     match /payments/{id} {
       allow read: if staff() || developer() || (signedIn() && resource.data.customerId == request.auth.uid);
       allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
-      allow update: if staff();
-      allow delete: if staff();
+      allow update, delete: if staff();
     }
 
     match /reviews/{id} {
@@ -69,7 +70,7 @@ service cloud.firestore {
 
     match /securityReports/{id} {
       allow read: if staff() || developer();
-      allow create: if staff() || developer();
+      allow create: if staff() || (developer() && request.resource.data.actorUid == request.auth.uid);
       allow update, delete: if staff();
     }
 
