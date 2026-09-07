@@ -40,6 +40,13 @@ class AlfaeqAiToolRegistry {
           optionalParameters: const ['status'],
         ),
         FunctionDeclaration(
+          'get_my_order',
+          'Read one signed-in user order by ID. Access is still enforced by Firestore rules; never access another user order.',
+          parameters: {
+            'orderId': Schema.string(description: 'Order document ID.'),
+          },
+        ),
+        FunctionDeclaration(
           'get_my_account_summary',
           'Read a safe summary of the signed-in account. Never return authentication secrets.',
           parameters: {},
@@ -87,6 +94,7 @@ class AlfaeqAiToolRegistry {
       switch (name) {
         case 'search_catalog': return await _searchCatalog(args);
         case 'get_my_orders': return await _getMyOrders(args);
+        case 'get_my_order': return await _getMyOrder(args);
         case 'get_my_account_summary': return await _getMyAccountSummary();
         case 'get_security_summary': return await _getSecuritySummary(audit: audit);
         case 'create_order_draft':
@@ -138,7 +146,7 @@ class AlfaeqAiToolRegistry {
     final user = _auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
     final requestedStatus = (args['status'] ?? 'all').toString();
-    final snap = await _db.collection('orders').where('userId', isEqualTo: user.uid).limit(20).get();
+    final snap = await _db.collection('orders').where('customerId', isEqualTo: user.uid).limit(20).get();
     final orders = <Map<String, Object?>>[];
     for (final doc in snap.docs) {
       final data = doc.data();
@@ -148,6 +156,37 @@ class AlfaeqAiToolRegistry {
       if (orders.length >= _maxResults) break;
     }
     return {'ok': true, 'orders': orders, 'resultCount': orders.length};
+  }
+
+  Future<Map<String, Object?>> _getMyOrder(Map<String, Object?> args) async {
+    final user = _auth.currentUser;
+    if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
+    final orderId = (args['orderId'] ?? '').toString().trim();
+    if (orderId.isEmpty || orderId.length > 128) {
+      return {'ok': false, 'error': 'رقم الطلب غير صالح.'};
+    }
+
+    final doc = await _db.collection('orders').doc(orderId).get();
+    if (!doc.exists) return {'ok': false, 'error': 'الطلب غير موجود.'};
+    final data = doc.data()!;
+    if (data['customerId'] != user.uid) {
+      return {'ok': false, 'error': 'لا تملك صلاحية الوصول إلى هذا الطلب.'};
+    }
+
+    return {
+      'ok': true,
+      'order': {
+        'id': doc.id,
+        'status': data['status'],
+        'deliveryStatus': data['deliveryStatus'],
+        'itemCount': data['items'] is List ? (data['items'] as List).length : null,
+        'total': data['total'],
+        'currency': data['currency'] ?? 'YER',
+        'paymentMethod': data['paymentMethod'],
+        'createdAt': _safeDate(data['createdAt']),
+        'updatedAt': _safeDate(data['updatedAt']),
+      },
+    };
   }
 
   Future<Map<String, Object?>> _getMyAccountSummary() async {
