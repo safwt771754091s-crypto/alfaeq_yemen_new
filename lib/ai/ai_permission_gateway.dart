@@ -37,6 +37,11 @@ class AlfaeqAiPermissionGateway {
       roles: <String>{'developer', 'admin', 'owner'},
       requiresSignIn: true,
     ),
+    'create_order_draft': _AiActionPolicy(
+      level: AiActionLevel.reversible,
+      roles: <String>{'customer', 'merchant', 'driver', 'developer', 'admin', 'owner'},
+      requiresSignIn: true,
+    ),
   };
 
   Future<AiPermissionDecision> authorize(
@@ -55,12 +60,6 @@ class AlfaeqAiPermissionGateway {
       return AiPermissionDecision.denied('يجب تسجيل الدخول أولاً.');
     }
 
-    if (policy.level != AiActionLevel.read && !userConfirmed) {
-      return AiPermissionDecision.confirmationRequired(
-        'هذه العملية تتطلب تأكيداً صريحاً قبل التنفيذ.',
-      );
-    }
-
     if (user == null) {
       return AiPermissionDecision.allowed(role: 'anonymous', level: policy.level);
     }
@@ -70,6 +69,14 @@ class AlfaeqAiPermissionGateway {
       return AiPermissionDecision.denied(
         'ليس لديك صلاحية لتنفيذ هذه العملية.',
         role: role,
+      );
+    }
+
+    if (policy.level != AiActionLevel.read && !userConfirmed) {
+      return AiPermissionDecision.confirmationRequired(
+        'هذه العملية تتطلب تأكيداً صريحاً قبل التنفيذ.',
+        role: role,
+        level: policy.level,
       );
     }
 
@@ -139,10 +146,15 @@ class AiPermissionDecision {
         role: role,
       );
 
-  factory AiPermissionDecision.confirmationRequired(String message) =>
-      AiPermissionDecision(
+  factory AiPermissionDecision.confirmationRequired(
+    String message, {
+    String? role,
+    AiActionLevel? level,
+  }) => AiPermissionDecision(
         allowed: false,
         requiresConfirmation: true,
         message: message,
+        role: role,
+        level: level,
       );
 }
