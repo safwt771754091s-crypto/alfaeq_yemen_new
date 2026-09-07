@@ -34,7 +34,7 @@ jobs:
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
       - name: Generate Firebase configuration
         run: |
-          flutterfire configure --project=alfaeq-yemen-fed37 --platforms=web,android --yes --out=lib/firebase_options.dart
+          flutterfire configure --project=alfaeq-yemen-fed37 --platforms=web --yes --out=lib/firebase_options.dart
           test -s lib/firebase_options.dart
           echo "Firebase configuration generated: $(wc -c < lib/firebase_options.dart) bytes"
       - name: Analyze
