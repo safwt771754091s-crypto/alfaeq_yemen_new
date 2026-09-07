@@ -1,8 +1,16 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'core/app_sections.dart';
+import 'firebase_options.dart';
 import 'screens/admin_dashboard.dart';
 
-void main() => runApp(const AlfaeqYemenApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(const AlfaeqYemenApp());
+}
 
 class AlfaeqYemenApp extends StatelessWidget {
   const AlfaeqYemenApp({super.key});
@@ -182,27 +190,55 @@ class SectionPage extends StatelessWidget {
             const Card(
               child: ListTile(
                 leading: Icon(Icons.cloud_outlined),
-                title: Text('بيانات القسم من Firebase'),
+                title: Text('متصل ببيانات Firebase'),
                 subtitle: Text(
-                  'لن يتم عرض منتجات أو أسعار وهمية. سيظهر المحتوى بعد اعتماد التاجر والبيانات الحقيقية.',
+                  'سيظهر هنا المحتوى الحقيقي للتجار والأصناف بعد اعتماد البيانات.',
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            const Card(
-              child: ListTile(
-                leading: Icon(Icons.store_outlined),
-                title: Text('التجار المعتمدون'),
-                subtitle: Text('المتاجر والمنتجات تُدار من لوحة الإدارة والتاجر.'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Card(
-              child: ListTile(
-                leading: Icon(Icons.local_shipping_outlined),
-                title: Text('التوصيل وتتبع الطلب'),
-                subtitle: Text('الطلبات يمكن ربطها بمندوب وحالات توصيل وموقع آخر مسجل.'),
-              ),
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('stores')
+                  .where('sectionId', isEqualTo: section.id)
+                  .where('status', isEqualTo: 'approved')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.error_outline),
+                      title: const Text('تعذر قراءة التجار'),
+                      subtitle: Text('${snapshot.error}'),
+                    ),
+                  );
+                }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Card(child: ListTile(title: Text('جاري تحميل التجار...')));
+                }
+                final stores = snapshot.data?.docs ?? const [];
+                if (stores.isEmpty) {
+                  return const Card(
+                    child: ListTile(
+                      leading: Icon(Icons.store_outlined),
+                      title: Text('لا يوجد تجار معتمدون بعد'),
+                      subtitle: Text('أضف أول تاجر حقيقي من لوحة الإدارة.'),
+                    ),
+                  );
+                }
+                return Column(
+                  children: stores.map((store) {
+                    final data = store.data();
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.storefront_outlined),
+                        title: Text('${data['name'] ?? 'متجر'}'),
+                        subtitle: Text('${data['address'] ?? ''}'),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
             ),
           ],
         ),
