@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_ai/firebase_ai.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'ai_tools.dart';
@@ -21,8 +20,6 @@ class AlfaeqAiService {
 
   GenerativeModel _model() {
     final ai = FirebaseAI.googleAI(
-      auth: FirebaseAuth.instance,
-      appCheck: FirebaseAppCheck.instance,
       useLimitedUseAppCheckTokens: true,
     );
     return ai.generativeModel(
@@ -88,8 +85,6 @@ class AlfaeqAiService {
   Stream<String> streamMessage(String message) async* {
     final text = message.trim();
     if (text.isEmpty) return;
-    // Streaming remains available for normal conversational turns. Tool calls
-    // use the deterministic sendMessage path so every tool result is audited.
     final session = _chat ??= _model().startChat(maxTurns: 40);
     await for (final response in session.sendMessageStream(Content.text(text))) {
       final chunk = response.text;
