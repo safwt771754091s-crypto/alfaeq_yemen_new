@@ -36,9 +36,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
         'source': 'developer_center',
         'createdAt': FieldValue.serverTimestamp(),
       });
-    } catch (_) {
-      // Audit failures must never crash the developer center.
-    }
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -54,9 +52,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
         await _checkAppIntegrity();
         await _writeAudit(action: 'developer_center_access', result: 'success');
       }
-    } catch (e) {
-      if (mounted) setState(() => _loading = false);
-    }
+    } catch (_) { if (mounted) setState(() => _loading = false); }
   }
 
   Future<void> _checkAppIntegrity() async {
@@ -93,24 +89,8 @@ class _DeveloperPageState extends State<DeveloperPage> {
       if (findings.isEmpty) findings.add('لم يظهر خلل حرج في العينة المفحوصة. الفحص الحالي حدّه 200 سجل لكل مجموعة.');
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid != null) {
-        await FirebaseFirestore.instance.collection('securityReports').add({
-          'actorUid': uid,
-          'role': _role,
-          'findings': findings,
-          'counts': counts,
-          'appCheck': _appCheckStatus,
-          'createdAt': FieldValue.serverTimestamp(),
-          'type': 'automated_security_scan',
-        });
-        await _writeAudit(
-          action: 'security_scan',
-          result: 'success',
-          details: {
-            'findingsCount': findings.length,
-            'counts': counts,
-            'appCheck': _appCheckStatus,
-          },
-        );
+        await FirebaseFirestore.instance.collection('securityReports').add({'actorUid': uid, 'role': _role, 'findings': findings, 'counts': counts, 'appCheck': _appCheckStatus, 'createdAt': FieldValue.serverTimestamp(), 'type': 'automated_security_scan'});
+        await _writeAudit(action: 'security_scan', result: 'success', details: {'findingsCount': findings.length, 'counts': counts, 'appCheck': _appCheckStatus});
       }
     } catch (e) {
       findings.add('تعذر إكمال الفحص: $e');
@@ -136,6 +116,8 @@ class _DeveloperPageState extends State<DeveloperPage> {
           const SizedBox(height: 14), _sectionTitle('🤖 الأتمتة والفحص'),
           Card(child: ListTile(leading: const Icon(Icons.radar_outlined), title: const Text('فحص أمني تلقائي للبيانات', style: TextStyle(fontWeight: FontWeight.w900)), subtitle: Text(_lastScan == null ? 'يفحص عينة حقيقية من المستخدمين والمتاجر والمنتجات والطلبات والمدفوعات.' : 'آخر فحص: ${_lastScan!.toLocal()}'), trailing: FilledButton.icon(onPressed: _scanning ? null : _runSecurityScan, icon: _scanning ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.play_arrow), label: const Text('فحص')))),
           if (_counts.isNotEmpty) _dataOverview(), if (_findings.isNotEmpty) _findingsCard(),
+          const SizedBox(height: 14), _sectionTitle('📜 سجل التدقيق'),
+          _auditLogCard(),
           const SizedBox(height: 14), _sectionTitle('💻 تطوير التطبيق'),
           const _DevCard(icon: Icons.code, title: 'مراجعة الكود', subtitle: 'مركز المطور ينسق نتائج الفحص والإنذارات؛ فحص المصدر الكامل يتم عبر CI قبل النشر.'),
           const _DevCard(icon: Icons.storage, title: 'فحص البيانات', subtitle: 'يبحث عن ملكيات قديمة، أدوار ناقصة، ومؤشرات غير طبيعية في البيانات الحقيقية ضمن عينة محددة.'),
@@ -145,6 +127,55 @@ class _DeveloperPageState extends State<DeveloperPage> {
         ]),
       ),
     );
+  }
+
+  Widget _auditLogCard() {
+    final query = FirebaseFirestore.instance.collection('auditLogs').orderBy('createdAt', descending: true).limit(30);
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: query.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return Card(child: ListTile(leading: const Icon(Icons.error_outline), title: const Text('تعذر تحميل سجل التدقيق'), subtitle: Text('${snapshot.error}')));
+        if (snapshot.connectionState == ConnectionState.waiting) return const Card(child: Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())));
+        final docs = snapshot.data?.docs ?? [];
+        if (docs.isEmpty) return const Card(child: ListTile(leading: Icon(Icons.history), title: Text('لا توجد عمليات مسجلة بعد'), subtitle: Text('ستظهر هنا العمليات الأمنية والتقنية الجديدة تلقائيًا.')));
+        return Card(child: Column(children: [
+          Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 8), child: Row(children: [const Icon(Icons.history), const SizedBox(width: 8), const Expanded(child: Text('آخر 30 عملية', style: TextStyle(fontWeight: FontWeight.w900))), Text('${docs.length} سجل')])),
+          const Divider(height: 1),
+          ...docs.map((doc) => _auditTile(doc)),
+        ]));
+      },
+    );
+  }
+
+  Widget _auditTile(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    final result = (data['result'] ?? 'unknown').toString();
+    final severity = (data['severity'] ?? 'info').toString();
+    final action = (data['action'] ?? 'عملية غير معروفة').toString();
+    final rawDetails = data['details'];
+    final details = rawDetails is Map ? rawDetails.entries.map((e) => '${e.key}: ${e.value}').join(' • ') : (rawDetails ?? '').toString();
+    final email = (data['actorEmail'] ?? data['actorUid'] ?? 'غير معروف').toString();
+    final timestamp = data['createdAt'];
+    final date = timestamp is Timestamp ? timestamp.toDate() : null;
+    final status = _auditStatus(result, severity);
+    return ListTile(
+      leading: CircleAvatar(backgroundColor: status.color.withValues(alpha: .12), child: Icon(status.icon, color: status.color)),
+      title: Text(_actionLabel(action), style: const TextStyle(fontWeight: FontWeight.w800)),
+      subtitle: Text('$email\n${details.isEmpty ? 'بدون تفاصيل' : details}${date == null ? '' : '\n${date.toLocal()}'}'),
+      isThreeLine: true,
+      trailing: Chip(label: Text(status.label)),
+    );
+  }
+
+  ({String label, IconData icon, Color color}) _auditStatus(String result, String severity) {
+    if (result == 'failed' || result == 'failure' || severity == 'critical') return (label: 'فشل', icon: Icons.error, color: Colors.red);
+    if (severity == 'warning') return (label: 'تحذير', icon: Icons.warning_amber, color: Colors.orange);
+    return (label: 'نجاح', icon: Icons.check_circle, color: Colors.green);
+  }
+
+  String _actionLabel(String action) {
+    const labels = {'security_scan': 'فحص أمني', 'developer_center_access': 'فتح مركز المطور'};
+    return labels[action] ?? action;
   }
 
   Widget _heroCard() => Card(color: const Color(0xFF0B6E4F), child: const Padding(padding: EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.shield_outlined, color: Colors.white, size: 38), SizedBox(height: 10), Text('مركز المطور الذكي', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)), SizedBox(height: 6), Text('تطوير • فحص • أتمتة • أمن سيبراني • حماية البيانات', style: TextStyle(color: Colors.white70))])));
