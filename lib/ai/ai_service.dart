@@ -7,8 +7,9 @@ import 'ai_tools.dart';
 
 /// Production AI gateway for Alfaeq Yemen.
 ///
-/// Model tool calls are never executed directly. Every action passes through
-/// AlfaeqAiPermissionGateway first, then through the allow-listed tool registry.
+/// Model tool calls never execute directly. Every action passes through the
+/// permission gateway. Reversible actions can pause for an explicit UI
+/// confirmation before the tool is executed.
 class AlfaeqAiService {
   static const String modelName = 'gemini-3.5-flash';
   static const int _maxToolRounds = 6;
@@ -16,12 +17,16 @@ class AlfaeqAiService {
   final AlfaeqAiToolRegistry _tools;
   final AlfaeqAiPermissionGateway _permissions;
   ChatSession? _chat;
+  _PendingAiAction? _pendingAction;
 
   AlfaeqAiService({
     AlfaeqAiToolRegistry? tools,
     AlfaeqAiPermissionGateway? permissions,
   })  : _tools = tools ?? AlfaeqAiToolRegistry(),
         _permissions = permissions ?? AlfaeqAiPermissionGateway();
+
+  bool get hasPendingConfirmation => _pendingAction != null;
+  String? get pendingActionName => _pendingAction?.name;
 
   GenerativeModel _model() {
     final ai = FirebaseAI.googleAI(
@@ -40,8 +45,10 @@ class AlfaeqAiService {
 - لا تدّعي تنفيذ عملية لم تنفذ فعلياً.
 - لا تطلب أو تكشف كلمات المرور أو مفاتيح API أو الرموز السرية أو بيانات الدفع الحساسة.
 - كل طلب أداة يمر أولاً عبر بوابة الصلاحيات. لا تحاول تجاوزها.
-- الأدوات الحالية للقراءة الآمنة فقط. لا تنفذ دفعاً أو شراءً أو إلغاءً أو تغيير صلاحيات أو عملية إدارية حساسة.
-- أي عملية تغيير مستقبلية يجب أن تمر عبر طبقة صلاحيات موثوقة، وتتحقق من هوية المستخدم ودوره، وتطلب تأكيداً صريحاً للعمليات عالية الخطورة.
+- عمليات القراءة الآمنة يمكن تنفيذها تلقائياً.
+- إنشاء طلب شراء معلّق عملية قابلة للتراجع وتتطلب تأكيداً صريحاً من المستخدم قبل التنفيذ، ولا تعني معالجة الدفع.
+- لا تنفذ دفعاً أو تغيير صلاحيات أو عملية إدارية حساسة من داخل العميل.
+- أي عملية حساسة مستقبلية يجب أن تمر عبر خدمة موثوقة على الخادم، وتتحقق من الهوية والدور وApp Check وتسجيل التدقيق.
 - لا تحاول التحايل على الصلاحيات أو قواعد Firestore.
 - عند رفض الصلاحية أو فشل الأداة، صرّح بذلك بوضوح ولا تدّعي النجاح.
 - اجعل الإجابة النهائية مفهومة ومختصرة، واذكر عندما استخدمت بيانات حقيقية من المنصة.
@@ -72,9 +79,13 @@ class AlfaeqAiService {
 
   Future<Map<String, Object?>> _executeThroughGateway(
     String tool,
-    Map<String, Object?> args,
-  ) async {
-    final decision = await _permissions.authorize(tool);
+    Map<String, Object?> args, {
+    bool userConfirmed = false,
+  }) async {
+    final decision = await _permissions.authorize(
+      tool,
+      userConfirmed: userConfirmed,
+    );
     if (!decision.allowed) {
       await _audit(
         action: 'ai_permission_$tool',
@@ -98,10 +109,20 @@ class AlfaeqAiService {
     await _audit(
       action: 'ai_permission_$tool',
       result: 'allowed',
-      details: {'tool': tool, 'role': decision.role, 'level': decision.level?.name},
+      details: {
+        'tool': tool,
+        'role': decision.role,
+        'level': decision.level?.name,
+        'confirmed': userConfirmed,
+      },
     );
 
-    return _tools.execute(tool, args, audit: _audit);
+    return _tools.execute(
+      tool,
+      args,
+      audit: _audit,
+      userConfirmed: userConfirmed,
+    );
   }
 
   Future<String> sendMessage(String message) async {
@@ -120,7 +141,22 @@ class AlfaeqAiService {
           result: 'requested',
           details: {'tool': call.name, 'args': call.args},
         );
+
         final result = await _executeThroughGateway(call.name, call.args);
+        if (result['permission'] == 'confirmation_required') {
+          _pendingAction = _PendingAiAction(
+            name: call.name,
+            args: Map<String, Object?>.from(call.args),
+            id: call.id,
+          );
+          await _audit(
+            action: 'ai_action_waiting_confirmation',
+            result: 'pending',
+            details: {'tool': call.name},
+          );
+          return 'هذه العملية تحتاج تأكيدك الصريح قبل التنفيذ. راجع التفاصيل ثم اضغط «تأكيد التنفيذ». ';
+        }
+
         await _audit(
           action: 'ai_tool_executed',
           result: result['ok'] == true ? 'success' : 'blocked',
@@ -138,6 +174,82 @@ class AlfaeqAiService {
         : 'لم يصل رد نصي من خدمة الذكاء الاصطناعي.';
   }
 
+  /// Executes the action previously paused by the gateway after the user
+  /// presses the confirmation control in the UI.
+  Future<String> confirmPendingAction() async {
+    final pending = _pendingAction;
+    if (pending == null) return 'لا توجد عملية معلقة للتأكيد.';
+    _pendingAction = null;
+
+    final session = _chat;
+    if (session == null) return 'انتهت جلسة العملية. أعد طلب العملية من جديد.';
+
+    final result = await _executeThroughGateway(
+      pending.name,
+      pending.args,
+      userConfirmed: true,
+    );
+    await _audit(
+      action: 'ai_tool_executed',
+      result: result['ok'] == true ? 'success' : 'blocked',
+      details: {
+        'tool': pending.name,
+        'permission': result['permission'],
+        'confirmedByUser': true,
+      },
+    );
+
+    var response = await session.sendMessage(
+      Content.functionResponse(pending.name, result, id: pending.id),
+    );
+
+    for (var round = 0; round < _maxToolRounds; round++) {
+      final calls = response.functionCalls.toList();
+      if (calls.isEmpty) break;
+      for (final call in calls) {
+        await _audit(
+          action: 'ai_tool_requested',
+          result: 'requested',
+          details: {'tool': call.name, 'args': call.args},
+        );
+        final next = await _executeThroughGateway(call.name, call.args);
+        if (next['permission'] == 'confirmation_required') {
+          _pendingAction = _PendingAiAction(
+            name: call.name,
+            args: Map<String, Object?>.from(call.args),
+            id: call.id,
+          );
+          return 'توجد عملية أخرى تحتاج تأكيدك الصريح قبل التنفيذ.';
+        }
+        await _audit(
+          action: 'ai_tool_executed',
+          result: next['ok'] == true ? 'success' : 'blocked',
+          details: {'tool': call.name, 'permission': next['permission']},
+        );
+        response = await session.sendMessage(
+          Content.functionResponse(call.name, next, id: call.id),
+        );
+      }
+    }
+
+    final answer = response.text?.trim();
+    return answer?.isNotEmpty == true
+        ? answer!
+        : (result['message']?.toString() ?? 'تمت معالجة العملية.');
+  }
+
+  void cancelPendingAction() {
+    final pending = _pendingAction;
+    _pendingAction = null;
+    if (pending != null) {
+      _audit(
+        action: 'ai_action_confirmation_cancelled',
+        result: 'cancelled',
+        details: {'tool': pending.name},
+      );
+    }
+  }
+
   Stream<String> streamMessage(String message) async* {
     final text = message.trim();
     if (text.isEmpty) return;
@@ -149,6 +261,19 @@ class AlfaeqAiService {
   }
 
   void resetConversation() {
+    _pendingAction = null;
     _chat = null;
   }
+}
+
+class _PendingAiAction {
+  final String name;
+  final Map<String, Object?> args;
+  final String? id;
+
+  const _PendingAiAction({
+    required this.name,
+    required this.args,
+    required this.id,
+  });
 }
