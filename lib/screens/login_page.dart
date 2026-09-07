@@ -96,7 +96,7 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 8),
               SizedBox(width: double.infinity, child: FilledButton(onPressed: _loading ? null : _submit, child: _loading ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)) : Text(_register ? 'إنشاء الحساب' : 'تسجيل الدخول'))),
               TextButton(onPressed: _loading ? null : () => setState(() => _register = !_register), child: Text(_register ? 'لديك حساب؟ تسجيل الدخول' : 'ليس لديك حساب؟ إنشاء حساب')),
-            ]))),
+            ])))),
           ])),
         ))),
       ),
