@@ -39,7 +39,15 @@ jobs:
           echo "Firebase configuration generated: $(wc -c < lib/firebase_options.dart) bytes"
       - name: Analyze
         run: flutter analyze --no-fatal-infos
-      - name: Build Web
-        run: flutter build web --release
+      - name: Build Web without PWA service worker
+        run: flutter build web --release --pwa-strategy=none
+      - name: Verify fresh web build
+        run: |
+          test -s build/web/index.html
+          if test -f build/web/flutter_service_worker.js; then
+            echo "ERROR: Flutter service worker still exists"
+            exit 1
+          fi
+          echo "Fresh web build verified: $(du -sh build/web | cut -f1)"
       - name: Deploy Hosting and Firestore rules
         run: firebase deploy --only hosting,firestore --project alfaeq-yemen-fed37
