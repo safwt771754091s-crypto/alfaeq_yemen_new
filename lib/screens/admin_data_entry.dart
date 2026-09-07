@@ -65,7 +65,7 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
     body: ListView(padding: const EdgeInsets.all(16), children: [
       const Text('التاجر', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900)),
       const SizedBox(height: 12),
-      DropdownButtonFormField<String>(value: sectionId, decoration: const InputDecoration(labelText: 'القسم'), items: [for (final s in appSections) DropdownMenuItem(value: s.id, child: Text(s.title))], onChanged: (v) => setState(() => sectionId = v!)),
+      DropdownButtonFormField<String>(initialValue: sectionId, decoration: const InputDecoration(labelText: 'القسم'), items: [for (final s in appSections) DropdownMenuItem(value: s.id, child: Text(s.title))], onChanged: (v) => setState(() => sectionId = v!)),
       TextField(controller: merchantName, decoration: const InputDecoration(labelText: 'اسم التاجر الحقيقي')),
       TextField(controller: merchantPhone, decoration: const InputDecoration(labelText: 'رقم الهاتف')),
       TextField(controller: merchantAddress, decoration: const InputDecoration(labelText: 'العنوان')),
