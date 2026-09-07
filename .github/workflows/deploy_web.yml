@@ -26,7 +26,6 @@ jobs:
             echo "Web platform already exists; keeping repository files unchanged."
           fi
           test -f web/index.html
-          test -f web/flutter_bootstrap.js
       - name: Authenticate Google/Firebase
         uses: google-github-actions/auth@v2
         with:
