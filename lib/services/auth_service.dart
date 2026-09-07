@@ -37,17 +37,49 @@ class AuthService {
 
   Future<void> signOut() => auth.signOut();
 
+  Future<Map<String, dynamic>> claims({bool forceRefresh = true}) async {
+    final user = auth.currentUser;
+    if (user == null) return const {};
+    final token = await user.getIdTokenResult(forceRefresh);
+    return Map<String, dynamic>.from(token.claims ?? const {});
+  }
+
   Future<String> role() async {
     final user = auth.currentUser;
     if (user == null) return 'guest';
+    final tokenClaims = await claims();
+    final claimRole = tokenClaims['role'];
+    if (claimRole is String && claimRole.isNotEmpty) return claimRole;
+    if (tokenClaims['admin'] == true) return 'admin';
     final snap = await db.collection('users').doc(user.uid).get();
     return (snap.data()?['role'] as String?) ?? 'customer';
   }
 
   Future<bool> hasAdminClaim() async {
+    final tokenClaims = await claims();
+    return tokenClaims['admin'] == true || tokenClaims['role'] == 'admin' || tokenClaims['role'] == 'owner';
+  }
+
+  Future<bool> hasOwnerClaim() async {
+    final tokenClaims = await claims();
+    return tokenClaims['owner'] == true || tokenClaims['role'] == 'owner';
+  }
+
+  Future<bool> isDeveloper() async {
+    final tokenClaims = await claims();
+    if (tokenClaims['role'] == 'developer') return true;
     final user = auth.currentUser;
     if (user == null) return false;
-    final token = await user.getIdTokenResult(true);
-    return token.claims?['admin'] == true;
+    final snap = await db.collection('users').doc(user.uid).get();
+    return snap.data()?['role'] == 'developer';
+  }
+
+  Future<bool> canOpenDeveloperCenter() async {
+    final tokenClaims = await claims();
+    return tokenClaims['owner'] == true ||
+        tokenClaims['admin'] == true ||
+        tokenClaims['role'] == 'owner' ||
+        tokenClaims['role'] == 'admin' ||
+        tokenClaims['role'] == 'developer';
   }
 }
