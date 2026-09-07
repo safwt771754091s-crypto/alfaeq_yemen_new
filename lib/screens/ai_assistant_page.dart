@@ -56,6 +56,37 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     }
   }
 
+  Future<void> _confirmAction() async {
+    if (_busy || !_ai.hasPendingConfirmation) return;
+    setState(() => _busy = true);
+    try {
+      final answer = await _ai.confirmPendingAction();
+      if (!mounted) return;
+      setState(() => _messages.add(_AiMessage(text: answer, fromUser: false)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _messages.add(const _AiMessage(
+        text: 'تعذر تنفيذ العملية بعد التأكيد. لم يتم اعتبارها ناجحة.',
+        fromUser: false,
+        error: true,
+      )));
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+        _scrollToEnd();
+      }
+    }
+  }
+
+  void _cancelAction() {
+    if (_busy || !_ai.hasPendingConfirmation) return;
+    _ai.cancelPendingAction();
+    setState(() => _messages.add(const _AiMessage(
+      text: 'تم إلغاء العملية المعلقة. لم يتم تنفيذ أي تغيير.',
+      fromUser: false,
+    )));
+  }
+
   void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients) return;
@@ -127,6 +158,61 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                 },
               ),
             ),
+            if (_ai.hasPendingConfirmation)
+              SafeArea(
+                top: false,
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.verified_user_outlined),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'تأكيد مطلوب',
+                              style: TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'لن يتم تنفيذ العملية إلا بعد ضغطك على «تأكيد التنفيذ». يمكنك الإلغاء بأمان.',
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _busy ? null : _cancelAction,
+                              child: const Text('إلغاء'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: _busy ? null : _confirmAction,
+                              icon: const Icon(Icons.check_circle_outline),
+                              label: const Text('تأكيد التنفيذ'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             SafeArea(
               top: false,
               child: Padding(
