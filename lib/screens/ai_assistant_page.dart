@@ -180,15 +180,30 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'تأكيد مطلوب',
+                              'مراجعة وتأكيد',
                               style: TextStyle(fontWeight: FontWeight.w900),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 220),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          color: Theme.of(context).colorScheme.surface,
+                        ),
+                        child: SingleChildScrollView(
+                          child: Text(
+                            _ai.pendingActionDescription,
+                            style: const TextStyle(height: 1.45),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       const Text(
-                        'لن يتم تنفيذ العملية إلا بعد ضغطك على «تأكيد التنفيذ». يمكنك الإلغاء بأمان.',
+                        'الأسعار النهائية وحالة توفر المنتجات يتم التحقق منها من Firestore عند التنفيذ. لن يتم تحصيل أي مبلغ من خلال هذه العملية.',
                       ),
                       const SizedBox(height: 10),
                       Row(
