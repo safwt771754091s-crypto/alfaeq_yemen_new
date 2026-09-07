@@ -48,7 +48,6 @@ jobs:
           data = json.loads(Path('/tmp/firebase_apps.json').read_text(encoding='utf-8'))
           result = data.get('result', data) if isinstance(data, dict) else data
 
-          # Firebase CLI may return the app list directly or wrapped in an object.
           if isinstance(result, list):
               apps = result
           elif isinstance(result, dict):
@@ -85,16 +84,29 @@ jobs:
           from pathlib import Path
 
           raw = json.loads(Path('/tmp/firebase_web_config.json').read_text(encoding='utf-8'))
-          cfg = raw.get('result', raw) if isinstance(raw, dict) else raw
-          if isinstance(cfg, dict) and isinstance(cfg.get('config'), dict):
-              cfg = cfg['config']
-          if not isinstance(cfg, dict):
-              raise SystemExit('Firebase CLI returned an unexpected Web configuration format.')
+          required = ('apiKey', 'appId', 'messagingSenderId', 'projectId')
 
-          required = ['apiKey', 'appId', 'messagingSenderId', 'projectId']
-          missing = [key for key in required if not cfg.get(key)]
-          if missing:
-              raise SystemExit('Firebase Web configuration is missing: ' + ', '.join(missing))
+          def find_config(value):
+              if isinstance(value, dict):
+                  if all(value.get(key) for key in required):
+                      return value
+                  for child in value.values():
+                      found = find_config(child)
+                      if found:
+                          return found
+              elif isinstance(value, list):
+                  for child in value:
+                      found = find_config(child)
+                      if found:
+                          return found
+              return None
+
+          cfg = find_config(raw)
+          if not cfg:
+              raise SystemExit(
+                  'Firebase Web configuration was returned, but the required fields '
+                  'apiKey, appId, messagingSenderId, projectId could not be located.'
+              )
 
           def dart_string(value):
               return str(value).replace('\\', '\\\\').replace("'", "\\'")
