@@ -53,7 +53,21 @@ class AlfaeqAiToolRegistry {
           'create_order_draft',
           'Create a pending order after the user explicitly confirms. Never process payment. Use only the signed-in user as customerId.',
           parameters: {
-            'items': Schema.array(description: 'Order item objects with productId, name, quantity, and optional price/storeId.'),
+            'items': Schema.array(
+              description: 'Order items. Each item contains productId, name, quantity, and optional price/storeId.',
+              minItems: 1,
+              maxItems: 20,
+              items: Schema.object(
+                properties: {
+                  'productId': Schema.string(description: 'Product document ID.'),
+                  'name': Schema.string(description: 'Product name.'),
+                  'quantity': Schema.integer(description: 'Quantity from 1 to 100.', minimum: 1, maximum: 100),
+                  'price': Schema.number(description: 'Optional product price snapshot.'),
+                  'storeId': Schema.string(description: 'Optional store document ID.'),
+                },
+                optionalProperties: const ['price', 'storeId'],
+              ),
+            ),
             'address': Schema.string(description: 'Delivery address supplied by the signed-in user.'),
             'paymentMethod': Schema.enumString(
               enumValues: ['cash_on_delivery', 'al_kuraimi', 'cash_wallet', 'jeeb_wallet'],
