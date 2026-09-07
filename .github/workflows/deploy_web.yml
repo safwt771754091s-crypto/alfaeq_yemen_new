@@ -26,17 +26,20 @@ jobs:
         run: flutter create . --platforms web
       - name: Dependencies
         run: flutter pub get
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
       - name: Install FlutterFire CLI
         run: |
           dart pub global activate flutterfire_cli
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
       - name: Generate Firebase configuration
-        run: flutterfire configure --project=alfaeq-yemen-fed37 --platforms=web,android --yes
+        run: |
+          flutterfire configure --project=alfaeq-yemen-fed37 --platforms=web,android --yes --out=lib/firebase_options.dart
+          test -s lib/firebase_options.dart
+          echo "Firebase configuration generated: $(wc -c < lib/firebase_options.dart) bytes"
       - name: Analyze
         run: flutter analyze --no-fatal-infos
       - name: Build Web
         run: flutter build web --release
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
       - name: Deploy Hosting and Firestore rules
         run: firebase deploy --only hosting,firestore --project alfaeq-yemen-fed37
