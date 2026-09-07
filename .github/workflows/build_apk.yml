@@ -26,6 +26,11 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Verify source commit
+        run: |
+          echo "Building Alfaeq Yemen from commit: $(git rev-parse HEAD)"
+          echo "Branch: $(git branch --show-current)"
+
       - name: Ensure Android platform exists
         run: |
           if [ ! -f android/app/build.gradle.kts ]; then
@@ -124,10 +129,13 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug --no-tree-shake-icons
 
-      - name: Upload APK
+      - name: Upload latest APK and replace previous artifact
         uses: actions/upload-artifact@v4
         with:
           name: alfaeq-yemen-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
+          overwrite: true
+          retention-days: 7
 
-# Build trigger refreshed after Firebase secret update; no project files are deleted.
+# Every push to main builds the current commit. The APK artifact name is overwritten so an old APK is not left as the current download.
+# No project files are deleted.
