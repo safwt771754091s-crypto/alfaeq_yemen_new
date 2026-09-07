@@ -27,6 +27,11 @@ class AlfaeqAiPermissionGateway {
       roles: <String>{'customer', 'merchant', 'driver', 'developer', 'admin', 'owner'},
       requiresSignIn: true,
     ),
+    'get_my_order': _AiActionPolicy(
+      level: AiActionLevel.read,
+      roles: <String>{'customer', 'merchant', 'driver', 'developer', 'admin', 'owner'},
+      requiresSignIn: true,
+    ),
     'get_my_account_summary': _AiActionPolicy(
       level: AiActionLevel.read,
       roles: <String>{'customer', 'merchant', 'driver', 'developer', 'admin', 'owner'},
