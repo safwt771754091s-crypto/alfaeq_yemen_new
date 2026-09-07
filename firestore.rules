@@ -4,14 +4,14 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function admin() { return signedIn() && (request.auth.token.admin == true || request.auth.token.role == 'admin'); }
     function ownerRole() { return signedIn() && (request.auth.token.owner == true || request.auth.token.role == 'owner'); }
-    function developer() { return signedIn() && request.auth.token.role == 'developer'; }
+    function developer() { return signedIn() && (request.auth.token.role == 'developer' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'developer'); }
     function staff() { return admin() || ownerRole(); }
     function merchant() { return signedIn() && request.auth.token.role == 'merchant'; }
     function driver() { return signedIn() && request.auth.token.role == 'driver'; }
     function self(uid) { return signedIn() && request.auth.uid == uid; }
 
     match /users/{uid} {
-      allow read: if self(uid) || staff();
+      allow read: if self(uid) || staff() || developer();
       allow create: if staff() || (self(uid) && request.resource.data.role == 'customer' && request.resource.data.uid == request.auth.uid);
       allow update: if staff() || (self(uid) && request.resource.data.role == resource.data.role && request.resource.data.uid == resource.data.uid);
       allow delete: if staff();
@@ -23,14 +23,14 @@ service cloud.firestore {
     }
 
     match /stores/{id} {
-      allow read: if resource.data.status == 'approved' || staff() || (merchant() && resource.data.ownerId == request.auth.uid);
+      allow read: if resource.data.status == 'approved' || staff() || developer() || (merchant() && resource.data.ownerId == request.auth.uid);
       allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid);
       allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid);
       allow delete: if staff();
     }
 
     match /products/{id} {
-      allow read: if resource.data.status == 'active' || staff() || (merchant() && resource.data.ownerId == request.auth.uid);
+      allow read: if resource.data.status == 'active' || staff() || developer() || (merchant() && resource.data.ownerId == request.auth.uid);
       allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid);
       allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid);
       allow delete: if staff() || (merchant() && resource.data.ownerId == request.auth.uid);
@@ -38,19 +38,19 @@ service cloud.firestore {
 
     match /orders/{id} {
       allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
-      allow read: if staff() || (signedIn() && resource.data.customerId == request.auth.uid) || (merchant() && resource.data.merchantId == request.auth.uid) || (driver() && resource.data.driverId == request.auth.uid);
+      allow read: if staff() || developer() || (signedIn() && resource.data.customerId == request.auth.uid) || (merchant() && resource.data.merchantId == request.auth.uid) || (driver() && resource.data.driverId == request.auth.uid);
       allow update: if staff() || (driver() && resource.data.driverId == request.auth.uid) || (merchant() && resource.data.merchantId == request.auth.uid);
       allow delete: if staff();
     }
 
     match /deliveryEvents/{id} {
-      allow read: if staff() || (driver() && resource.data.driverId == request.auth.uid);
+      allow read: if staff() || developer() || (driver() && resource.data.driverId == request.auth.uid);
       allow create: if staff() || driver();
       allow update, delete: if staff();
     }
 
     match /payments/{id} {
-      allow read: if staff() || (signedIn() && resource.data.customerId == request.auth.uid);
+      allow read: if staff() || developer() || (signedIn() && resource.data.customerId == request.auth.uid);
       allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
       allow update: if staff();
       allow delete: if staff();
