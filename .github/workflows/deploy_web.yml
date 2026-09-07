@@ -43,12 +43,32 @@ jobs:
 
           WEB_APP_ID=$(python3 - <<'PY'
           import json
-          with open('/tmp/firebase_apps.json', encoding='utf-8') as f:
-              data = json.load(f)
-          apps = data.get('result', {}).get('apps', [])
-          web = next((a for a in apps if str(a.get('platform', '')).upper() == 'WEB'), None)
+          from pathlib import Path
+
+          data = json.loads(Path('/tmp/firebase_apps.json').read_text(encoding='utf-8'))
+          result = data.get('result', data) if isinstance(data, dict) else data
+
+          # Firebase CLI may return the app list directly or wrapped in an object.
+          if isinstance(result, list):
+              apps = result
+          elif isinstance(result, dict):
+              apps = result.get('apps', [])
+          else:
+              apps = []
+
+          if not isinstance(apps, list):
+              raise SystemExit('Firebase CLI returned an unexpected apps:list JSON format.')
+
+          web = next(
+              (a for a in apps if isinstance(a, dict) and str(a.get('platform', '')).upper() == 'WEB'),
+              None,
+          )
           if not web:
-              raise SystemExit('No Firebase Web App is registered in project alfaeq-yemen-fed37. Register one in Firebase Console first.')
+              raise SystemExit(
+                  'No Firebase Web App is registered in project alfaeq-yemen-fed37. '
+                  'Register one in Firebase Console first.'
+              )
+
           app_id = web.get('appId') or web.get('app_id')
           if not app_id:
               raise SystemExit('Firebase Web App was found but its appId is missing.')
@@ -65,7 +85,7 @@ jobs:
           from pathlib import Path
 
           raw = json.loads(Path('/tmp/firebase_web_config.json').read_text(encoding='utf-8'))
-          cfg = raw.get('result', raw)
+          cfg = raw.get('result', raw) if isinstance(raw, dict) else raw
           if isinstance(cfg, dict) and isinstance(cfg.get('config'), dict):
               cfg = cfg['config']
           if not isinstance(cfg, dict):
