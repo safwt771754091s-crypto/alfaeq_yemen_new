@@ -36,6 +36,13 @@ service cloud.firestore {
       allow delete: if staff() || (merchant() && resource.data.ownerId == request.auth.uid);
     }
 
+    // Each user owns exactly one cart document. Cart data never grants access to
+    // another user's orders, payments, profile or private data.
+    match /carts/{uid} {
+      allow read, create, update: if self(uid) && request.resource.data.ownerId == request.auth.uid;
+      allow delete: if self(uid);
+    }
+
     match /orders/{id} {
       allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
       allow read: if staff() || developer() || (signedIn() && resource.data.customerId == request.auth.uid) || (merchant() && resource.data.merchantId == request.auth.uid) || (driver() && resource.data.driverId == request.auth.uid);
