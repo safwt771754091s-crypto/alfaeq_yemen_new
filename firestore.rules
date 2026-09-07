@@ -2,66 +2,81 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function admin() { return signedIn() && request.auth.token.admin == true; }
+    function admin() { return signedIn() && (request.auth.token.admin == true || request.auth.token.role == 'admin'); }
+    function ownerRole() { return signedIn() && (request.auth.token.owner == true || request.auth.token.role == 'owner'); }
+    function developer() { return signedIn() && request.auth.token.role == 'developer'; }
+    function staff() { return admin() || ownerRole(); }
     function merchant() { return signedIn() && request.auth.token.role == 'merchant'; }
     function driver() { return signedIn() && request.auth.token.role == 'driver'; }
-    function owner(uid) { return signedIn() && request.auth.uid == uid; }
+    function self(uid) { return signedIn() && request.auth.uid == uid; }
 
     match /users/{uid} {
-      allow read: if owner(uid) || admin();
-      allow create: if admin() || (owner(uid) && request.resource.data.role == 'customer' && request.resource.data.uid == request.auth.uid);
-      allow update: if admin() || (owner(uid) && request.resource.data.role == resource.data.role && request.resource.data.uid == resource.data.uid);
-      allow delete: if admin();
+      allow read: if self(uid) || staff();
+      allow create: if staff() || (self(uid) && request.resource.data.role == 'customer' && request.resource.data.uid == request.auth.uid);
+      allow update: if staff() || (self(uid) && request.resource.data.role == resource.data.role && request.resource.data.uid == resource.data.uid);
+      allow delete: if staff();
     }
 
     match /sections/{id} {
       allow read: if true;
-      allow create, update, delete: if admin();
+      allow create, update, delete: if staff();
     }
 
     match /stores/{id} {
-      allow read: if resource.data.status == 'approved' || admin() || (merchant() && resource.data.ownerId == request.auth.uid);
-      allow create: if admin() || (merchant() && request.resource.data.ownerId == request.auth.uid);
-      allow update: if admin() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid);
-      allow delete: if admin();
+      allow read: if resource.data.status == 'approved' || staff() || (merchant() && resource.data.ownerId == request.auth.uid);
+      allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid);
+      allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid);
+      allow delete: if staff();
     }
 
     match /products/{id} {
-      allow read: if resource.data.status == 'active' || admin() || (merchant() && resource.data.ownerId == request.auth.uid);
-      allow create: if admin() || (merchant() && request.resource.data.ownerId == request.auth.uid);
-      allow update: if admin() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid);
-      allow delete: if admin() || (merchant() && resource.data.ownerId == request.auth.uid);
+      allow read: if resource.data.status == 'active' || staff() || (merchant() && resource.data.ownerId == request.auth.uid);
+      allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid);
+      allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == request.auth.uid);
+      allow delete: if staff() || (merchant() && resource.data.ownerId == request.auth.uid);
     }
 
     match /orders/{id} {
       allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
-      allow read: if admin() || (signedIn() && resource.data.customerId == request.auth.uid) || (merchant() && resource.data.merchantId == request.auth.uid) || (driver() && resource.data.driverId == request.auth.uid);
-      allow update: if admin() || (driver() && resource.data.driverId == request.auth.uid) || (merchant() && resource.data.merchantId == request.auth.uid);
-      allow delete: if admin();
+      allow read: if staff() || (signedIn() && resource.data.customerId == request.auth.uid) || (merchant() && resource.data.merchantId == request.auth.uid) || (driver() && resource.data.driverId == request.auth.uid);
+      allow update: if staff() || (driver() && resource.data.driverId == request.auth.uid) || (merchant() && resource.data.merchantId == request.auth.uid);
+      allow delete: if staff();
     }
 
     match /deliveryEvents/{id} {
-      allow read: if admin() || signedIn();
-      allow create: if admin() || driver();
-      allow update, delete: if admin();
+      allow read: if staff() || (driver() && resource.data.driverId == request.auth.uid);
+      allow create: if staff() || driver();
+      allow update, delete: if staff();
     }
 
     match /payments/{id} {
-      allow read: if admin() || (signedIn() && resource.data.customerId == request.auth.uid);
+      allow read: if staff() || (signedIn() && resource.data.customerId == request.auth.uid);
       allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
-      allow update: if admin();
-      allow delete: if admin();
+      allow update: if staff();
+      allow delete: if staff();
     }
 
     match /reviews/{id} {
       allow read: if true;
       allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if admin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update, delete: if staff() || (signedIn() && resource.data.userId == request.auth.uid);
     }
 
     match /settings/{id} {
       allow read: if signedIn();
-      allow write: if admin();
+      allow write: if staff();
+    }
+
+    match /securityReports/{id} {
+      allow read: if staff() || developer();
+      allow create: if staff() || developer();
+      allow update, delete: if staff();
+    }
+
+    match /auditLogs/{id} {
+      allow read: if staff() || developer();
+      allow create: if staff() || (developer() && request.resource.data.actorUid == request.auth.uid);
+      allow update, delete: if staff();
     }
   }
 }
