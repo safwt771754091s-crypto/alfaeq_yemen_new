@@ -44,10 +44,13 @@ class FirestoreService {
       db.collection('orders').doc(orderId).snapshots();
 
   Future<void> updateDelivery(String orderId, String status, {GeoPoint? location}) {
-    return db.collection('orders').doc(orderId).update({
+    final data = <String, dynamic>{
       'deliveryStatus': status,
-      'deliveryLocation': ?location,
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+    if (location != null) {
+      data['deliveryLocation'] = location;
+    }
+    return db.collection('orders').doc(orderId).update(data);
   }
 }
