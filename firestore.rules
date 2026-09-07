@@ -74,10 +74,16 @@ service cloud.firestore {
       allow update, delete: if staff();
     }
 
+    // Append-only audit trail: clients can create their own events, but no client role can edit or erase history.
     match /auditLogs/{id} {
       allow read: if staff() || developer();
-      allow create: if staff() || (developer() && request.resource.data.actorUid == request.auth.uid);
-      allow update, delete: if staff();
+      allow create: if signedIn()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.action is string
+        && request.resource.data.result is string
+        && request.resource.data.source is string
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
     }
   }
 }
