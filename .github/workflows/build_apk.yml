@@ -25,12 +25,17 @@ jobs:
         run: flutter create . --platforms android --org com.alfaeq
       - name: Dependencies
         run: flutter pub get
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
       - name: Install FlutterFire CLI
         run: |
           dart pub global activate flutterfire_cli
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
       - name: Generate Firebase configuration
-        run: flutterfire configure --project=alfaeq-yemen-fed37 --platforms=android,web --yes
+        run: |
+          flutterfire configure --project=alfaeq-yemen-fed37 --platforms=android,web --yes --out=lib/firebase_options.dart
+          test -s lib/firebase_options.dart
+          echo "Firebase configuration generated: $(wc -c < lib/firebase_options.dart) bytes"
       - name: Analyze
         run: flutter analyze --no-fatal-infos
       - name: Build APK
