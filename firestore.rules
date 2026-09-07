@@ -9,8 +9,8 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if owner(uid) || admin();
-      allow create: if owner(uid);
-      allow update: if owner(uid) || admin();
+      allow create: if admin() || (owner(uid) && request.resource.data.role == 'customer' && request.resource.data.uid == request.auth.uid);
+      allow update: if admin() || (owner(uid) && request.resource.data.role == resource.data.role && request.resource.data.uid == resource.data.uid);
       allow delete: if admin();
     }
 
