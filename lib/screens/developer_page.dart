@@ -19,8 +19,18 @@ class _DeveloperPageState extends State<DeveloperPage> {
   List<String> _findings = [];
   DateTime? _lastScan;
 
+  final TextEditingController _auditSearchController = TextEditingController();
+  String _auditActionFilter = 'الكل';
+  String _auditResultFilter = 'الكل';
+
   @override
   void initState() { super.initState(); _load(); }
+
+  @override
+  void dispose() {
+    _auditSearchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _writeAudit({required String action, required String result, Map<String, dynamic>? details}) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -130,21 +140,87 @@ class _DeveloperPageState extends State<DeveloperPage> {
   }
 
   Widget _auditLogCard() {
-    final query = FirebaseFirestore.instance.collection('auditLogs').orderBy('createdAt', descending: true).limit(30);
+    final query = FirebaseFirestore.instance.collection('auditLogs').orderBy('createdAt', descending: true).limit(50);
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: query.snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) return Card(child: ListTile(leading: const Icon(Icons.error_outline), title: const Text('تعذر تحميل سجل التدقيق'), subtitle: Text('${snapshot.error}')));
         if (snapshot.connectionState == ConnectionState.waiting) return const Card(child: Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())));
         final docs = snapshot.data?.docs ?? [];
-        if (docs.isEmpty) return const Card(child: ListTile(leading: Icon(Icons.history), title: Text('لا توجد عمليات مسجلة بعد'), subtitle: Text('ستظهر هنا العمليات الأمنية والتقنية الجديدة تلقائيًا.')));
+        final filtered = docs.where(_matchesAuditFilters).toList();
+        final actions = docs.map((d) => (d.data()['action'] ?? '').toString()).where((v) => v.isNotEmpty).toSet().toList()..sort();
         return Card(child: Column(children: [
-          Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 8), child: Row(children: [const Icon(Icons.history), const SizedBox(width: 8), const Expanded(child: Text('آخر 30 عملية', style: TextStyle(fontWeight: FontWeight.w900))), Text('${docs.length} سجل')])),
+          _auditFilters(actions),
           const Divider(height: 1),
-          ...docs.map((doc) => _auditTile(doc)),
+          Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 8), child: Row(children: [const Icon(Icons.history), const SizedBox(width: 8), const Expanded(child: Text('آخر العمليات', style: TextStyle(fontWeight: FontWeight.w900))), Text('${filtered.length} من ${docs.length}')])),
+          if (filtered.isEmpty)
+            const Padding(padding: EdgeInsets.all(24), child: Column(children: [Icon(Icons.search_off, size: 38), SizedBox(height: 8), Text('لا توجد نتائج مطابقة للفلاتر.', style: TextStyle(fontWeight: FontWeight.w700))]))
+          else ...filtered.map((doc) => _auditTile(doc)),
         ]));
       },
     );
+  }
+
+  Widget _auditFilters(List<String> actions) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      child: Column(children: [
+        TextField(
+          controller: _auditSearchController,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            labelText: 'بحث في المستخدم أو العملية أو التفاصيل',
+            hintText: 'البريد، UID، اسم العملية...',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _auditSearchController.text.isEmpty ? null : IconButton(onPressed: () { _auditSearchController.clear(); setState(() {}); }, icon: const Icon(Icons.clear)),
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            DropdownButton<String>(
+              value: actions.contains(_auditActionFilter) || _auditActionFilter == 'الكل' ? _auditActionFilter : 'الكل',
+              items: ['الكل', ...actions].map((value) => DropdownMenuItem(value: value, child: Text(value == 'الكل' ? 'كل العمليات' : _actionLabel(value)))).toList(),
+              onChanged: (value) { if (value != null) setState(() => _auditActionFilter = value); },
+            ),
+            DropdownButton<String>(
+              value: _auditResultFilter,
+              items: const [
+                DropdownMenuItem(value: 'الكل', child: Text('كل الحالات')),
+                DropdownMenuItem(value: 'success', child: Text('نجاح')),
+                DropdownMenuItem(value: 'failed', child: Text('فشل')),
+                DropdownMenuItem(value: 'warning', child: Text('تحذير')),
+              ],
+              onChanged: (value) { if (value != null) setState(() => _auditResultFilter = value); },
+            ),
+            OutlinedButton.icon(
+              onPressed: () { _auditSearchController.clear(); setState(() { _auditActionFilter = 'الكل'; _auditResultFilter = 'الكل'; }); },
+              icon: const Icon(Icons.filter_alt_off),
+              label: const Text('مسح الفلاتر'),
+            ),
+          ],
+        ),
+      ]),
+    );
+  }
+
+  bool _matchesAuditFilters(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    final action = (data['action'] ?? '').toString();
+    final result = (data['result'] ?? '').toString();
+    final severity = (data['severity'] ?? '').toString();
+    final email = (data['actorEmail'] ?? '').toString();
+    final uid = (data['actorUid'] ?? '').toString();
+    final details = (data['details'] ?? '').toString();
+    final search = _auditSearchController.text.trim().toLowerCase();
+
+    final actionMatches = _auditActionFilter == 'الكل' || action == _auditActionFilter;
+    final resultMatches = _auditResultFilter == 'الكل' || result == _auditResultFilter || (_auditResultFilter == 'warning' && severity == 'warning');
+    final searchMatches = search.isEmpty || '$action $email $uid $details'.toLowerCase().contains(search);
+    return actionMatches && resultMatches && searchMatches;
   }
 
   Widget _auditTile(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
@@ -169,7 +245,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
 
   ({String label, IconData icon, Color color}) _auditStatus(String result, String severity) {
     if (result == 'failed' || result == 'failure' || severity == 'critical') return (label: 'فشل', icon: Icons.error, color: Colors.red);
-    if (severity == 'warning') return (label: 'تحذير', icon: Icons.warning_amber, color: Colors.orange);
+    if (result == 'warning' || severity == 'warning') return (label: 'تحذير', icon: Icons.warning_amber, color: Colors.orange);
     return (label: 'نجاح', icon: Icons.check_circle, color: Colors.green);
   }
 
