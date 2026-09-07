@@ -211,7 +211,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
       Container(width: double.infinity, padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(14)), child: SelectableText(detailsText.isEmpty ? 'لا توجد تفاصيل تقنية.' : detailsText, style: const TextStyle(fontFamily: 'monospace', height: 1.5))),
       const SizedBox(height: 16),
       _detailSection('معرّف سجل التدقيق', doc.id, Icons.tag),
-    ]))));
+    ])))));
   }
 
   Widget _detailSection(String label, String value, IconData icon, {Color? valueColor}) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(border: Border.all(color: Theme.of(context).dividerColor), borderRadius: BorderRadius.circular(12)), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, size: 20), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)), const SizedBox(height: 3), SelectableText(value, style: TextStyle(fontWeight: FontWeight.w800, color: valueColor))]))])));
