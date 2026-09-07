@@ -22,6 +22,25 @@ class _DeveloperPageState extends State<DeveloperPage> {
   @override
   void initState() { super.initState(); _load(); }
 
+  Future<void> _writeAudit({required String action, required String result, Map<String, dynamic>? details}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      await FirebaseFirestore.instance.collection('auditLogs').add({
+        'actorUid': user.uid,
+        'actorEmail': user.email,
+        'role': _role,
+        'action': action,
+        'result': result,
+        'details': details ?? <String, dynamic>{},
+        'source': 'developer_center',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // Audit failures must never crash the developer center.
+    }
+  }
+
   Future<void> _load() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) { if (mounted) setState(() => _loading = false); return; }
@@ -31,8 +50,13 @@ class _DeveloperPageState extends State<DeveloperPage> {
       final role = await _auth.role();
       final allowed = await _auth.canOpenDeveloperCenter();
       if (mounted) setState(() { _role = role; _profile = data; _allowed = allowed; _loading = false; });
-      if (allowed) await _checkAppIntegrity();
-    } catch (_) { if (mounted) setState(() => _loading = false); }
+      if (allowed) {
+        await _checkAppIntegrity();
+        await _writeAudit(action: 'developer_center_access', result: 'success');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<void> _checkAppIntegrity() async {
@@ -68,8 +92,30 @@ class _DeveloperPageState extends State<DeveloperPage> {
       if (_appCheckStatus != 'نشط ومصادق عليه') findings.add('App Check غير نشط بالكامل لهذه البيئة؛ لا نعتبر الحماية مكتملة حتى تفعيل المزود في Firebase.');
       if (findings.isEmpty) findings.add('لم يظهر خلل حرج في العينة المفحوصة. الفحص الحالي حدّه 200 سجل لكل مجموعة.');
       final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid != null) await FirebaseFirestore.instance.collection('securityReports').add({'actorUid': uid, 'role': _role, 'findings': findings, 'counts': counts, 'appCheck': _appCheckStatus, 'createdAt': FieldValue.serverTimestamp(), 'type': 'automated_security_scan'});
-    } catch (e) { findings.add('تعذر إكمال الفحص: $e'); }
+      if (uid != null) {
+        await FirebaseFirestore.instance.collection('securityReports').add({
+          'actorUid': uid,
+          'role': _role,
+          'findings': findings,
+          'counts': counts,
+          'appCheck': _appCheckStatus,
+          'createdAt': FieldValue.serverTimestamp(),
+          'type': 'automated_security_scan',
+        });
+        await _writeAudit(
+          action: 'security_scan',
+          result: 'success',
+          details: {
+            'findingsCount': findings.length,
+            'counts': counts,
+            'appCheck': _appCheckStatus,
+          },
+        );
+      }
+    } catch (e) {
+      findings.add('تعذر إكمال الفحص: $e');
+      await _writeAudit(action: 'security_scan', result: 'failed', details: {'error': e.toString()});
+    }
     if (!mounted) return;
     setState(() { _findings = findings; _counts = counts; _lastScan = DateTime.now(); _scanning = false; });
   }
