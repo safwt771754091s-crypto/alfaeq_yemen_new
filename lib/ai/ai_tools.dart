@@ -56,10 +56,10 @@ class AlfaeqAiToolRegistry {
   }) async {
     try {
       switch (name) {
-        case 'search_catalog': return _searchCatalog(args);
-        case 'get_my_orders': return _getMyOrders(args);
-        case 'get_my_account_summary': return _getMyAccountSummary();
-        case 'get_security_summary': return _getSecuritySummary(audit: audit);
+        case 'search_catalog': return await _searchCatalog(args);
+        case 'get_my_orders': return await _getMyOrders(args);
+        case 'get_my_account_summary': return await _getMyAccountSummary();
+        case 'get_security_summary': return await _getSecuritySummary(audit: audit);
         default: return {'ok': false, 'error': 'الأداة غير مسموحة.'};
       }
     } catch (e) {
