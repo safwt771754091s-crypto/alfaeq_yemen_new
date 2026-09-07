@@ -15,15 +15,12 @@ class AuthService {
     return auth.signInWithEmailAndPassword(email: email.trim(), password: password);
   }
 
-  Future<UserCredential> register({
-    required String name,
-    required String email,
-    required String password,
-  }) async {
-    final credential = await auth.createUserWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
+  Future<void> sendPasswordReset({required String email}) {
+    return auth.sendPasswordResetEmail(email: email.trim());
+  }
+
+  Future<UserCredential> register({required String name, required String email, required String password}) async {
+    final credential = await auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
     final user = credential.user!;
     await user.updateDisplayName(name.trim());
     await db.collection('users').doc(user.uid).set({
