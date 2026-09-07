@@ -17,6 +17,16 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Ensure Web platform
+        run: |
+          if [ ! -d web ]; then
+            echo "Web platform is missing; generating it now."
+            flutter create . --platforms=web
+          else
+            echo "Web platform already exists; keeping repository files unchanged."
+          fi
+          test -f web/index.html
+          test -f web/flutter_bootstrap.js
       - name: Authenticate Google/Firebase
         uses: google-github-actions/auth@v2
         with:
@@ -41,10 +51,15 @@ jobs:
         run: |
           rm -rf build/web
           flutter build web --release --pwa-strategy=none
+          rm -f build/web/flutter_service_worker.js
       - name: Verify fresh web build
         run: |
           test -s build/web/index.html
           test -s build/web/main.dart.js
+          if grep -R "flutter_service_worker" -n build/web/index.html build/web/flutter_bootstrap.js 2>/dev/null; then
+            echo "ERROR: service worker reference remains in generated web files"
+            exit 1
+          fi
           echo "Fresh web build verified: $(du -sh build/web | cut -f1)"
       - name: Deploy Hosting and Firestore rules
         run: firebase deploy --only hosting,firestore --project alfaeq-yemen-fed37
