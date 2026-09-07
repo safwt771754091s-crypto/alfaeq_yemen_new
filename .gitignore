@@ -1,46 +1,7 @@
-# IDE and Editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-
-# Build and dependency output
-.gradle/
-build/
+# Generated Flutter project files are created by CI.
 .dart_tool/
-.packages
+build/
 .pub-cache/
-
-# Android signing secrets
-android/key.properties
-*.jks
-*.keystore
-
-# Environment and secrets
-.env
-.env.*
-secrets/
-*.pem
-*.key
-*.crt
-*.p12
-*.pfx
-
-# Node / Python / generated output
-node_modules/
-__pycache__/
-*.py[cod]
-coverage/
-test-results/
-*.log
-*.tmp
-*.bak
-
-# Generated documentation
-apidocs/
-docs/generated/
-docs/.vitepress/generated/
-docs/.vitepress/dist/
+android/.gradle/
+android/local.properties
+web/

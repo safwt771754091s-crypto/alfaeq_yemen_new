@@ -1,1 +1,0 @@
-Build verification marker retained.

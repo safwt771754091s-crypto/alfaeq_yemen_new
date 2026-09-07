@@ -1,141 +1,32 @@
-name: Build Flutter Android
+name: Build Fresh Alfaeq Yemen Android
 
 on:
   workflow_dispatch:
   push:
-    branches: ["main", "launch-prep-2026-09"]
-  pull_request:
-    branches: ["main"]
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-
-      - name: Verify source commit
-        run: |
-          echo "Building Alfaeq Yemen from commit: $(git rev-parse HEAD)"
-          echo "Branch: $(git branch --show-current)"
-
-      - name: Ensure Android platform exists
-        run: |
-          if [ ! -f android/app/build.gradle.kts ]; then
-            flutter create . --platforms=android --org com.alfaeq
-          fi
-          test -f android/app/build.gradle.kts
-
-      - name: Set final Android application ID and compile SDK
-        run: |
-          sed -i 's/applicationId = "[^"]*"/applicationId = "com.alfaeq.yemen"/' android/app/build.gradle.kts
-          find android -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) -exec sed -i \
-            -e 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' \
-            -e 's/compileSdk flutter.compileSdkVersion/compileSdk 36/g' \
-            -e 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/g' \
-            -e 's/compileSdk = [0-9][0-9]*/compileSdk = 36/g' \
-            -e 's/compileSdk [0-9][0-9]*/compileSdk 36/g' \
-            -e 's/compileSdkVersion [0-9][0-9]*/compileSdkVersion 36/g' {} \;
-          echo "Android applicationId:"
-          grep -R "applicationId" android -n || true
-          echo "Gradle compileSdk:"
-          grep -R "compileSdk" android -n || true
-
-      - name: Generate Firebase options from google-services.json
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-          FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
-        run: |
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            printf '%s' "$GOOGLE_SERVICES_JSON" > /tmp/google-services.json
-            python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          data = json.loads(Path('/tmp/google-services.json').read_text())
-          project = data['project_info']
-          clients = data.get('client', [])
-          android_clients = [
-              c for c in clients
-              if c.get('client_info', {}).get('android_client_info', {}).get('package_name')
-          ]
-          if not android_clients:
-              raise SystemExit('GOOGLE_SERVICES_JSON contains no Android Firebase client.')
-
-          target_package = 'com.alfaeq.yemen'
-          client = next(
-              (c for c in android_clients
-               if c.get('client_info', {}).get('android_client_info', {}).get('package_name') == target_package),
-              android_clients[0],
-          )
-          selected_package = client['client_info']['android_client_info']['package_name']
-          print(f'Using Firebase Android client: {selected_package}')
-          if selected_package != target_package:
-              print('Firebase JSON has no com.alfaeq.yemen client; using the first available Firebase client for this build.')
-
-          api_key = client['api_key'][0]['current_key']
-          app_id = client['client_info']['mobilesdk_app_id']
-          sender_id = project['project_number']
-          project_id = project['project_id']
-          storage_bucket = project.get('storage_bucket')
-
-          def dart_string(value):
-              return json.dumps(value if value is not None else '')
-
-          dart = f'''// Generated for the Alfaeq Yemen Android build from GOOGLE_SERVICES_JSON.
-          // Do not edit this generated file manually.
-          import 'package:firebase_core/firebase_core.dart';
-
-          class DefaultFirebaseOptions {{
-            const DefaultFirebaseOptions._();
-            static bool get isConfigured => true;
-            static FirebaseOptions get currentPlatform => android;
-            static const FirebaseOptions android = FirebaseOptions(
-              apiKey: {dart_string(api_key)},
-              appId: {dart_string(app_id)},
-              messagingSenderId: {dart_string(sender_id)},
-              projectId: {dart_string(project_id)},
-              storageBucket: {dart_string(storage_bucket)},
-            );
-          }}
-          '''
-          Path('lib/core/firebase/firebase_options.dart').write_text(dart)
-          PY
-          elif [ -n "$FIREBASE_OPTIONS_DART" ]; then
-            printf '%s' "$FIREBASE_OPTIONS_DART" > lib/core/firebase/firebase_options.dart
-            echo "Firebase options injected from FIREBASE_OPTIONS_DART."
-          else
-            echo "No Firebase secret configured; building with repository placeholder."
-          fi
-
-      - name: Install dependencies
+      - name: Verify source
+        run: echo "FRESH BUILD SOURCE=$(git rev-parse HEAD)"
+      - name: Create Android platform
+        run: flutter create . --platforms android --org com.alfaeq
+      - name: Dependencies
         run: flutter pub get
-
       - name: Analyze
         run: flutter analyze --no-fatal-infos
-
-      - name: Build debug APK
+      - name: Build APK
         run: flutter build apk --debug --no-tree-shake-icons
-
-      - name: Upload latest APK and replace previous artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: alfaeq-yemen-debug-apk
+          name: alfaeq-yemen-fresh-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
           overwrite: true
           retention-days: 7
-
-# Every push to main builds the current commit. The APK artifact name is overwritten so an old APK is not left as the current download.
-# No project files are deleted.

@@ -1,9 +1,0 @@
-{
-  "name": "vscode-hexeditor-simple-find-example",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "test": "node tests/find.spec.js"
-  },
-  "dependencies": {}
-}
