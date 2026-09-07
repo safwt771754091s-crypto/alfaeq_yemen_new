@@ -16,10 +16,21 @@ jobs:
           cache: true
       - name: Verify source
         run: echo "FRESH BUILD SOURCE=$(git rev-parse HEAD)"
+      - name: Authenticate Google/Firebase
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      - uses: google-github-actions/setup-gcloud@v2
       - name: Create Android platform
         run: flutter create . --platforms android --org com.alfaeq
       - name: Dependencies
         run: flutter pub get
+      - name: Install FlutterFire CLI
+        run: |
+          dart pub global activate flutterfire_cli
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+      - name: Generate Firebase configuration
+        run: flutterfire configure --project=alfaeq-yemen-fed37 --platforms=android,web --yes
       - name: Analyze
         run: flutter analyze --no-fatal-infos
       - name: Build APK
