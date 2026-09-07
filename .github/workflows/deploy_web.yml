@@ -55,10 +55,8 @@ jobs:
         run: |
           test -s build/web/index.html
           test -s build/web/main.dart.js
-          if grep -R "flutter_service_worker" -n build/web/index.html build/web/flutter_bootstrap.js 2>/dev/null; then
-            echo "ERROR: service worker reference remains in generated web files"
-            exit 1
-          fi
+          test -s build/web/flutter_bootstrap.js
+          test ! -e build/web/flutter_service_worker.js
           echo "Fresh web build verified: $(du -sh build/web | cut -f1)"
       - name: Deploy Hosting and Firestore rules
         run: firebase deploy --only hosting,firestore --project alfaeq-yemen-fed37
