@@ -2,8 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_ai/firebase_ai.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-/// Allow-listed, read-only tools for Alfaeq AI.
-/// Sensitive mutations must stay behind a trusted server-side permission layer.
+/// Allow-listed tools for Alfaeq AI.
+/// Sensitive mutations remain behind the permission gateway and trusted
+/// backend boundary. The order action below creates only a pending order after
+/// explicit user confirmation; it never charges or processes a payment.
 class AlfaeqAiToolRegistry {
   static const int _maxResults = 8;
   final FirebaseFirestore _db;
@@ -47,12 +49,25 @@ class AlfaeqAiToolRegistry {
           'For owner/admin/developer only: return non-sensitive security aggregates. Read-only.',
           parameters: {},
         ),
+        FunctionDeclaration(
+          'create_order_draft',
+          'Create a pending order after the user explicitly confirms. Never process payment. Use only the signed-in user as customerId.',
+          parameters: {
+            'items': Schema.array(description: 'Order item objects with productId, name, quantity, and optional price/storeId.'),
+            'address': Schema.string(description: 'Delivery address supplied by the signed-in user.'),
+            'paymentMethod': Schema.enumString(
+              enumValues: ['cash_on_delivery', 'al_kuraimi', 'cash_wallet', 'jeeb_wallet'],
+              description: 'Selected payment method. Selecting it does not charge the user.',
+            ),
+          },
+        ),
       ];
 
   Future<Map<String, Object?>> execute(
     String name,
     Map<String, Object?> args, {
     required Future<void> Function({required String action, required String result, Map<String, dynamic>? details}) audit,
+    bool userConfirmed = false,
   }) async {
     try {
       switch (name) {
@@ -60,6 +75,8 @@ class AlfaeqAiToolRegistry {
         case 'get_my_orders': return await _getMyOrders(args);
         case 'get_my_account_summary': return await _getMyAccountSummary();
         case 'get_security_summary': return await _getSecuritySummary(audit: audit);
+        case 'create_order_draft':
+          return await _createOrderDraft(args, userConfirmed: userConfirmed);
         default: return {'ok': false, 'error': 'الأداة غير مسموحة.'};
       }
     } catch (e) {
@@ -142,6 +159,69 @@ class AlfaeqAiToolRegistry {
     final warnings = logs.docs.where((d) => d.data()['severity'] == 'warning' || d.data()['result'] == 'warning').length;
     await audit(action: 'ai_tool_get_security_summary', result: 'success', details: {'role': role});
     return {'ok': true, 'role': role, 'recentAuditEntries': logs.docs.length, 'recentFailures': failures, 'recentWarnings': warnings, 'scope': 'ملخص أمني غير حساس فقط.'};
+  }
+
+  Future<Map<String, Object?>> _createOrderDraft(
+    Map<String, Object?> args, {
+    required bool userConfirmed,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
+    if (!userConfirmed) {
+      return {'ok': false, 'error': 'ينتظر تأكيد المستخدم.', 'permission': 'confirmation_required'};
+    }
+
+    final rawItems = args['items'];
+    final address = (args['address'] ?? '').toString().trim();
+    final paymentMethod = (args['paymentMethod'] ?? '').toString();
+    const methods = {'cash_on_delivery', 'al_kuraimi', 'cash_wallet', 'jeeb_wallet'};
+    if (rawItems is! List || rawItems.isEmpty || rawItems.length > 20) {
+      return {'ok': false, 'error': 'يجب تحديد من 1 إلى 20 منتجاً.'};
+    }
+    if (address.isEmpty || address.length > 300) {
+      return {'ok': false, 'error': 'عنوان التوصيل غير صالح.'};
+    }
+    if (!methods.contains(paymentMethod)) {
+      return {'ok': false, 'error': 'طريقة الدفع غير مدعومة.'};
+    }
+
+    final items = <Map<String, Object?>>[];
+    for (final raw in rawItems) {
+      if (raw is! Map) return {'ok': false, 'error': 'بيانات أحد المنتجات غير صالحة.'};
+      final item = <String, Object?>{
+        'productId': raw['productId']?.toString(),
+        'name': raw['name']?.toString(),
+        'quantity': raw['quantity'] is num ? (raw['quantity'] as num).toInt() : 1,
+        'price': raw['price'] is num ? raw['price'] : null,
+        'storeId': raw['storeId']?.toString(),
+      };
+      final productId = item['productId']?.toString() ?? '';
+      final name = item['name']?.toString() ?? '';
+      final quantity = item['quantity'] is int ? item['quantity'] as int : 0;
+      if (productId.isEmpty || name.isEmpty || name.length > 160 || quantity < 1 || quantity > 100) {
+        return {'ok': false, 'error': 'بيانات منتج غير صالحة.'};
+      }
+      items.add(item);
+    }
+
+    final ref = await _db.collection('orders').add({
+      'customerId': user.uid,
+      'items': items,
+      'address': address,
+      'paymentMethod': paymentMethod,
+      'status': 'pending',
+      'deliveryStatus': 'awaiting_assignment',
+      'source': 'ai_confirmed',
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    return {
+      'ok': true,
+      'orderId': ref.id,
+      'status': 'pending',
+      'paymentProcessed': false,
+      'message': 'تم إنشاء الطلب المعلّق بعد تأكيدك. لم تتم أي عملية دفع.',
+    };
   }
 
   String? _safeDate(dynamic value) {
