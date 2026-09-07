@@ -28,6 +28,53 @@ class AlfaeqAiService {
   bool get hasPendingConfirmation => _pendingAction != null;
   String? get pendingActionName => _pendingAction?.name;
 
+  String get pendingActionDescription {
+    final pending = _pendingAction;
+    if (pending == null) return '';
+    final args = pending.args;
+    switch (pending.name) {
+      case 'create_order_draft':
+        final rawItems = args['items'];
+        final items = rawItems is List ? rawItems : const [];
+        final itemLines = <String>[];
+        for (final raw in items.take(20)) {
+          if (raw is! Map) continue;
+          final productId = (raw['productId'] ?? '').toString();
+          final quantity = (raw['quantity'] as num?)?.toInt() ?? 0;
+          final name = (raw['name'] ?? '').toString().trim();
+          final label = name.isNotEmpty ? name : 'منتج $productId';
+          if (quantity > 0) itemLines.add('• $label × $quantity');
+        }
+        final payment = (args['paymentMethod'] ?? '').toString();
+        final address = (args['address'] ?? '').toString().trim();
+        final buffer = StringBuffer('سيتم إنشاء طلب معلّق فقط بعد التحقق من بيانات المنتجات والأسعار الحالية.');
+        if (itemLines.isNotEmpty) {
+          buffer.write('\n\nالمنتجات:\n${itemLines.join('\n')}');
+        }
+        if (payment.isNotEmpty) buffer.write('\n\nطريقة الدفع: ${_paymentLabel(payment)}');
+        if (address.isNotEmpty) buffer.write('\nعنوان التوصيل: $address');
+        return buffer.toString();
+      case 'add_to_cart':
+        return 'إضافة المنتج ${args['productId']} بكمية ${args['quantity']} إلى سلتك.';
+      case 'update_cart_item':
+        return 'تعديل كمية المنتج ${args['productId']} إلى ${args['quantity']}.';
+      case 'remove_from_cart':
+        return 'حذف المنتج ${args['productId']} من سلتك.';
+      default:
+        return 'تنفيذ العملية: ${pending.name}.';
+    }
+  }
+
+  String _paymentLabel(String value) {
+    switch (value) {
+      case 'cash_on_delivery': return 'الدفع عند الاستلام';
+      case 'al_kuraimi': return 'تحويل الكريمي';
+      case 'cash_wallet': return 'محفظة كاش';
+      case 'jeeb_wallet': return 'محفظة جيب';
+      default: return value;
+    }
+  }
+
   GenerativeModel _model() {
     final ai = FirebaseAI.googleAI(
       useLimitedUseAppCheckTokens: true,
