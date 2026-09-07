@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'core/app_sections.dart';
 import 'firebase_options.dart';
 import 'screens/admin_dashboard.dart';
+import 'screens/ai_assistant_page.dart';
 import 'screens/auth_gate.dart';
 import 'screens/developer_page.dart';
 import 'services/auth_service.dart';
@@ -86,14 +87,21 @@ class HomePage extends StatelessWidget {
         appBar: AppBar(
           title: const Text('الفائق يمن', style: TextStyle(fontWeight: FontWeight.w900)),
           actions: [
+            IconButton(
+              tooltip: 'ذكاء الفائق',
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage())),
+              icon: const Icon(Icons.auto_awesome),
+            ),
             IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none)),
             PopupMenuButton<String>(
               onSelected: (value) {
+                if (value == 'ai') Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()));
                 if (value == 'admin') _openAdmin(context);
                 if (value == 'developer') _openDeveloper(context);
                 if (value == 'logout') _signOut(context);
               },
               itemBuilder: (_) => const [
+                PopupMenuItem(value: 'ai', child: ListTile(leading: Icon(Icons.auto_awesome), title: Text('ذكاء الفائق'))),
                 PopupMenuItem(value: 'admin', child: ListTile(leading: Icon(Icons.admin_panel_settings_outlined), title: Text('لوحة الإدارة'))),
                 PopupMenuItem(value: 'developer', child: ListTile(leading: Icon(Icons.code), title: Text('صفحة المطور'))),
                 PopupMenuItem(value: 'logout', child: ListTile(leading: Icon(Icons.logout), title: Text('تسجيل الخروج'))),
@@ -118,19 +126,29 @@ class HomePage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                color: const Color(0xFF0B6E4F),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('مرحباً بك في الفائق يمن', style: TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900)),
-                  SizedBox(height: 8),
-                  Text('16 قطاعاً في منصة واحدة، مع التجار والطلبات والتوصيل والإدارة.', style: TextStyle(color: Colors.white70)),
-                ],
+            InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage())),
+              child: Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  color: const Color(0xFF0B6E4F),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.auto_awesome, color: Colors.white, size: 34),
+                    SizedBox(width: 14),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('مرحباً بك في الفائق يمن', style: TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900)),
+                        SizedBox(height: 8),
+                        Text('منصة عالمية تبدأ من اليمن — اسأل ذكاء الفائق عن الخدمات والبحث والتخطيط.', style: TextStyle(color: Colors.white70)),
+                      ],
+                    )),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 24),
