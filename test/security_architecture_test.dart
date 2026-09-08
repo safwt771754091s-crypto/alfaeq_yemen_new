@@ -115,6 +115,10 @@ void main() {
       expect(auth, contains('SetOptions(merge: true)'));
       expect(auth, contains("'location': location"));
       expect(auth, contains("'uid': user.uid"));
+      expect(auth, contains("if (!snapshot.exists)"));
+      expect(auth, contains("update['role'] = 'customer'"));
+      expect(auth, contains("else if (existing?['role'] == null)"));
+      expect(auth, contains("update['createdAt'] = FieldValue.serverTimestamp()"));
       expect(gate, contains('hasRequiredLocation()'));
       expect(gate, contains('LocationRequiredPage'));
       expect(gate, contains('setState(() {})'));
