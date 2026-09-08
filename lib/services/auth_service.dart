@@ -56,11 +56,9 @@ class AuthService {
     if (user == null) throw StateError('User is not signed in.');
 
     final ref = db.collection('users').doc(user.uid);
-
-    // Use one atomic merge write for both new and legacy profiles. Firestore
-    // evaluates the resulting document against the same secure create/update
-    // rules, while avoiding a read-then-update race for legacy accounts.
-    await ref.set({
+    final snapshot = await ref.get();
+    final existing = snapshot.data();
+    final update = <String, dynamic>{
       'uid': user.uid,
       'location': location,
       'latitude': location.latitude,
@@ -70,7 +68,18 @@ class AuthService {
       'updatedAt': FieldValue.serverTimestamp(),
       'name': (user.displayName ?? '').trim(),
       'email': user.email,
-    }, SetOptions(merge: true));
+    };
+
+    // Legacy/missing profiles are repaired as customers. Existing privileged
+    // roles are preserved and never overwritten by onboarding.
+    if (!snapshot.exists) {
+      update['role'] = 'customer';
+      update['createdAt'] = FieldValue.serverTimestamp();
+    } else if (existing?['role'] == null) {
+      update['role'] = 'customer';
+    }
+
+    await ref.set(update, SetOptions(merge: true));
   }
 
   Future<bool> hasRequiredLocation() async {
