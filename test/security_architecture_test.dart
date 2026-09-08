@@ -83,7 +83,7 @@ void main() {
       expect(gate, contains('DriverCenterPage()'));
       expect(rules, contains('match /drivers/{uid}'));
       expect(rules, contains("request.resource.data.approved == resource.data.approved"));
-      expect(rules, contains("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveryLocation', 'updatedAt', 'status', 'deliveredAt'])"));
+      expect(rules, contains("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOnline', 'currentLocation', 'lastSeenAt', 'updatedAt', 'activeOrderCount'])"));
       expect(rules, contains("resource.data.driverId == request.auth.uid"));
     });
 
@@ -102,7 +102,7 @@ void main() {
       expect(rules, contains("resource.data.driverId == request.auth.uid"));
     });
 
-    test('location onboarding requires a valid map/device location', () {
+    test('location onboarding requires a valid map/device location and legacy profile repair', () {
       final auth = File('lib/services/auth_service.dart').readAsStringSync();
       final gate = File('lib/screens/auth_gate.dart').readAsStringSync();
       final onboarding = File('lib/screens/location_required_page.dart').readAsStringSync();
@@ -112,8 +112,12 @@ void main() {
       expect(auth, contains('required GeoPoint location'));
       expect(auth, contains('hasRequiredLocation'));
       expect(auth, contains('saveUserLocation'));
+      expect(auth, contains('if (!snapshot.exists)'));
+      expect(auth, contains("'role': 'customer'"));
+      expect(auth, contains('await ref.update(update);'));
       expect(gate, contains('hasRequiredLocation()'));
       expect(gate, contains('LocationRequiredPage'));
+      expect(gate, contains('setState(() {})'));
       expect(onboarding, contains('LocationPickerPage'));
       expect(onboarding, contains('LocationService.requireCurrentPosition'));
       expect(login, contains('LocationPickerPage'));
@@ -123,6 +127,8 @@ void main() {
       expect(rules, contains('function validLocation'));
       expect(rules, contains('validLocation(request.resource.data)'));
       expect(rules, contains("request.resource.data.location is latlng"));
+      expect(rules, contains("request.resource.data.get('uid', request.auth.uid) == request.auth.uid"));
+      expect(rules, contains("request.resource.data.get('role', 'customer') == resource.data.get('role', 'customer')"));
     });
 
     test('order flow prevents forged delivery state and enforces sequential transitions', () {
