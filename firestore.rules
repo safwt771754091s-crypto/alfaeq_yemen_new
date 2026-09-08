@@ -36,8 +36,6 @@ service cloud.firestore {
       allow delete: if staff() || (merchant() && resource.data.ownerId == request.auth.uid);
     }
 
-    // Each user owns exactly one cart document. Cart data never grants access to
-    // another user's orders, payments, profile or private data.
     match /carts/{uid} {
       allow read, create, update: if self(uid) && request.resource.data.ownerId == request.auth.uid;
       allow delete: if self(uid);
@@ -45,8 +43,13 @@ service cloud.firestore {
 
     match /orders/{id} {
       allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
-      allow read: if staff() || developer() || (signedIn() && resource.data.customerId == request.auth.uid) || (merchant() && resource.data.merchantId == request.auth.uid) || (driver() && resource.data.driverId == request.auth.uid);
+      allow read: if staff() || developer()
+        || (signedIn() && resource.data.customerId == request.auth.uid)
+        || (merchant() && request.auth.uid in resource.data.merchantIds)
+        || (merchant() && resource.data.merchantId == request.auth.uid)
+        || (driver() && resource.data.driverId == request.auth.uid);
       allow update: if staff()
+        || (merchant() && request.auth.uid in resource.data.merchantIds && request.resource.data.customerId == resource.data.customerId && request.resource.data.merchantIds == resource.data.merchantIds)
         || (merchant() && resource.data.merchantId == request.auth.uid && request.resource.data.customerId == resource.data.customerId && request.resource.data.merchantId == resource.data.merchantId)
         || (driver() && resource.data.driverId == request.auth.uid && request.resource.data.customerId == resource.data.customerId && request.resource.data.driverId == resource.data.driverId);
       allow delete: if staff();
@@ -81,7 +84,6 @@ service cloud.firestore {
       allow update, delete: if staff();
     }
 
-    // Append-only audit trail: clients can create their own events, but no client role can edit or erase history.
     match /auditLogs/{id} {
       allow read: if staff() || developer();
       allow create: if signedIn()
