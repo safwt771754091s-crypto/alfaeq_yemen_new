@@ -22,7 +22,18 @@ jobs:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
       - uses: google-github-actions/setup-gcloud@v2
       - name: Create Android platform
-        run: flutter create . --platforms android --org com.alfaeq
+        run: |
+          flutter create . --platforms android --org com.alfaeq
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android/app/src/main/AndroidManifest.xml')
+          text = path.read_text()
+          permission = '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
+          if 'android.permission.ACCESS_FINE_LOCATION' not in text:
+              text = text.replace('<manifest ', '<manifest ' + '\n' + permission, 1)
+          path.write_text(text)
+          PY
+          grep -q 'android.permission.ACCESS_FINE_LOCATION' android/app/src/main/AndroidManifest.xml
       - name: Dependencies
         run: flutter pub get
       - name: Security architecture tests
