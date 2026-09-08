@@ -75,7 +75,8 @@ void main() {
       final gate = File('lib/screens/auth_gate.dart').readAsStringSync();
       final rules = File('firestore.rules').readAsStringSync();
       expect(driver, contains("role == 'driver'"));
-      expect(driver, contains("'currentLocation': GeoPoint"));
+      expect(driver, contains("'currentLocation': location"));
+      expect(driver, contains('final location = GeoPoint('));
       expect(driver, contains("where('driverId', isEqualTo: user.uid)"));
       expect(driver, contains("status == 'assigned'"));
       expect(driver, contains("status == 'delivered'"));
