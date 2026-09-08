@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'driver_center_page.dart';
@@ -28,14 +29,9 @@ class AuthGate extends StatelessWidget {
               builder: (context, locationSnapshot) {
                 if (locationSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
                 if (locationSnapshot.data != true) {
-                  return LocationRequiredPage(
-                    onLocationReady: (latitude, longitude) async {
-                      await AuthService().saveUserLocation(
-                        location: GeoPoint(latitude, longitude),
-                        source: 'required_onboarding',
-                      );
-                    },
-                  );
+                  return LocationRequiredPage(onLocationReady: (latitude, longitude) async {
+                    await AuthService().saveUserLocation(location: GeoPoint(latitude, longitude), source: 'required_onboarding');
+                  });
                 }
                 return const WorldHomePage();
               },
