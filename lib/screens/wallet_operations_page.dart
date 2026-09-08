@@ -10,7 +10,6 @@ class WalletOperationsPage extends StatefulWidget {
 }
 
 class _WalletOperationsPageState extends State<WalletOperationsPage> {
-  final WalletService _service = WalletService();
   final _recipientController = TextEditingController();
   final _amountController = TextEditingController();
   bool _busy = false;
@@ -35,16 +34,17 @@ class _WalletOperationsPageState extends State<WalletOperationsPage> {
     }
     setState(() => _busy = true);
     try {
+      final service = WalletService();
       String operationId;
       if (_mode == 'transfer') {
-        operationId = await _service.requestTransfer(
+        operationId = await service.requestTransfer(
           recipientUid: _recipientController.text,
           amount: amount,
         );
       } else if (_mode == 'deposit') {
-        operationId = await _service.requestDeposit(amount: amount);
+        operationId = await service.requestDeposit(amount: amount);
       } else {
-        operationId = await _service.requestWithdraw(amount: amount);
+        operationId = await service.requestWithdraw(amount: amount);
       }
       if (!mounted) return;
       _amountController.clear();
