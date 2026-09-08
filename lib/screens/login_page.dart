@@ -93,7 +93,7 @@ class _LoginPageState extends State<LoginPage> {
             if (!_register) ...[const SizedBox(height: 8), SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _loading ? null : _forgotPassword, icon: const Icon(Icons.lock_reset_rounded), label: const Text('نسيت كلمة المرور؟', style: TextStyle(fontWeight: FontWeight.w800))))],
             const SizedBox(height: 12), SizedBox(width: double.infinity, child: FilledButton(onPressed: _loading ? null : _submit, child: _loading ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)) : Text(_register ? 'إنشاء الحساب' : 'تسجيل الدخول'))),
             TextButton(onPressed: _loading ? null : () => setState(() { _register = !_register; _pendingLocation = null; }), child: Text(_register ? 'لديك حساب؟ تسجيل الدخول' : 'ليس لديك حساب؟ إنشاء حساب')),
-          ]))),
+          ])))),
         ]),
       )))),
     ),
