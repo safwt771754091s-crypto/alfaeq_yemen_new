@@ -35,21 +35,18 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if self(uid) || staff() || developer();
-      // A signed-in user may bootstrap only their own missing profile during
-      // mandatory location onboarding. The role is fixed to customer and the
-      // location is validated, so this does not grant arbitrary database write access.
+      // Location is optional during account creation. If supplied, it must be valid.
       allow create: if staff()
         || (self(uid)
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.role == 'customer'
-          && validLocation(request.resource.data));
-      // Existing users may update their own location and safe identity fields,
-      // but can never change uid or an existing role.
+          && (!('location' in request.resource.data) || validLocation(request.resource.data)));
+      // Existing users may update their own safe profile/location fields. Privileged roles remain immutable.
       allow update: if staff()
         || (self(uid)
           && request.resource.data.get('uid', request.auth.uid) == request.auth.uid
           && request.resource.data.get('role', resource.data.get('role', 'customer')) == resource.data.get('role', 'customer')
-          && validLocation(request.resource.data));
+          && (!('location' in request.resource.data) || validLocation(request.resource.data)));
       allow delete: if staff();
     }
 
