@@ -11,6 +11,11 @@ void main() {
     expect(rules, contains("allow update, delete: if false;"));
     expect(rules, contains("match /walletOperations/{id}"));
     expect(rules, contains("request.resource.data.status == 'pending'"));
+    expect(rules, contains("request.resource.data.currency == 'YER'"));
+    expect(rules, contains("request.resource.data.createdAt == request.time"));
+    expect(rules, contains("keys().hasOnly(['type', 'recipientUid', 'amount', 'uid', 'status', 'currency', 'createdAt'])"));
+    expect(rules, contains("request.resource.data.recipientUid != request.auth.uid"));
+    expect(rules, contains("allow update, delete: if false;"));
   });
 
   test('wallet service never writes monetary balances from client operations', () {
