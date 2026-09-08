@@ -100,10 +100,7 @@ class _SmartDispatchPageState extends State<SmartDispatchPage> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              const Text(
-                'اختيار المندوب',
-                style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
-              ),
+              const Text('اختيار المندوب', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
               const SizedBox(height: 10),
               ...ranked.map((driver) {
                 final data = driver.data();
@@ -111,21 +108,10 @@ class _SmartDispatchPageState extends State<SmartDispatchPage> {
                   elevation: 0,
                   child: ListTile(
                     leading: CircleAvatar(
-                      child: Icon(
-                        data['isOnline'] == true
-                            ? Icons.wifi_tethering
-                            : Icons.wifi_off_outlined,
-                      ),
+                      child: Icon(data['isOnline'] == true ? Icons.wifi_tethering : Icons.wifi_off_outlined),
                     ),
-                    title: Text(
-                      '${data['name'] ?? data['displayName'] ?? driver.id}',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    subtitle: Text(
-                      'الحمولة: ${data['activeOrderCount'] ?? 0} • '
-                      'التقييم: ${data['rating'] ?? 5} • '
-                      'النقاط: ${_score(data).toStringAsFixed(1)}',
-                    ),
+                    title: Text('${data['name'] ?? data['displayName'] ?? driver.id}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                    subtitle: Text('الحمولة: ${data['activeOrderCount'] ?? 0} • التقييم: ${data['rating'] ?? 5} • النقاط: ${_score(data).toStringAsFixed(1)}'),
                     trailing: const Icon(Icons.chevron_left),
                     onTap: () => Navigator.pop(context, driver),
                   ),
@@ -154,9 +140,7 @@ class _SmartDispatchPageState extends State<SmartDispatchPage> {
         future: _staff(),
         builder: (context, access) {
           if (access.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
           if (access.data != true) {
             return const Scaffold(
@@ -186,32 +170,17 @@ class _SmartDispatchPageState extends State<SmartDispatchPage> {
               stream: orders,
               builder: (context, orderSnap) {
                 if (orderSnap.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text('تعذر تحميل الطلبات: ${orderSnap.error}'),
-                    ),
-                  );
+                  return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('تعذر تحميل الطلبات: ${orderSnap.error}')));
                 }
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: drivers,
                   builder: (context, driverSnap) {
                     if (driverSnap.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text('تعذر تحميل المندوبين: ${driverSnap.error}'),
-                        ),
-                      );
+                      return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('تعذر تحميل المندوبين: ${driverSnap.error}')));
                     }
-
-                    final ordersDocs = orderSnap.data?.docs ??
-                        <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                    final driverDocs = driverSnap.data?.docs ??
-                        <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                    final ranked = [...driverDocs]
-                      ..sort((a, b) => _score(b.data()).compareTo(_score(a.data())));
-
+                    final ordersDocs = orderSnap.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                    final driverDocs = driverSnap.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                    final ranked = [...driverDocs]..sort((a, b) => _score(b.data()).compareTo(_score(a.data())));
                     return ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
@@ -224,17 +193,9 @@ class _SmartDispatchPageState extends State<SmartDispatchPage> {
                               children: [
                                 const Icon(Icons.alt_route, size: 38),
                                 const SizedBox(height: 8),
-                                const Text(
-                                  'محرك التوزيع الذكي',
-                                  style: TextStyle(
-                                    fontSize: 25,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
+                                const Text('محرك التوزيع الذكي', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900)),
                                 const SizedBox(height: 6),
-                                const Text(
-                                  'يرتب المندوبين حسب الاعتماد، الاتصال، الحمولة، التقييم وتوفر الموقع.',
-                                ),
+                                const Text('يرتب المندوبين حسب الاعتماد، الاتصال، الحمولة، التقييم وتوفر الموقع.'),
                                 const SizedBox(height: 12),
                                 Text('طلبات تنتظر الإسناد: ${ordersDocs.length}'),
                                 Text('مندوبون معتمدون: ${driverDocs.length}'),
@@ -244,22 +205,14 @@ class _SmartDispatchPageState extends State<SmartDispatchPage> {
                         ),
                         const SizedBox(height: 16),
                         if (ordersDocs.isEmpty)
-                          const Card(
-                            elevation: 0,
-                            child: Padding(
-                              padding: EdgeInsets.all(24),
-                              child: Text('لا توجد طلبات تنتظر التوزيع حالياً.'),
-                            ),
-                          ),
-                        ...ordersDocs.map(
-                          (order) => _DispatchCard(
-                            order: order,
-                            recommended: ranked.isEmpty ? null : ranked.first,
-                            busy: _busy,
-                            onAssign: _showAssignDialog,
-                            drivers: driverDocs,
-                          ),
-                        ),
+                          const Card(elevation: 0, child: Padding(padding: EdgeInsets.all(24), child: Text('لا توجد طلبات تنتظر التوزيع حالياً.'))),
+                        ...ordersDocs.map((order) => _DispatchCard(
+                          order: order,
+                          recommended: ranked.isEmpty ? null : ranked.first,
+                          busy: _busy,
+                          onAssign: _showAssignDialog,
+                          drivers: driverDocs,
+                        )),
                       ],
                     );
                   },
@@ -278,10 +231,7 @@ class _DispatchCard extends StatelessWidget {
   final QueryDocumentSnapshot<Map<String, dynamic>>? recommended;
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> drivers;
   final bool busy;
-  final Future<void> Function(
-    QueryDocumentSnapshot<Map<String, dynamic>>,
-    List<QueryDocumentSnapshot<Map<String, dynamic>>>,
-  ) onAssign;
+  final Future<void> Function(QueryDocumentSnapshot<Map<String, dynamic>>, List<QueryDocumentSnapshot<Map<String, dynamic>>>) onAssign;
 
   const _DispatchCard({
     required this.order,
@@ -296,7 +246,6 @@ class _DispatchCard extends StatelessWidget {
     final data = order.data();
     final driver = recommended?.data();
     final shortId = order.id.substring(0, order.id.length > 8 ? 8 : order.id.length);
-
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
@@ -310,10 +259,7 @@ class _DispatchCard extends StatelessWidget {
             Text('الإجمالي: ${data['total'] ?? 0} ${data['currency'] ?? 'YER'}'),
             const SizedBox(height: 10),
             if (recommended != null)
-              Text(
-                'المقترح: ${driver?['name'] ?? driver?['displayName'] ?? recommended!.id} • الحمولة ${driver?['activeOrderCount'] ?? 0}',
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
+              Text('المقترح: ${driver?['name'] ?? driver?['displayName'] ?? recommended!.id} • الحمولة ${driver?['activeOrderCount'] ?? 0}', style: const TextStyle(fontWeight: FontWeight.w800)),
             const SizedBox(height: 10),
             FilledButton.icon(
               onPressed: busy || drivers.isEmpty ? null : () => onAssign(order, drivers),
