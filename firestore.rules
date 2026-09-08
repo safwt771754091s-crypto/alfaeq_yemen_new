@@ -37,6 +37,30 @@ service cloud.firestore {
         || (resource.data.deliveryStatus == request.resource.data.deliveryStatus)
         || (request.resource.data.deliveryStatus == 'failed' && resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery']);
     }
+    function validWalletOperationBase() {
+      return signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.currency == 'YER'
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && request.resource.data.createdAt == request.time;
+    }
+    function validWalletOperationShape() {
+      return request.resource.data.keys().hasOnly(['type', 'recipientUid', 'amount', 'uid', 'status', 'currency', 'createdAt']);
+    }
+    function validWalletOperationCreate() {
+      return validWalletOperationBase()
+        && validWalletOperationShape()
+        && request.resource.data.type == 'transfer'
+        && request.resource.data.recipientUid is string
+        && request.resource.data.recipientUid != request.auth.uid;
+    }
+    function validWalletNonTransferCreate() {
+      return validWalletOperationBase()
+        && request.resource.data.keys().hasOnly(['type', 'amount', 'uid', 'status', 'currency', 'createdAt'])
+        && request.resource.data.type in ['deposit', 'withdraw'];
+    }
 
     match /users/{uid} {
       allow read: if self(uid) || staff() || developer();
@@ -163,12 +187,7 @@ service cloud.firestore {
 
     match /walletOperations/{id} {
       allow read: if staff() || developer() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow create: if signedIn()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.type in ['deposit', 'withdraw', 'transfer']
-        && request.resource.data.status == 'pending'
-        && request.resource.data.amount is number
-        && request.resource.data.amount > 0;
+      allow create: if validWalletOperationCreate() || validWalletNonTransferCreate();
       allow update, delete: if false;
     }
 
