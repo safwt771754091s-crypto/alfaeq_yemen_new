@@ -33,6 +33,8 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
       - name: Dependencies
         run: flutter pub get
+      - name: Security architecture tests
+        run: flutter test test/security_architecture_test.dart
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
       - name: Install FlutterFire CLI
