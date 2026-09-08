@@ -19,20 +19,61 @@ class AuthService {
     return auth.sendPasswordResetEmail(email: email.trim());
   }
 
-  Future<UserCredential> register({required String name, required String email, required String password}) async {
+  Future<UserCredential> register({
+    required String name,
+    required String email,
+    required String password,
+    required GeoPoint location,
+    String locationSource = 'device',
+  }) async {
     final credential = await auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
     final user = credential.user!;
     await user.updateDisplayName(name.trim());
-    await db.collection('users').doc(user.uid).set({
-      'uid': user.uid,
-      'name': name.trim(),
-      'email': user.email,
-      'role': 'customer',
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await db.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'name': name.trim(),
+        'email': user.email,
+        'role': 'customer',
+        'location': location,
+        'latitude': location.latitude,
+        'longitude': location.longitude,
+        'locationSource': locationSource,
+        'locationUpdatedAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      await user.delete();
+      rethrow;
+    }
     await user.reload();
     return credential;
+  }
+
+  Future<void> saveUserLocation({required GeoPoint location, String source = 'device'}) async {
+    final user = auth.currentUser;
+    if (user == null) throw StateError('User is not signed in.');
+    await db.collection('users').doc(user.uid).set({
+      'uid': user.uid,
+      'location': location,
+      'latitude': location.latitude,
+      'longitude': location.longitude,
+      'locationSource': source,
+      'locationUpdatedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<bool> hasRequiredLocation() async {
+    final user = auth.currentUser;
+    if (user == null) return false;
+    final snap = await db.collection('users').doc(user.uid).get();
+    final data = snap.data();
+    final location = data?['location'];
+    return location is GeoPoint &&
+        (data?['latitude'] is num) &&
+        (data?['longitude'] is num);
   }
 
   Future<void> signOut() => auth.signOut();
