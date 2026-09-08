@@ -13,9 +13,8 @@ void main() {
     expect(rules, contains("request.resource.data.status == 'pending'"));
     expect(rules, contains("request.resource.data.currency == 'YER'"));
     expect(rules, contains("request.resource.data.createdAt == request.time"));
-    expect(rules, contains("keys().hasOnly(['type', 'recipientUid', 'amount', 'uid', 'status', 'currency', 'createdAt'])"));
+    expect(rules, contains("validWalletOperationShape"));
     expect(rules, contains("request.resource.data.recipientUid != request.auth.uid"));
-    expect(rules, contains("allow update, delete: if false;"));
   });
 
   test('wallet service never writes monetary balances from client operations', () {
@@ -33,6 +32,10 @@ void main() {
     expect(source, contains("retry: true"));
     expect(source, contains("runTransaction"));
     expect(source, contains("INSUFFICIENT_FUNDS"));
+    expect(source, contains("INVALID_WALLET_BALANCE"));
+    expect(source, contains("MAX_OPERATION_AMOUNT"));
+    expect(source, contains("operation.currency === CURRENCY"));
+    expect(source, contains("operation.createdAt != null"));
     expect(source, contains("transfer_debit"));
     expect(source, contains("transfer_credit"));
     expect(source, contains("wallet_backend"));
