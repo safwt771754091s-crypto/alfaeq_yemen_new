@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
@@ -318,6 +319,22 @@ class ServicesHubPage extends StatelessWidget {
 class _AccountTab extends StatelessWidget {
   const _AccountTab();
 
+  Future<void> _signOut(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تسجيل الخروج'),
+        content: const Text('هل تريد تسجيل الخروج من حسابك على الفائق يمن؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('تسجيل الخروج')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await FirebaseAuth.instance.signOut();
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(padding: const EdgeInsets.all(18), children: [
@@ -328,6 +345,17 @@ class _AccountTab extends StatelessWidget {
       const SizedBox(height: 24),
       Card(elevation: 0, child: ListTile(leading: const Icon(Icons.account_balance_wallet_outlined), title: const Text('المحافظ والدفع'), trailing: const Icon(Icons.chevron_left), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletCenterPage())))),
       Card(elevation: 0, child: ListTile(leading: const Icon(Icons.local_shipping_outlined), title: const Text('طلباتي والتتبع'), trailing: const Icon(Icons.chevron_left), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersPage())))),
+      const SizedBox(height: 12),
+      Card(
+        elevation: 0,
+        child: ListTile(
+          leading: const Icon(Icons.logout, color: Colors.redAccent),
+          title: const Text('تسجيل الخروج', style: TextStyle(fontWeight: FontWeight.w900)),
+          subtitle: const Text('إنهاء الجلسة الحالية بأمان'),
+          trailing: const Icon(Icons.chevron_left),
+          onTap: () => _signOut(context),
+        ),
+      ),
     ]);
   }
 }
