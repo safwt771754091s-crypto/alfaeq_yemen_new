@@ -6,7 +6,6 @@ void main() {
   group('Alfaeq Yemen security architecture', () {
     test('AI permission gateway remains default-deny and confirmation-gated', () {
       final source = File('lib/ai/ai_permission_gateway.dart').readAsStringSync();
-
       expect(source, contains('Default-deny'));
       expect(source, contains("if (policy == null) return AiPermissionDecision.denied"));
       expect(source, contains('requiresConfirmation'));
@@ -17,7 +16,6 @@ void main() {
 
     test('AI service uses limited-use App Check tokens', () {
       final source = File('lib/ai/ai_service.dart').readAsStringSync();
-
       expect(source, contains('FirebaseAI.googleAI'));
       expect(source, contains('useLimitedUseAppCheckTokens: true'));
       expect(source, contains('_executeThroughGateway'));
@@ -26,7 +24,6 @@ void main() {
 
     test('Firestore rules keep audit logs append-only and user-owned data scoped', () {
       final rules = File('firestore.rules').readAsStringSync();
-
       expect(rules, contains('match /auditLogs/{id}'));
       expect(rules, contains('allow update, delete: if false;'));
       expect(rules, contains('request.resource.data.actorUid == request.auth.uid'));
@@ -39,7 +36,6 @@ void main() {
       final merchant = File('lib/screens/merchant_center_page.dart').readAsStringSync();
       final approval = File('lib/screens/merchant_approval_page.dart').readAsStringSync();
       final rules = File('firestore.rules').readAsStringSync();
-
       expect(merchant, contains("'status': 'pending'"));
       expect(merchant, contains("'ownerId': user.uid"));
       expect(approval, contains('Future<bool> _isStaff()'));
@@ -53,7 +49,6 @@ void main() {
 
     test('merchant portal is role-gated before opening merchant controls', () {
       final portal = File('lib/screens/merchant_portal_page.dart').readAsStringSync();
-
       expect(portal, contains("import '../services/auth_service.dart';"));
       expect(portal, contains("role == 'merchant'"));
       expect(portal, contains("role == 'admin'"));
@@ -67,13 +62,43 @@ void main() {
       final orders = File('lib/screens/merchant_orders_page.dart').readAsStringSync();
       final service = File('lib/services/firestore_service.dart').readAsStringSync();
       final rules = File('firestore.rules').readAsStringSync();
-
       expect(orders, contains("where('merchantIds', arrayContains: user.uid)"));
       expect(orders, contains("collection('auditLogs')"));
       expect(orders, contains('merchant_order_status_'));
       expect(service, contains("'merchantIds': merchantIds.toList()"));
       expect(rules, contains("request.auth.uid in resource.data.merchantIds"));
       expect(rules, contains("request.resource.data.merchantIds == resource.data.merchantIds"));
+    });
+
+    test('driver center is role-gated and delivery transitions preserve assignment', () {
+      final driver = File('lib/screens/driver_center_page.dart').readAsStringSync();
+      final gate = File('lib/screens/auth_gate.dart').readAsStringSync();
+      final rules = File('firestore.rules').readAsStringSync();
+      expect(driver, contains("role == 'driver'"));
+      expect(driver, contains("'currentLocation': GeoPoint"));
+      expect(driver, contains("where('driverId', isEqualTo: user.uid)"));
+      expect(driver, contains("status == 'assigned'"));
+      expect(driver, contains("status == 'delivered'"));
+      expect(gate, contains("if (roleSnapshot.data == 'driver') return const DriverCenterPage();"));
+      expect(rules, contains('match /drivers/{uid}'));
+      expect(rules, contains("request.resource.data.approved == resource.data.approved"));
+      expect(rules, contains("request.auth.uid == request.auth.uid"));
+      expect(rules, contains("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveryLocation', 'updatedAt', 'status', 'deliveredAt'])"));
+      expect(rules, contains("(driver() && request.auth.uid == resource.data.driverId"));
+    });
+
+    test('smart dispatch is distance/load scored and audited', () {
+      final service = File('lib/services/dispatch_service.dart').readAsStringSync();
+      final center = File('lib/screens/dispatch_center_page.dart').readAsStringSync();
+      final rules = File('firestore.rules').readAsStringSync();
+      expect(service, contains('distanceKm'));
+      expect(service, contains('activeOrderCount'));
+      expect(service, contains('dispatchScore'));
+      expect(service, contains("'smart_dispatch_assign'"));
+      expect(center, contains("where('deliveryStatus', isEqualTo: 'awaiting_assignment')"));
+      expect(center, contains('assignBestDriver'));
+      expect(rules, contains("function driver()"));
+      expect(rules, contains("resource.data.driverId == request.auth.uid"));
     });
   });
 }
