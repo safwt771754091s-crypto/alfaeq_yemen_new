@@ -18,6 +18,20 @@ service cloud.firestore {
         && data.location.latitude >= -90 && data.location.latitude <= 90
         && data.location.longitude >= -180 && data.location.longitude <= 180;
     }
+    function validMerchantStatusTransition() {
+      return (resource.data.status == 'pending' && request.resource.data.status in ['accepted', 'cancelled'])
+        || (resource.data.status == 'accepted' && request.resource.data.status in ['preparing', 'cancelled'])
+        || (resource.data.status == 'preparing' && request.resource.data.status == 'ready_for_pickup')
+        || (resource.data.status == request.resource.data.status);
+    }
+    function validDeliveryTransition() {
+      return (resource.data.deliveryStatus == 'awaiting_assignment' && request.resource.data.deliveryStatus == 'assigned')
+        || (resource.data.deliveryStatus == 'assigned' && request.resource.data.deliveryStatus == 'picked_up')
+        || (resource.data.deliveryStatus == 'picked_up' && request.resource.data.deliveryStatus == 'out_for_delivery')
+        || (resource.data.deliveryStatus == 'out_for_delivery' && request.resource.data.deliveryStatus == 'delivered')
+        || (resource.data.deliveryStatus == request.resource.data.deliveryStatus)
+        || (request.resource.data.deliveryStatus == 'failed' && resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery']);
+    }
 
     match /users/{uid} {
       allow read: if self(uid) || staff() || developer();
@@ -64,20 +78,37 @@ service cloud.firestore {
     }
 
     match /orders/{id} {
-      allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.customerId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.deliveryStatus == 'awaiting_assignment'
+        && !('driverId' in request.resource.data)
+        && !('deliveredAt' in request.resource.data)
+        && request.resource.data.address is string
+        && request.resource.data.paymentMethod in ['cash_on_delivery', 'al_kuraimi', 'cash_wallet', 'jeeb_wallet']
+        && request.resource.data.items is list;
       allow read: if staff() || developer()
         || (signedIn() && resource.data.customerId == request.auth.uid)
         || (merchant() && request.auth.uid in resource.data.merchantIds)
         || (merchant() && resource.data.merchantId == request.auth.uid)
         || (driver() && resource.data.driverId == request.auth.uid);
       allow update: if staff()
-        || (merchant() && request.auth.uid in resource.data.merchantIds && request.resource.data.customerId == resource.data.customerId && request.resource.data.merchantIds == resource.data.merchantIds)
-        || (merchant() && resource.data.merchantId == request.auth.uid && request.resource.data.customerId == resource.data.customerId && request.resource.data.merchantId == resource.data.merchantId)
+        || (merchant() && request.auth.uid in resource.data.merchantIds
+          && request.resource.data.customerId == resource.data.customerId
+          && request.resource.data.merchantIds == resource.data.merchantIds
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && validMerchantStatusTransition())
+        || (merchant() && resource.data.merchantId == request.auth.uid
+          && request.resource.data.customerId == resource.data.customerId
+          && request.resource.data.merchantId == resource.data.merchantId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && validMerchantStatusTransition())
         || (driver() && resource.data.driverId == request.auth.uid
           && request.resource.data.customerId == resource.data.customerId
           && request.resource.data.driverId == resource.data.driverId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveryLocation', 'updatedAt', 'status', 'deliveredAt'])
-          && request.resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery', 'delivered', 'failed']);
+          && request.resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery', 'delivered', 'failed']
+          && validDeliveryTransition());
       allow delete: if staff();
     }
 
