@@ -147,7 +147,7 @@ class AlfaeqAiToolRegistry {
     final stores = <Map<String, Object?>>[];
 
     if (type == 'products' || type == 'both') {
-      final snap = await _db.collection('products').limit(80).get();
+      final snap = await _db.collection('products').where('status', isEqualTo: 'active').limit(80).get();
       for (final doc in snap.docs) {
         final data = doc.data();
         final name = (data['name'] ?? data['title'] ?? '').toString();
@@ -159,7 +159,7 @@ class AlfaeqAiToolRegistry {
       }
     }
     if (type == 'stores' || type == 'both') {
-      final snap = await _db.collection('stores').limit(80).get();
+      final snap = await _db.collection('stores').where('status', isEqualTo: 'approved').limit(80).get();
       for (final doc in snap.docs) {
         final data = doc.data();
         final name = (data['name'] ?? data['title'] ?? '').toString();
