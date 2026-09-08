@@ -42,8 +42,8 @@ class _RealWalletPageState extends State<RealWalletPage> {
               return _notInitialized();
             }
             final data = wallet.data() ?? const <String, dynamic>{};
-            final available = data['availableBalance'] is num ? (data['availableBalance'] as num).toDouble() : 0;
-            final reserved = data['reservedBalance'] is num ? (data['reservedBalance'] as num).toDouble() : 0;
+            final available = data['availableBalance'] is num ? (data['availableBalance'] as num).toDouble() : 0.0;
+            final reserved = data['reservedBalance'] is num ? (data['reservedBalance'] as num).toDouble() : 0.0;
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
               children: [
