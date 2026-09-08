@@ -8,9 +8,20 @@ const db = getFirestore();
 
 const WALLET_STATUS = 'active';
 const CURRENCY = 'YER';
+const MAX_OPERATION_AMOUNT = 100000000;
 
 function positiveAmount(value) {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= MAX_OPERATION_AMOUNT;
+}
+
+function validOperationEnvelope(operation) {
+  return operation
+    && typeof operation.uid === 'string'
+    && ['deposit', 'withdraw', 'transfer'].includes(operation.type)
+    && operation.status === 'pending'
+    && operation.currency === CURRENCY
+    && positiveAmount(operation.amount)
+    && operation.createdAt != null;
 }
 
 async function serverAudit(data) {
@@ -37,7 +48,7 @@ exports.processWalletOperation = onDocumentCreated(
     const amount = operation.amount;
     const recipientUid = operation.recipientUid;
 
-    if (!uid || !['deposit', 'withdraw', 'transfer'].includes(type) || !positiveAmount(amount)) {
+    if (!validOperationEnvelope(operation)) {
       await operationRef.update({ status: 'rejected', rejectionCode: 'INVALID_OPERATION', processedAt: FieldValue.serverTimestamp() });
       await serverAudit({ actorUid: uid || 'unknown', action: 'wallet.operation.rejected', result: 'rejected', operationId, reason: 'INVALID_OPERATION' });
       return;
@@ -49,7 +60,7 @@ exports.processWalletOperation = onDocumentCreated(
       return;
     }
 
-    if (!recipientUid || recipientUid === uid) {
+    if (typeof recipientUid !== 'string' || recipientUid.trim().isEmpty || recipientUid === uid) {
       await operationRef.update({ status: 'rejected', rejectionCode: 'INVALID_RECIPIENT', processedAt: FieldValue.serverTimestamp() });
       await serverAudit({ actorUid: uid, action: 'wallet.transfer.rejected', result: 'rejected', operationId, reason: 'INVALID_RECIPIENT' });
       return;
@@ -77,6 +88,7 @@ exports.processWalletOperation = onDocumentCreated(
         const destinationBalance = Number(destination.availableBalance || 0);
 
         if (source.currency !== CURRENCY || destination.currency !== CURRENCY || source.status !== WALLET_STATUS || destination.status !== WALLET_STATUS) throw new Error('WALLET_NOT_ACTIVE');
+        if (!Number.isFinite(sourceBalance) || !Number.isFinite(destinationBalance) || sourceBalance < 0 || destinationBalance < 0) throw new Error('INVALID_WALLET_BALANCE');
         if (sourceBalance < amount) throw new Error('INSUFFICIENT_FUNDS');
 
         const now = FieldValue.serverTimestamp();
@@ -90,7 +102,7 @@ exports.processWalletOperation = onDocumentCreated(
       await serverAudit({ actorUid: uid, action: 'wallet.transfer.completed', result: 'success', operationId, amount, currency: CURRENCY, recipientUid });
     } catch (error) {
       const code = error && error.message ? error.message : 'WALLET_OPERATION_FAILED';
-      if (!['WALLET_NOT_FOUND', 'WALLET_NOT_ACTIVE', 'INSUFFICIENT_FUNDS'].includes(code)) {
+      if (!['WALLET_NOT_FOUND', 'WALLET_NOT_ACTIVE', 'INSUFFICIENT_FUNDS', 'INVALID_WALLET_BALANCE'].includes(code)) {
         logger.error('Transient wallet operation failure', { operationId, code });
         throw error;
       }
