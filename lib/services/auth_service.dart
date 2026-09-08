@@ -54,48 +54,23 @@ class AuthService {
   Future<void> saveUserLocation({required GeoPoint location, String source = 'device'}) async {
     final user = auth.currentUser;
     if (user == null) throw StateError('User is not signed in.');
+
     final ref = db.collection('users').doc(user.uid);
-    final snapshot = await ref.get();
-    final existing = snapshot.data();
 
-    if (!snapshot.exists) {
-      // Legacy/Auth-only accounts may exist without a Firestore profile.
-      // Create the minimum real customer profile needed to pass onboarding.
-      await ref.set({
-        'uid': user.uid,
-        'name': (user.displayName ?? '').trim(),
-        'email': user.email,
-        'role': 'customer',
-        'location': location,
-        'latitude': location.latitude,
-        'longitude': location.longitude,
-        'locationSource': source,
-        'locationUpdatedAt': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      return;
-    }
-
-    // Existing profiles receive a location-only update so role/ownership
-    // fields cannot accidentally be rewritten during onboarding.
-    final update = <String, dynamic>{
+    // Use one atomic merge write for both new and legacy profiles. Firestore
+    // evaluates the resulting document against the same secure create/update
+    // rules, while avoiding a read-then-update race for legacy accounts.
+    await ref.set({
+      'uid': user.uid,
       'location': location,
       'latitude': location.latitude,
       'longitude': location.longitude,
       'locationSource': source,
       'locationUpdatedAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    // Repair only missing legacy identity fields that are safe for the
-    // authenticated owner to establish. Existing role values are preserved.
-    if (existing?['uid'] == null) update['uid'] = user.uid;
-    if (existing?['role'] == null) update['role'] = 'customer';
-    if (existing?['email'] == null && user.email != null) update['email'] = user.email;
-    if (existing?['name'] == null && user.displayName != null) update['name'] = user.displayName!.trim();
-
-    await ref.update(update);
+      'name': (user.displayName ?? '').trim(),
+      'email': user.email,
+    }, SetOptions(merge: true));
   }
 
   Future<bool> hasRequiredLocation() async {
