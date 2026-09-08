@@ -35,8 +35,16 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if self(uid) || staff() || developer();
-      allow create: if staff() || (self(uid) && request.resource.data.role == 'customer' && request.resource.data.uid == request.auth.uid && validLocation(request.resource.data));
-      allow update: if staff() || (self(uid) && request.resource.data.role == resource.data.role && request.resource.data.uid == resource.data.uid && validLocation(request.resource.data));
+      allow create: if staff()
+        || (self(uid)
+          && request.resource.data.role == 'customer'
+          && request.resource.data.uid == request.auth.uid
+          && validLocation(request.resource.data));
+      allow update: if staff()
+        || (self(uid)
+          && request.resource.data.get('uid', request.auth.uid) == request.auth.uid
+          && request.resource.data.get('role', 'customer') == resource.data.get('role', 'customer')
+          && validLocation(request.resource.data));
       allow delete: if staff();
     }
 
