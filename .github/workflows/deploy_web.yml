@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  RECAPTCHA_V3_SITE_KEY: 6LcDsK8tAAAAAIao34qFSlPGecpCxGolh_GpzUol
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -51,7 +54,7 @@ jobs:
       - name: Build Web
         run: |
           rm -rf build/web
-          flutter build web --release --pwa-strategy=none
+          flutter build web --release --pwa-strategy=none --dart-define=RECAPTCHA_V3_SITE_KEY="$RECAPTCHA_V3_SITE_KEY"
           rm -f build/web/flutter_service_worker.js
       - name: Verify fresh web build
         run: |
