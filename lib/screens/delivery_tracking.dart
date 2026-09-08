@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../services/firestore_service.dart';
+import 'live_tracking_map_page.dart';
 
 class DeliveryTracking extends StatelessWidget {
   final String orderId;
@@ -63,6 +64,17 @@ class DeliveryTracking extends StatelessWidget {
                         _InfoRow(icon: Icons.account_balance_wallet_outlined, title: 'طريقة الدفع', value: payment),
                       ],
                     ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  elevation: 0,
+                  child: ListTile(
+                    leading: const Icon(Icons.map_outlined),
+                    title: const Text('الخريطة والتتبع الحي', style: TextStyle(fontWeight: FontWeight.w900)),
+                    subtitle: Text(location is GeoPoint ? 'عرض آخر موقع مسجل للمندوب وتحديثاته المباشرة.' : 'سيظهر التتبع تلقائياً عند بدء تسجيل موقع المندوب.'),
+                    trailing: const Icon(Icons.arrow_back_ios_new, size: 16),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LiveTrackingMapPage(orderId: orderId))),
                   ),
                 ),
                 const SizedBox(height: 12),
