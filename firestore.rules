@@ -6,8 +6,8 @@ service cloud.firestore {
     function ownerRole() { return signedIn() && (request.auth.token.owner == true || request.auth.token.role == 'owner'); }
     function developer() { return signedIn() && (request.auth.token.role == 'developer' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'developer'); }
     function staff() { return admin() || ownerRole(); }
-    function merchant() { return signedIn() && request.auth.token.role == 'merchant'; }
-    function driver() { return signedIn() && request.auth.token.role == 'driver'; }
+    function merchant() { return signedIn() && (request.auth.token.role == 'merchant' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'merchant'); }
+    function driver() { return signedIn() && (request.auth.token.role == 'driver' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'driver'); }
     function self(uid) { return signedIn() && request.auth.uid == uid; }
 
     match /users/{uid} {
@@ -41,6 +41,19 @@ service cloud.firestore {
       allow delete: if self(uid);
     }
 
+    match /drivers/{uid} {
+      allow read: if staff() || developer() || self(uid);
+      allow create: if staff() || (driver() && self(uid) && request.resource.data.uid == request.auth.uid && request.resource.data.approved == false);
+      allow update: if staff()
+        || (driver() && self(uid)
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.approved == resource.data.approved
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOnline', 'currentLocation', 'lastSeenAt', 'updatedAt', 'activeOrderCount'])
+          && request.resource.data.activeOrderCount >= 0
+          && request.resource.data.activeOrderCount <= resource.data.activeOrderCount);
+      allow delete: if staff();
+    }
+
     match /orders/{id} {
       allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
       allow read: if staff() || developer()
@@ -51,7 +64,10 @@ service cloud.firestore {
       allow update: if staff()
         || (merchant() && request.auth.uid in resource.data.merchantIds && request.resource.data.customerId == resource.data.customerId && request.resource.data.merchantIds == resource.data.merchantIds)
         || (merchant() && resource.data.merchantId == request.auth.uid && request.resource.data.customerId == resource.data.customerId && request.resource.data.merchantId == resource.data.merchantId)
-        || (driver() && resource.data.driverId == request.auth.uid && request.resource.data.customerId == resource.data.customerId && request.resource.data.driverId == resource.data.driverId);
+        || (driver() && resource.data.driverId == request.auth.uid
+          && request.resource.data.customerId == resource.data.customerId
+          && request.resource.data.driverId == resource.data.driverId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveryLocation', 'updatedAt', 'status', 'deliveredAt']));
       allow delete: if staff();
     }
 
