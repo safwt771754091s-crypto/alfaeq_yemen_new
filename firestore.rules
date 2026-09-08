@@ -35,13 +35,11 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if self(uid) || staff() || developer();
-      // Location is optional during account creation. If supplied, it must be valid.
       allow create: if staff()
         || (self(uid)
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.role == 'customer'
           && (!('location' in request.resource.data) || validLocation(request.resource.data)));
-      // Existing users may update their own safe profile/location fields. Privileged roles remain immutable.
       allow update: if staff()
         || (self(uid)
           && request.resource.data.get('uid', request.auth.uid) == request.auth.uid
@@ -66,14 +64,17 @@ service cloud.firestore {
       allow read: if resource.data.status == 'active' || staff() || developer() || (merchant() && resource.data.ownerId == request.auth.uid);
       allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid);
       allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId && request.resource.data.storeId == resource.data.storeId);
-      allow delete: if staff() || (merchant() && resource.data.ownerId == request.auth.uid);
+      allow delete: if staff() || (merchant() && request.auth.uid == resource.data.ownerId);
     }
 
     match /carts/{uid} {
-      allow read: if self(uid) && resource.data.ownerId == request.auth.uid;
+      // The document path is already the authenticated user's UID, so legacy carts without ownerId remain readable.
+      allow read: if self(uid);
+      // New carts must record their owner explicitly.
       allow create: if self(uid) && request.resource.data.ownerId == request.auth.uid;
+      // Permit a one-time safe migration of legacy carts that lack ownerId, while every resulting cart is owned by the caller.
       allow update: if self(uid)
-        && resource.data.ownerId == request.auth.uid
+        && (!('ownerId' in resource.data) || resource.data.ownerId == request.auth.uid)
         && request.resource.data.ownerId == request.auth.uid;
       allow delete: if self(uid);
     }
