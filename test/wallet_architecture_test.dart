@@ -17,7 +17,20 @@ void main() {
     final source = File('lib/services/wallet_service.dart').readAsStringSync();
     expect(source, contains("availableBalance': 0"));
     expect(source, contains("reservedBalance': 0"));
+    expect(source, contains("'type': 'transfer'"));
+    expect(source, contains("'status': 'pending'"));
     expect(source, isNot(contains('availableBalance: amount')));
+  });
+
+  test('trusted wallet backend is idempotent and transactional', () {
+    final source = File('functions/index.js').readAsStringSync();
+    expect(source, contains("onDocumentCreated"));
+    expect(source, contains("retry: true"));
+    expect(source, contains("runTransaction"));
+    expect(source, contains("INSUFFICIENT_FUNDS"));
+    expect(source, contains("transfer_debit"));
+    expect(source, contains("transfer_credit"));
+    expect(source, contains("wallet_backend"));
   });
 
   test('Super App sections contain live approved store queries', () {
