@@ -124,5 +124,28 @@ void main() {
       expect(rules, contains('validLocation(request.resource.data)'));
       expect(rules, contains("request.resource.data.location is latlng"));
     });
+
+    test('order flow prevents forged delivery state and enforces sequential transitions', () {
+      final rules = File('firestore.rules').readAsStringSync();
+      final service = File('lib/services/firestore_service.dart').readAsStringSync();
+      final merchant = File('lib/screens/merchant_orders_page.dart').readAsStringSync();
+      final driver = File('lib/screens/driver_center_page.dart').readAsStringSync();
+      expect(rules, contains("request.resource.data.status == 'pending'"));
+      expect(rules, contains("request.resource.data.deliveryStatus == 'awaiting_assignment'"));
+      expect(rules, contains("!('driverId' in request.resource.data)"));
+      expect(rules, contains("!('deliveredAt' in request.resource.data)"));
+      expect(rules, contains("function validMerchantStatusTransition()"));
+      expect(rules, contains("function validDeliveryTransition()"));
+      expect(rules, contains("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])"));
+      expect(rules, contains("request.resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery', 'delivered', 'failed']"));
+      expect(service, contains("'deliveryStatus': 'awaiting_assignment'"));
+      expect(service, contains("'merchantIds': merchantIds.toList()"));
+      expect(merchant, contains("onStatus(doc, 'accepted')"));
+      expect(merchant, contains("onStatus(doc, 'preparing')"));
+      expect(merchant, contains("onStatus(doc, 'ready_for_pickup')"));
+      expect(driver, contains("onStatus(doc, 'picked_up')"));
+      expect(driver, contains("onStatus(doc, 'out_for_delivery')"));
+      expect(driver, contains("onStatus(doc, 'delivered')"));
+    });
   });
 }
