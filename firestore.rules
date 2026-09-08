@@ -18,6 +18,11 @@ service cloud.firestore {
         && data.location.latitude >= -90 && data.location.latitude <= 90
         && data.location.longitude >= -180 && data.location.longitude <= 180;
     }
+    function validGeoPoint(value) {
+      return value is latlng
+        && value.latitude >= -90 && value.latitude <= 90
+        && value.longitude >= -180 && value.longitude <= 180;
+    }
     function validMerchantStatusTransition() {
       return (resource.data.status == 'pending' && request.resource.data.status in ['accepted', 'cancelled'])
         || (resource.data.status == 'accepted' && request.resource.data.status in ['preparing', 'cancelled'])
@@ -88,7 +93,8 @@ service cloud.firestore {
           && request.resource.data.approved == resource.data.approved
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOnline', 'currentLocation', 'lastSeenAt', 'updatedAt', 'activeOrderCount'])
           && request.resource.data.activeOrderCount >= 0
-          && request.resource.data.activeOrderCount <= resource.data.activeOrderCount);
+          && request.resource.data.activeOrderCount <= resource.data.activeOrderCount
+          && (!('currentLocation' in request.resource.data) || validGeoPoint(request.resource.data.currentLocation)));
       allow delete: if staff();
     }
 
@@ -123,6 +129,7 @@ service cloud.firestore {
           && request.resource.data.driverId == resource.data.driverId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveryLocation', 'updatedAt', 'status', 'deliveredAt'])
           && request.resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery', 'delivered', 'failed']
+          && (!('deliveryLocation' in request.resource.data) || validGeoPoint(request.resource.data.deliveryLocation))
           && validDeliveryTransition());
       allow delete: if staff();
     }
