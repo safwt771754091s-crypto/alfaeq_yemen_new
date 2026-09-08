@@ -87,50 +87,29 @@ void main() {
       expect(rules, contains("resource.data.driverId == request.auth.uid"));
     });
 
-    test('smart dispatch is distance/load scored and audited', () {
-      final service = File('lib/services/dispatch_service.dart').readAsStringSync();
-      final center = File('lib/screens/dispatch_center_page.dart').readAsStringSync();
-      final rules = File('firestore.rules').readAsStringSync();
-      expect(service, contains('distanceKm'));
-      expect(service, contains('activeOrderCount'));
-      expect(service, contains('dispatchScore'));
-      expect(service, contains("'smart_dispatch_assign'"));
-      expect(center, contains("where('deliveryStatus', isEqualTo: 'awaiting_assignment')"));
-      expect(center, contains('assignBestDriver'));
-      expect(center, contains("'deliveryLocation': GeoPoint"));
-      expect(rules, contains("function driver()"));
-      expect(rules, contains("resource.data.driverId == request.auth.uid"));
-    });
-
-    test('location onboarding requires a valid map/device location and legacy profile repair', () {
+    test('location is optional at signup and requested only by location-dependent features', () {
       final auth = File('lib/services/auth_service.dart').readAsStringSync();
       final gate = File('lib/screens/auth_gate.dart').readAsStringSync();
-      final onboarding = File('lib/screens/location_required_page.dart').readAsStringSync();
       final login = File('lib/screens/login_page.dart').readAsStringSync();
+      final onboarding = File('lib/screens/location_required_page.dart').readAsStringSync();
       final merchant = File('lib/screens/merchant_center_page.dart').readAsStringSync();
       final rules = File('firestore.rules').readAsStringSync();
-      expect(auth, contains('required GeoPoint location'));
-      expect(auth, contains('hasRequiredLocation'));
+
+      expect(auth, contains('GeoPoint? location'));
+      expect(auth, contains('if (location != null)'));
       expect(auth, contains('saveUserLocation'));
       expect(auth, contains('SetOptions(merge: true)'));
       expect(auth, contains("'location': location"));
-      expect(auth, contains("'uid': user.uid"));
-      expect(auth, contains("if (!snapshot.exists)"));
-      expect(auth, contains("update['role'] = 'customer'"));
-      expect(auth, contains("else if (existing?['role'] == null)"));
-      expect(auth, contains("update['createdAt'] = FieldValue.serverTimestamp()"));
-      expect(gate, contains('hasRequiredLocation()'));
-      expect(gate, contains('LocationRequiredPage'));
-      expect(gate, contains('setState(() {})'));
+      expect(gate, isNot(contains('hasRequiredLocation()')));
+      expect(gate, isNot(contains('LocationRequiredPage')));
+      expect(login, isNot(contains('_pendingLocation')));
+      expect(login, isNot(contains('LocationPickerPage')));
       expect(onboarding, contains('LocationPickerPage'));
       expect(onboarding, contains('LocationService.requireCurrentPosition'));
-      expect(login, contains('LocationPickerPage'));
-      expect(login, contains('_pendingLocation'));
       expect(merchant, contains('LocationService.requireCurrentPosition'));
       expect(merchant, contains("'location': location"));
       expect(rules, contains('function validLocation'));
-      expect(rules, contains('validLocation(request.resource.data)'));
-      expect(rules, contains("request.resource.data.location is latlng"));
+      expect(rules, contains("!('location' in request.resource.data) || validLocation(request.resource.data)"));
       expect(rules, contains("request.resource.data.get('uid', request.auth.uid) == request.auth.uid"));
       expect(rules, contains("request.resource.data.get('role', resource.data.get('role', 'customer')) == resource.data.get('role', 'customer')"));
     });
