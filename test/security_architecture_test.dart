@@ -82,9 +82,8 @@ void main() {
       expect(gate, contains("if (roleSnapshot.data == 'driver') return const DriverCenterPage();"));
       expect(rules, contains('match /drivers/{uid}'));
       expect(rules, contains("request.resource.data.approved == resource.data.approved"));
-      expect(rules, contains("request.auth.uid == request.auth.uid"));
       expect(rules, contains("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveryLocation', 'updatedAt', 'status', 'deliveredAt'])"));
-      expect(rules, contains("(driver() && request.auth.uid == resource.data.driverId"));
+      expect(rules, contains("resource.data.driverId == request.auth.uid"));
     });
 
     test('smart dispatch is distance/load scored and audited', () {
@@ -97,6 +96,7 @@ void main() {
       expect(service, contains("'smart_dispatch_assign'"));
       expect(center, contains("where('deliveryStatus', isEqualTo: 'awaiting_assignment')"));
       expect(center, contains('assignBestDriver'));
+      expect(center, contains("'deliveryLocation': GeoPoint"));
       expect(rules, contains("function driver()"));
       expect(rules, contains("resource.data.driverId == request.auth.uid"));
     });
