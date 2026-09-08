@@ -23,26 +23,31 @@ class AuthService {
     required String name,
     required String email,
     required String password,
-    required GeoPoint location,
+    GeoPoint? location,
     String locationSource = 'device',
   }) async {
     final credential = await auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
     final user = credential.user!;
     await user.updateDisplayName(name.trim());
     try {
-      await db.collection('users').doc(user.uid).set({
+      final profile = <String, dynamic>{
         'uid': user.uid,
         'name': name.trim(),
         'email': user.email,
         'role': 'customer',
-        'location': location,
-        'latitude': location.latitude,
-        'longitude': location.longitude,
-        'locationSource': locationSource,
-        'locationUpdatedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+      if (location != null) {
+        profile.addAll({
+          'location': location,
+          'latitude': location.latitude,
+          'longitude': location.longitude,
+          'locationSource': locationSource,
+          'locationUpdatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await db.collection('users').doc(user.uid).set(profile);
     } catch (_) {
       await user.delete();
       rethrow;
@@ -70,8 +75,6 @@ class AuthService {
       'email': user.email,
     };
 
-    // Legacy/missing profiles are repaired as customers. Existing privileged
-    // roles are preserved and never overwritten by onboarding.
     if (!snapshot.exists) {
       update['role'] = 'customer';
       update['createdAt'] = FieldValue.serverTimestamp();
