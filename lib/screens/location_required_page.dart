@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -16,12 +17,24 @@ class _LocationRequiredPageState extends State<LocationRequiredPage> {
   bool _busy = false;
   String? _error;
 
+  String _saveError(Object error) {
+    if (error is FirebaseException) {
+      if (error.code == 'permission-denied') {
+        return 'تم تحديد الموقع، لكن Firebase رفض حفظه. سأحتاج إصلاح صلاحيات قاعدة البيانات قبل المتابعة.';
+      }
+      if (error.code == 'unavailable') {
+        return 'تم تحديد الموقع، لكن قاعدة البيانات غير متاحة الآن. تحقق من الإنترنت وحاول مرة أخرى.';
+      }
+    }
+    return 'تعذر حفظ الموقع في قاعدة بيانات الفائق يمن. حاول مرة أخرى.';
+  }
+
   Future<void> _save(LatLng point) async {
     setState(() { _busy = true; _error = null; });
     try {
       await widget.onLocationReady(point.latitude, point.longitude);
-    } catch (_) {
-      setState(() => _error = 'تعذر حفظ موقع الحساب. حاول مرة أخرى.');
+    } catch (error) {
+      if (mounted) setState(() => _error = _saveError(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -32,15 +45,23 @@ class _LocationRequiredPageState extends State<LocationRequiredPage> {
     try {
       final position = await LocationService.requireCurrentPosition();
       await widget.onLocationReady(position.latitude, position.longitude);
-    } catch (_) {
-      setState(() => _error = 'يجب تفعيل خدمة الموقع ومنح الفائق يمن صلاحية الوصول إلى موقعك للمتابعة.');
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error is FirebaseException
+              ? _saveError(error)
+              : 'تعذر الوصول إلى موقع الهاتف. اسمح للموقع من إعدادات المتصفح ثم حاول مرة أخرى، أو حدد موقعك يدويًا على الخريطة.';
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _openMap() async {
-    final point = await Navigator.of(context).push<LatLng>(MaterialPageRoute(builder: (_) => const LocationPickerPage(title: 'تحديد موقع الحساب')));
+    final point = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(builder: (_) => const LocationPickerPage(title: 'تحديد موقع الحساب')),
+    );
     if (point != null) await _save(point);
   }
 
@@ -53,11 +74,11 @@ class _LocationRequiredPageState extends State<LocationRequiredPage> {
         const SizedBox(height: 18),
         const Text('الموقع مطلوب للمتابعة', textAlign: TextAlign.center, style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900)),
         const SizedBox(height: 12),
-        const Text('حدد موقعك على الخريطة أو استخدم موقع الهاتف. نحتاج الموقع لتحديد الخدمات القريبة وحساب التوصيل وتوزيع الطلبات.', textAlign: TextAlign.center, style: TextStyle(height: 1.5)),
+        const Text('حدد موقعك على الخريطة أو استخدم موقع الهاتف. الموقع الحقيقي يُحفظ في Firebase لاستخدام الخدمات القريبة والتوصيل وتوزيع الطلبات.', textAlign: TextAlign.center, style: TextStyle(height: 1.5)),
         const SizedBox(height: 18),
-        if (_error != null) Text(_error!, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 12),
-        SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _busy ? null : _useDevice, icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.my_location), label: Text(_busy ? 'جارٍ تحديد موقعك...' : 'استخدام موقع الهاتف'))),
+        if (_error != null) Container(width: double.infinity, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Theme.of(context).colorScheme.errorContainer, borderRadius: BorderRadius.circular(12)), child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onErrorContainer))),
+        if (_error != null) const SizedBox(height: 12),
+        SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _busy ? null : _useDevice, icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.my_location), label: Text(_busy ? 'جارٍ الحفظ...' : 'استخدام موقع الهاتف'))),
         const SizedBox(height: 10),
         SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _busy ? null : _openMap, icon: const Icon(Icons.map_outlined), label: const Text('تحديد الموقع على الخريطة'))),
       ]))))))));
