@@ -112,9 +112,9 @@ void main() {
       expect(auth, contains('required GeoPoint location'));
       expect(auth, contains('hasRequiredLocation'));
       expect(auth, contains('saveUserLocation'));
-      expect(auth, contains('if (!snapshot.exists)'));
-      expect(auth, contains("'role': 'customer'"));
-      expect(auth, contains('await ref.update(update);'));
+      expect(auth, contains('SetOptions(merge: true)'));
+      expect(auth, contains("'location': location"));
+      expect(auth, contains("'uid': user.uid"));
       expect(gate, contains('hasRequiredLocation()'));
       expect(gate, contains('LocationRequiredPage'));
       expect(gate, contains('setState(() {})'));
