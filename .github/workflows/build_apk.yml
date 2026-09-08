@@ -51,6 +51,10 @@ jobs:
           grep -q 'android.permission.ACCESS_FINE_LOCATION' android/app/src/main/AndroidManifest.xml
       - name: Dependencies
         run: flutter pub get
+      - name: Validate wallet backend
+        run: |
+          npm install --prefix functions
+          npm --prefix functions run check
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
       - name: Install FlutterFire CLI
