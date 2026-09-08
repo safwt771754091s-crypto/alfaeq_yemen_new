@@ -128,7 +128,7 @@ void main() {
       expect(rules, contains('validLocation(request.resource.data)'));
       expect(rules, contains("request.resource.data.location is latlng"));
       expect(rules, contains("request.resource.data.get('uid', request.auth.uid) == request.auth.uid"));
-      expect(rules, contains("request.resource.data.get('role', 'customer') == resource.data.get('role', 'customer')"));
+      expect(rules, contains("request.resource.data.get('role', resource.data.get('role', 'customer')) == resource.data.get('role', 'customer')"));
     });
 
     test('order flow prevents forged delivery state and enforces sequential transitions', () {
