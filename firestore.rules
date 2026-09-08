@@ -67,7 +67,8 @@ service cloud.firestore {
         || (driver() && resource.data.driverId == request.auth.uid
           && request.resource.data.customerId == resource.data.customerId
           && request.resource.data.driverId == resource.data.driverId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveryLocation', 'updatedAt', 'status', 'deliveredAt']));
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveryLocation', 'updatedAt', 'status', 'deliveredAt'])
+          && request.resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery', 'delivered', 'failed']);
       allow delete: if staff();
     }
 
