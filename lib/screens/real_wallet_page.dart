@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/wallet_service.dart';
+import 'wallet_operations_page.dart';
 
 class RealWalletPage extends StatefulWidget {
   const RealWalletPage({super.key});
@@ -26,6 +27,10 @@ class _RealWalletPageState extends State<RealWalletPage> {
     }
   }
 
+  void _openOperations() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletOperationsPage()));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -38,9 +43,7 @@ class _RealWalletPageState extends State<RealWalletPage> {
             if (walletSnapshot.hasError) return _error('تعذر الوصول إلى المحفظة.');
             if (walletSnapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
             final wallet = walletSnapshot.data;
-            if (wallet == null || !wallet.exists) {
-              return _notInitialized();
-            }
+            if (wallet == null || !wallet.exists) return _notInitialized();
             final data = wallet.data() ?? const <String, dynamic>{};
             final available = data['availableBalance'] is num ? (data['availableBalance'] as num).toDouble() : 0.0;
             final reserved = data['reservedBalance'] is num ? (data['reservedBalance'] as num).toDouble() : 0.0;
@@ -48,6 +51,8 @@ class _RealWalletPageState extends State<RealWalletPage> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
               children: [
                 _balanceCard(available, reserved, '${data['currency'] ?? 'YER'}'),
+                const SizedBox(height: 14),
+                FilledButton.icon(onPressed: _openOperations, icon: const Icon(Icons.swap_horiz), label: const Text('تحويل / إيداع / سحب')),
                 const SizedBox(height: 16),
                 const _SecurityCard(),
                 const SizedBox(height: 18),
@@ -124,6 +129,6 @@ class _TransactionTile extends StatelessWidget {
     final amount = data['amount'];
     final type = '${data['type'] ?? 'transaction'}';
     final status = '${data['status'] ?? 'pending'}';
-    return Card(elevation: 0, child: ListTile(leading: CircleAvatar(backgroundColor: const Color(0xFFE7F3EE), child: Icon(type == 'credit' ? Icons.arrow_downward : Icons.arrow_upward, color: const Color(0xFF0B6E4F))), title: Text(amount is num ? '${amount.toString()} ${data['currency'] ?? 'YER'}' : 'معاملة مالية', style: const TextStyle(fontWeight: FontWeight.w900)), subtitle: Text('${data['description'] ?? 'معاملة محفظة'} • $status')));
+    return Card(elevation: 0, child: ListTile(leading: CircleAvatar(backgroundColor: const Color(0xFFE7F3EE), child: Icon(type.contains('credit') ? Icons.arrow_downward : Icons.arrow_upward, color: const Color(0xFF0B6E4F))), title: Text(amount is num ? '${amount.toString()} ${data['currency'] ?? 'YER'}' : 'معاملة مالية', style: const TextStyle(fontWeight: FontWeight.w900)), subtitle: Text('${data['description'] ?? 'معاملة محفظة'} • $status')));
   }
 }
