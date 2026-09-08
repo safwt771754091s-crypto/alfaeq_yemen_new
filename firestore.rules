@@ -9,11 +9,20 @@ service cloud.firestore {
     function merchant() { return signedIn() && (request.auth.token.role == 'merchant' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'merchant'); }
     function driver() { return signedIn() && (request.auth.token.role == 'driver' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'driver'); }
     function self(uid) { return signedIn() && request.auth.uid == uid; }
+    function validLocation(data) {
+      return data.location is latlng
+        && data.latitude is number
+        && data.longitude is number
+        && data.latitude >= -90 && data.latitude <= 90
+        && data.longitude >= -180 && data.longitude <= 180
+        && data.location.latitude >= -90 && data.location.latitude <= 90
+        && data.location.longitude >= -180 && data.location.longitude <= 180;
+    }
 
     match /users/{uid} {
       allow read: if self(uid) || staff() || developer();
-      allow create: if staff() || (self(uid) && request.resource.data.role == 'customer' && request.resource.data.uid == request.auth.uid);
-      allow update: if staff() || (self(uid) && request.resource.data.role == resource.data.role && request.resource.data.uid == resource.data.uid);
+      allow create: if staff() || (self(uid) && request.resource.data.role == 'customer' && request.resource.data.uid == request.auth.uid && validLocation(request.resource.data));
+      allow update: if staff() || (self(uid) && request.resource.data.role == resource.data.role && request.resource.data.uid == resource.data.uid && validLocation(request.resource.data));
       allow delete: if staff();
     }
 
@@ -24,7 +33,7 @@ service cloud.firestore {
 
     match /stores/{id} {
       allow read: if resource.data.status == 'approved' || staff() || developer() || (merchant() && resource.data.ownerId == request.auth.uid);
-      allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid);
+      allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid && request.resource.data.location is latlng);
       allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId);
       allow delete: if staff();
     }
