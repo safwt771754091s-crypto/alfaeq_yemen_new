@@ -33,6 +33,47 @@ class WalletService {
     });
   }
 
+  Future<String> requestTransfer({required String recipientUid, required num amount}) async {
+    _validateAmount(amount);
+    final normalizedRecipient = recipientUid.trim();
+    if (normalizedRecipient.isEmpty || normalizedRecipient == _uid) {
+      throw ArgumentError('المستفيد غير صالح');
+    }
+    return _createOperation({
+      'type': 'transfer',
+      'recipientUid': normalizedRecipient,
+      'amount': amount.toDouble(),
+    });
+  }
+
+  Future<String> requestDeposit({required num amount}) async {
+    _validateAmount(amount);
+    return _createOperation({'type': 'deposit', 'amount': amount.toDouble()});
+  }
+
+  Future<String> requestWithdraw({required num amount}) async {
+    _validateAmount(amount);
+    return _createOperation({'type': 'withdraw', 'amount': amount.toDouble()});
+  }
+
+  Future<String> _createOperation(Map<String, dynamic> data) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('يجب تسجيل الدخول أولاً');
+    final ref = _firestore.collection('walletOperations').doc();
+    await ref.set({
+      ...data,
+      'uid': user.uid,
+      'status': 'pending',
+      'currency': 'YER',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return ref.id;
+  }
+
+  void _validateAmount(num amount) {
+    if (!amount.isFinite || amount <= 0) throw ArgumentError('المبلغ يجب أن يكون أكبر من صفر');
+  }
+
   Stream<QuerySnapshot<Map<String, dynamic>>> watchTransactions() => _firestore
       .collection('walletTransactions')
       .where('uid', isEqualTo: _uid)
