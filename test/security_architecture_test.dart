@@ -34,5 +34,21 @@ void main() {
       expect(rules, contains('request.resource.data.ownerId == request.auth.uid'));
       expect(rules, contains('request.resource.data.customerId == request.auth.uid'));
     });
+
+    test('merchant onboarding starts pending and approval is staff-gated with audit logging', () {
+      final merchant = File('lib/screens/merchant_center_page.dart').readAsStringSync();
+      final approval = File('lib/screens/merchant_approval_page.dart').readAsStringSync();
+      final rules = File('firestore.rules').readAsStringSync();
+
+      expect(merchant, contains("'status': 'pending'"));
+      expect(merchant, contains("'ownerId': user.uid"));
+      expect(approval, contains('Future<bool> _isStaff()'));
+      expect(approval, contains("where('status', isEqualTo: 'pending')"));
+      expect(approval, contains("'reviewedBy': user.uid"));
+      expect(approval, contains("collection('auditLogs')"));
+      expect(approval, contains("'source': 'admin_merchant_approval'"));
+      expect(rules, contains("(merchant() && request.resource.data.ownerId == request.auth.uid)"));
+      expect(rules, contains('allow update: if staff()'));
+    });
   });
 }
