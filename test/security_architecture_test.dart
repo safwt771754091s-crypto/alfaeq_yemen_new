@@ -79,7 +79,8 @@ void main() {
       expect(driver, contains("where('driverId', isEqualTo: user.uid)"));
       expect(driver, contains("status == 'assigned'"));
       expect(driver, contains("status == 'delivered'"));
-      expect(gate, contains("if (roleSnapshot.data == 'driver') return const DriverCenterPage();"));
+      expect(gate, contains("role == 'driver'"));
+      expect(gate, contains('DriverCenterPage()'));
       expect(rules, contains('match /drivers/{uid}'));
       expect(rules, contains("request.resource.data.approved == resource.data.approved"));
       expect(rules, contains("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveryLocation', 'updatedAt', 'status', 'deliveredAt'])"));
@@ -99,6 +100,29 @@ void main() {
       expect(center, contains("'deliveryLocation': GeoPoint"));
       expect(rules, contains("function driver()"));
       expect(rules, contains("resource.data.driverId == request.auth.uid"));
+    });
+
+    test('location onboarding requires a valid map/device location', () {
+      final auth = File('lib/services/auth_service.dart').readAsStringSync();
+      final gate = File('lib/screens/auth_gate.dart').readAsStringSync();
+      final onboarding = File('lib/screens/location_required_page.dart').readAsStringSync();
+      final login = File('lib/screens/login_page.dart').readAsStringSync();
+      final merchant = File('lib/screens/merchant_center_page.dart').readAsStringSync();
+      final rules = File('firestore.rules').readAsStringSync();
+      expect(auth, contains('required GeoPoint location'));
+      expect(auth, contains('hasRequiredLocation'));
+      expect(auth, contains('saveUserLocation'));
+      expect(gate, contains('hasRequiredLocation()'));
+      expect(gate, contains('LocationRequiredPage'));
+      expect(onboarding, contains('LocationPickerPage'));
+      expect(onboarding, contains('LocationService.requireCurrentPosition'));
+      expect(login, contains('LocationPickerPage'));
+      expect(login, contains('_pendingLocation'));
+      expect(merchant, contains('LocationService.requireCurrentPosition'));
+      expect(merchant, contains("'location': location"));
+      expect(rules, contains('function validLocation'));
+      expect(rules, contains('validLocation(request.resource.data)'));
+      expect(rules, contains("request.resource.data.location is latlng"));
     });
   });
 }
