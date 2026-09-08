@@ -60,7 +60,20 @@ void main() {
       expect(portal, contains("role == 'owner'"));
       expect(portal, contains("role == 'developer'"));
       expect(portal, contains('const MerchantCenterPage()'));
-      expect(portal, contains('مركز التاجر محمي'));
+      expect(portal, contains('const MerchantOrdersPage()'));
+    });
+
+    test('merchant orders are scoped by merchantIds and status changes are audited', () {
+      final orders = File('lib/screens/merchant_orders_page.dart').readAsStringSync();
+      final service = File('lib/services/firestore_service.dart').readAsStringSync();
+      final rules = File('firestore.rules').readAsStringSync();
+
+      expect(orders, contains("where('merchantIds', arrayContains: user.uid)"));
+      expect(orders, contains("collection('auditLogs')"));
+      expect(orders, contains('merchant_order_status_'));
+      expect(service, contains("'merchantIds': merchantIds.toList()"));
+      expect(rules, contains("request.auth.uid in resource.data.merchantIds"));
+      expect(rules, contains("request.resource.data.merchantIds == resource.data.merchantIds"));
     });
   });
 }
