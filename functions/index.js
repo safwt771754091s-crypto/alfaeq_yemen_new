@@ -60,7 +60,7 @@ exports.processWalletOperation = onDocumentCreated(
       return;
     }
 
-    if (typeof recipientUid !== 'string' || recipientUid.trim().isEmpty || recipientUid === uid) {
+    if (typeof recipientUid !== 'string' || recipientUid.trim() === '' || recipientUid === uid) {
       await operationRef.update({ status: 'rejected', rejectionCode: 'INVALID_RECIPIENT', processedAt: FieldValue.serverTimestamp() });
       await serverAudit({ actorUid: uid, action: 'wallet.transfer.rejected', result: 'rejected', operationId, reason: 'INVALID_RECIPIENT' });
       return;
