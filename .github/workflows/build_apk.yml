@@ -28,10 +28,23 @@ jobs:
           from pathlib import Path
           path = Path('android/app/src/main/AndroidManifest.xml')
           text = path.read_text()
-          permission = '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
+          permissions = (
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n'
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
+          )
           if 'android.permission.ACCESS_FINE_LOCATION' not in text:
-              text = text.replace('<manifest ', '<manifest ' + '\n' + permission, 1)
+              marker = '    <application'
+              if marker not in text:
+                  raise SystemExit('AndroidManifest.xml does not contain the expected application tag')
+              text = text.replace(marker, permissions + marker, 1)
           path.write_text(text)
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          path = Path('android/app/src/main/AndroidManifest.xml')
+          ET.parse(path)
+          print(f'Valid AndroidManifest.xml: {path.stat().st_size} bytes')
           PY
           grep -q 'android.permission.ACCESS_FINE_LOCATION' android/app/src/main/AndroidManifest.xml
       - name: Dependencies
