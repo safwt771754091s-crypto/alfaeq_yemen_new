@@ -50,5 +50,17 @@ void main() {
       expect(rules, contains("(merchant() && request.resource.data.ownerId == request.auth.uid)"));
       expect(rules, contains('allow update: if staff()'));
     });
+
+    test('merchant portal is role-gated before opening merchant controls', () {
+      final portal = File('lib/screens/merchant_portal_page.dart').readAsStringSync();
+
+      expect(portal, contains("import '../services/auth_service.dart';"));
+      expect(portal, contains("role == 'merchant'"));
+      expect(portal, contains("role == 'admin'"));
+      expect(portal, contains("role == 'owner'"));
+      expect(portal, contains("role == 'developer'"));
+      expect(portal, contains('const MerchantCenterPage()'));
+      expect(portal, contains('مركز التاجر محمي'));
+    });
   });
 }
