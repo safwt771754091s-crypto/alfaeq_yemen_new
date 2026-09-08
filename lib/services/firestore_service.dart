@@ -27,9 +27,24 @@ class FirestoreService {
     required List<Map<String, dynamic>> items,
     required String address,
     required String paymentMethod,
-  }) {
+  }) async {
+    final merchantIds = <String>{};
+    for (final item in items) {
+      final merchantId = item['merchantId']?.toString();
+      if (merchantId != null && merchantId.isNotEmpty) {
+        merchantIds.add(merchantId);
+        continue;
+      }
+      final storeId = item['storeId']?.toString() ?? '';
+      if (storeId.isEmpty) continue;
+      final store = await db.collection('stores').doc(storeId).get();
+      final ownerId = store.data()?['ownerId']?.toString() ?? '';
+      if (store.exists && ownerId.isNotEmpty) merchantIds.add(ownerId);
+    }
+
     return db.collection('orders').add({
       'customerId': customerId,
+      'merchantIds': merchantIds.toList(),
       'items': items,
       'address': address,
       'paymentMethod': paymentMethod,
