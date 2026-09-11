@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -19,18 +19,10 @@ jobs:
       - name: Verify source
         run: echo "FRESH BUILD SOURCE=$(git rev-parse HEAD)"
       - name: Authenticate Google/Firebase
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-      - uses: google-github-actions/setup-gcloud@v2
-      - name: Setup Java 21 for Firebase Emulator
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: gradle
-      - name: Verify Java runtime
-        run: java -version
+      - uses: google-github-actions/setup-gcloud@v3
       - name: Create Android platform
         run: |
           flutter create . --platforms android --org com.alfaeq
@@ -57,6 +49,14 @@ jobs:
           print(f'Valid AndroidManifest.xml: {path.stat().st_size} bytes')
           PY
           grep -q 'android.permission.ACCESS_FINE_LOCATION' android/app/src/main/AndroidManifest.xml
+      - name: Setup Java 21 for Firebase Emulator
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Verify Java runtime
+        run: java -version
       - name: Dependencies
         run: flutter pub get
       - name: Validate wallet backend
