@@ -95,6 +95,72 @@ exports.syncPaymentProviderAutomation = onDocumentWritten(
   },
 );
 
+exports.syncStoreAutomation = onDocumentWritten(
+  { document: 'stores/{storeId}', region: 'us-central1', retry: true },
+  async (event) => {
+    const storeId = event.params.storeId;
+    const after = event.data?.after;
+    if (!after || !after.exists) {
+      await updateAutomation('store', storeId, { status: 'removed', ready: false, checklist: ['store_deleted'] });
+      return;
+    }
+    const store = after.data() || {};
+    const hasIdentity = typeof store.name === 'string' && store.name.trim() !== '';
+    const hasOwner = typeof store.ownerId === 'string' && store.ownerId.trim() !== '' && store.ownerId !== 'admin-created';
+    const hasSection = typeof store.sectionId === 'string' && store.sectionId.trim() !== '';
+    const approved = store.status === 'approved' || store.status === 'active';
+    const ready = hasIdentity && hasOwner && hasSection && approved;
+    const checklist = [];
+    if (!hasIdentity) checklist.push('store_name');
+    if (!hasOwner) checklist.push('real_owner_account');
+    if (!hasSection) checklist.push('section_assignment');
+    if (!approved) checklist.push('store_approval');
+    if (ready) checklist.push('catalog_entry_ready');
+    await updateAutomation('store', storeId, {
+      status: ready ? 'ready' : 'needs_configuration',
+      ready,
+      checklist,
+      nextAction: ready ? 'none' : 'complete_store_setup_and_approval',
+    });
+    await serverAudit({ actorUid: store.ownerId || 'unknown', action: 'platform.store.automation_synced', result: ready ? 'ready' : 'needs_configuration', source: 'platform_automation', storeId });
+  },
+);
+
+exports.syncProductAutomation = onDocumentWritten(
+  { document: 'products/{productId}', region: 'us-central1', retry: true },
+  async (event) => {
+    const productId = event.params.productId;
+    const after = event.data?.after;
+    if (!after || !after.exists) {
+      await updateAutomation('product', productId, { status: 'removed', ready: false, checklist: ['product_deleted'] });
+      return;
+    }
+    const product = after.data() || {};
+    const hasName = typeof product.name === 'string' && product.name.trim() !== '';
+    const hasStore = typeof product.storeId === 'string' && product.storeId.trim() !== '';
+    const hasOwner = typeof product.ownerId === 'string' && product.ownerId.trim() !== '' && product.ownerId !== 'admin-created';
+    const validPrice = typeof product.price === 'number' && Number.isFinite(product.price) && product.price >= 0;
+    const validStock = typeof product.stock === 'number' && Number.isInteger(product.stock) && product.stock >= 0;
+    const active = product.status === 'active';
+    const ready = hasName && hasStore && hasOwner && validPrice && validStock && active;
+    const checklist = [];
+    if (!hasName) checklist.push('product_name');
+    if (!hasStore) checklist.push('store_assignment');
+    if (!hasOwner) checklist.push('real_owner_account');
+    if (!validPrice) checklist.push('valid_price');
+    if (!validStock) checklist.push('valid_stock');
+    if (!active) checklist.push('activate_product');
+    if (ready) checklist.push('catalog_ready');
+    await updateAutomation('product', productId, {
+      status: ready ? 'ready' : 'needs_configuration',
+      ready,
+      checklist,
+      nextAction: ready ? 'none' : 'complete_product_setup',
+    });
+    await serverAudit({ actorUid: product.ownerId || 'unknown', action: 'platform.product.automation_synced', result: ready ? 'ready' : 'needs_configuration', source: 'platform_automation', productId });
+  },
+);
+
 exports.processWalletOperation = onDocumentCreated(
   { document: 'walletOperations/{operationId}', region: 'us-central1', retry: true },
   async (event) => {
