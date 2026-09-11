@@ -5,6 +5,7 @@ import 'dispatch_center_page.dart';
 import 'merchant_approval_page.dart';
 import 'merchant_portal_page.dart';
 import 'platform_control_page.dart';
+import 'platform_automation_page.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -24,6 +25,8 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 18),
             FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlatformControlPage())), icon: const Icon(Icons.tune_outlined), label: const Text('مركز تشغيل المنصة')),
             const SizedBox(height: 10),
+            FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlatformAutomationPage())), icon: const Icon(Icons.radar_outlined), label: const Text('مركز أتمتة وجاهزية المنصة')),
+            const SizedBox(height: 10),
             FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DispatchCenterPage())), icon: const Icon(Icons.auto_awesome_motion_outlined), label: const Text('مركز التوزيع الذكي')),
             const SizedBox(height: 10),
             FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MerchantApprovalPage())), icon: const Icon(Icons.fact_check_outlined), label: const Text('طلبات اعتماد المتاجر')),
@@ -36,6 +39,7 @@ class AdminDashboard extends StatelessWidget {
             _ActionCard(icon: Icons.delivery_dining, title: 'المندوبون والتوزيع', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DispatchCenterPage()))),
             _ActionCard(icon: Icons.category, title: 'إدارة الأقسام', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlatformControlPage()))),
             _ActionCard(icon: Icons.account_balance_wallet_outlined, title: 'مزودو الدفع والمحافظ', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlatformControlPage()))),
+            _ActionCard(icon: Icons.radar_outlined, title: 'جاهزية الأتمتة', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlatformAutomationPage()))),
             _ActionCard(icon: Icons.inventory_2, title: 'إدارة المنتجات', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MerchantPortalPage()))),
             _ActionCard(icon: Icons.receipt_long, title: 'الطلبات والمدفوعات', onTap: () => _message(context, 'الطلبات والمدفوعات تحفظ بسجل زمني في Firestore.')),
             const SizedBox(height: 18),
