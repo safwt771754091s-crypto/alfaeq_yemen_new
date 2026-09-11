@@ -37,6 +37,30 @@ service cloud.firestore {
         || (resource.data.deliveryStatus == request.resource.data.deliveryStatus)
         || (request.resource.data.deliveryStatus == 'failed' && resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery']);
     }
+    function validWalletOperationBase() {
+      return signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.currency == 'YER'
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && request.resource.data.createdAt == request.time;
+    }
+    function validWalletOperationShape() {
+      return request.resource.data.keys().hasOnly(['type', 'recipientUid', 'amount', 'uid', 'status', 'currency', 'createdAt']);
+    }
+    function validWalletOperationCreate() {
+      return validWalletOperationBase()
+        && validWalletOperationShape()
+        && request.resource.data.type == 'transfer'
+        && request.resource.data.recipientUid is string
+        && request.resource.data.recipientUid != request.auth.uid;
+    }
+    function validWalletNonTransferCreate() {
+      return validWalletOperationBase()
+        && request.resource.data.keys().hasOnly(['type', 'amount', 'uid', 'status', 'currency', 'createdAt'])
+        && request.resource.data.type in ['deposit', 'withdraw'];
+    }
 
     match /users/{uid} {
       allow read: if self(uid) || staff() || developer();
@@ -73,11 +97,8 @@ service cloud.firestore {
     }
 
     match /carts/{uid} {
-      // The document path is already the authenticated user's UID, so legacy carts without ownerId remain readable.
       allow read: if self(uid);
-      // New carts must record their owner explicitly.
       allow create: if self(uid) && request.resource.data.ownerId == request.auth.uid;
-      // Permit a one-time safe migration of legacy carts that lack ownerId, while every resulting cart is owned by the caller.
       allow update: if self(uid)
         && (!('ownerId' in resource.data) || resource.data.ownerId == request.auth.uid)
         && request.resource.data.ownerId == request.auth.uid;
@@ -144,6 +165,30 @@ service cloud.firestore {
       allow read: if staff() || developer() || (signedIn() && resource.data.customerId == request.auth.uid);
       allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
       allow update, delete: if staff();
+    }
+
+    match /wallets/{uid} {
+      allow read: if self(uid) || staff() || developer();
+      allow create: if self(uid)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.currency == 'YER'
+        && request.resource.data.availableBalance == 0
+        && request.resource.data.reservedBalance == 0
+        && request.resource.data.status == 'active'
+        && request.resource.data.version == 1;
+      allow update, delete: if staff();
+    }
+
+    match /walletTransactions/{id} {
+      allow read: if staff() || developer() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if staff();
+      allow update, delete: if false;
+    }
+
+    match /walletOperations/{id} {
+      allow read: if staff() || developer() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if validWalletOperationCreate() || validWalletNonTransferCreate();
+      allow update, delete: if false;
     }
 
     match /reviews/{id} {

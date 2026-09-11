@@ -4,12 +4,14 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -17,10 +19,10 @@ jobs:
       - name: Verify source
         run: echo "FRESH BUILD SOURCE=$(git rev-parse HEAD)"
       - name: Authenticate Google/Firebase
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v3
       - name: Create Android platform
         run: |
           flutter create . --platforms android --org com.alfaeq
@@ -47,12 +49,24 @@ jobs:
           print(f'Valid AndroidManifest.xml: {path.stat().st_size} bytes')
           PY
           grep -q 'android.permission.ACCESS_FINE_LOCATION' android/app/src/main/AndroidManifest.xml
+      - name: Setup Java 21 for Firebase Emulator
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Verify Java runtime
+        run: java -version
       - name: Dependencies
         run: flutter pub get
-      - name: Security architecture tests
-        run: flutter test test/security_architecture_test.dart
+      - name: Validate wallet backend
+        run: |
+          npm install --prefix functions
+          npm --prefix functions run check
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
+      - name: Wallet backend emulator integration tests
+        run: firebase emulators:exec --only firestore,functions "node functions/test/wallet_backend_integration.test.js"
       - name: Install FlutterFire CLI
         run: |
           dart pub global activate flutterfire_cli
@@ -62,6 +76,8 @@ jobs:
           flutterfire configure --project=alfaeq-yemen-fed37 --platforms=android --android-package-name=com.alfaeq.alfaeq_yemen --yes --out=lib/firebase_options.dart
           test -s lib/firebase_options.dart
           echo "Firebase configuration generated: $(wc -c < lib/firebase_options.dart) bytes"
+      - name: Flutter test suite
+        run: flutter test
       - name: Analyze
         run: flutter analyze --no-fatal-infos
       - name: Build APK

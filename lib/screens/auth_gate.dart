@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'driver_center_page.dart';
 import 'login_page.dart';
-import 'world_home_page.dart';
+import 'super_app_shell_page.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -29,7 +29,7 @@ class _AuthGateState extends State<AuthGate> {
             }
             final role = roleSnapshot.data ?? 'customer';
             if (role == 'driver') return const DriverCenterPage();
-            return const WorldHomePage();
+            return const SuperAppShellPage();
           },
         );
       },
