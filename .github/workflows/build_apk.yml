@@ -23,6 +23,14 @@ jobs:
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
       - uses: google-github-actions/setup-gcloud@v2
+      - name: Setup Java 21 for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Verify Java runtime
+        run: java -version
       - name: Create Android platform
         run: |
           flutter create . --platforms android --org com.alfaeq
