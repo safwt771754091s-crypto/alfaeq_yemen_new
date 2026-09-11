@@ -9,214 +9,31 @@ service cloud.firestore {
     function merchant() { return signedIn() && (request.auth.token.role == 'merchant' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'merchant'); }
     function driver() { return signedIn() && (request.auth.token.role == 'driver' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'driver'); }
     function self(uid) { return signedIn() && request.auth.uid == uid; }
-    function validLocation(data) {
-      return data.location is latlng
-        && data.latitude is number
-        && data.longitude is number
-        && data.latitude >= -90 && data.latitude <= 90
-        && data.longitude >= -180 && data.longitude <= 180
-        && data.location.latitude >= -90 && data.location.latitude <= 90
-        && data.location.longitude >= -180 && data.location.longitude <= 180;
-    }
-    function validGeoPoint(value) {
-      return value is latlng
-        && value.latitude >= -90 && value.latitude <= 90
-        && value.longitude >= -180 && value.longitude <= 180;
-    }
-    function validMerchantStatusTransition() {
-      return (resource.data.status == 'pending' && request.resource.data.status in ['accepted', 'cancelled'])
-        || (resource.data.status == 'accepted' && request.resource.data.status in ['preparing', 'cancelled'])
-        || (resource.data.status == 'preparing' && request.resource.data.status == 'ready_for_pickup')
-        || (resource.data.status == request.resource.data.status);
-    }
-    function validDeliveryTransition() {
-      return (resource.data.deliveryStatus == 'awaiting_assignment' && request.resource.data.deliveryStatus == 'assigned')
-        || (resource.data.deliveryStatus == 'assigned' && request.resource.data.deliveryStatus == 'picked_up')
-        || (resource.data.deliveryStatus == 'picked_up' && request.resource.data.deliveryStatus == 'out_for_delivery')
-        || (resource.data.deliveryStatus == 'out_for_delivery' && request.resource.data.deliveryStatus == 'delivered')
-        || (resource.data.deliveryStatus == request.resource.data.deliveryStatus)
-        || (request.resource.data.deliveryStatus == 'failed' && resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery']);
-    }
-    function validWalletOperationBase() {
-      return signedIn()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.currency == 'YER'
-        && request.resource.data.amount is number
-        && request.resource.data.amount > 0
-        && request.resource.data.createdAt == request.time;
-    }
-    function validWalletOperationShape() {
-      return request.resource.data.keys().hasOnly(['type', 'recipientUid', 'amount', 'uid', 'status', 'currency', 'createdAt']);
-    }
-    function validWalletOperationCreate() {
-      return validWalletOperationBase()
-        && validWalletOperationShape()
-        && request.resource.data.type == 'transfer'
-        && request.resource.data.recipientUid is string
-        && request.resource.data.recipientUid != request.auth.uid;
-    }
-    function validWalletNonTransferCreate() {
-      return validWalletOperationBase()
-        && request.resource.data.keys().hasOnly(['type', 'amount', 'uid', 'status', 'currency', 'createdAt'])
-        && request.resource.data.type in ['deposit', 'withdraw'];
-    }
-
-    match /users/{uid} {
-      allow read: if self(uid) || staff() || developer();
-      allow create: if staff()
-        || (self(uid)
-          && request.resource.data.uid == request.auth.uid
-          && request.resource.data.role == 'customer'
-          && (!('location' in request.resource.data) || validLocation(request.resource.data)));
-      allow update: if staff()
-        || (self(uid)
-          && request.resource.data.get('uid', request.auth.uid) == request.auth.uid
-          && request.resource.data.get('role', resource.data.get('role', 'customer')) == resource.data.get('role', 'customer')
-          && (!('location' in request.resource.data) || validLocation(request.resource.data)));
-      allow delete: if staff();
-    }
-
-    match /sections/{id} {
-      allow read: if true;
-      allow create, update, delete: if staff();
-    }
-
-    match /stores/{id} {
-      allow read: if resource.data.status == 'approved' || staff() || developer() || (merchant() && resource.data.ownerId == request.auth.uid);
-      allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid && request.resource.data.location is latlng);
-      allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId);
-      allow delete: if staff();
-    }
-
-    match /products/{id} {
-      allow read: if resource.data.status == 'active' || staff() || developer() || (merchant() && resource.data.ownerId == request.auth.uid);
-      allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid);
-      allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId && request.resource.data.storeId == resource.data.storeId);
-      allow delete: if staff() || (merchant() && request.auth.uid == resource.data.ownerId);
-    }
-
-    match /carts/{uid} {
-      allow read: if self(uid);
-      allow create: if self(uid) && request.resource.data.ownerId == request.auth.uid;
-      allow update: if self(uid)
-        && (!('ownerId' in resource.data) || resource.data.ownerId == request.auth.uid)
-        && request.resource.data.ownerId == request.auth.uid;
-      allow delete: if self(uid);
-    }
-
-    match /drivers/{uid} {
-      allow read: if staff() || developer() || self(uid);
-      allow create: if staff() || (driver() && self(uid) && request.resource.data.uid == request.auth.uid && request.resource.data.approved == false);
-      allow update: if staff()
-        || (driver() && self(uid)
-          && request.resource.data.uid == resource.data.uid
-          && request.resource.data.approved == resource.data.approved
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOnline', 'currentLocation', 'lastSeenAt', 'updatedAt', 'activeOrderCount'])
-          && request.resource.data.activeOrderCount >= 0
-          && request.resource.data.activeOrderCount <= resource.data.activeOrderCount
-          && (!('currentLocation' in request.resource.data) || validGeoPoint(request.resource.data.currentLocation)));
-      allow delete: if staff();
-    }
-
-    match /orders/{id} {
-      allow create: if signedIn()
-        && request.resource.data.customerId == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.deliveryStatus == 'awaiting_assignment'
-        && !('driverId' in request.resource.data)
-        && !('deliveredAt' in request.resource.data)
-        && request.resource.data.address is string
-        && request.resource.data.paymentMethod in ['cash_on_delivery', 'al_kuraimi', 'cash_wallet', 'jeeb_wallet']
-        && request.resource.data.items is list;
-      allow read: if staff() || developer()
-        || (signedIn() && resource.data.customerId == request.auth.uid)
-        || (merchant() && request.auth.uid in resource.data.merchantIds)
-        || (merchant() && resource.data.merchantId == request.auth.uid)
-        || (driver() && resource.data.driverId == request.auth.uid);
-      allow update: if staff()
-        || (merchant() && request.auth.uid in resource.data.merchantIds
-          && request.resource.data.customerId == resource.data.customerId
-          && request.resource.data.merchantIds == resource.data.merchantIds
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-          && validMerchantStatusTransition())
-        || (merchant() && resource.data.merchantId == request.auth.uid
-          && request.resource.data.customerId == resource.data.customerId
-          && request.resource.data.merchantId == resource.data.merchantId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-          && validMerchantStatusTransition())
-        || (driver() && resource.data.driverId == request.auth.uid
-          && request.resource.data.customerId == resource.data.customerId
-          && request.resource.data.driverId == resource.data.driverId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveryLocation', 'updatedAt', 'status', 'deliveredAt'])
-          && request.resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery', 'delivered', 'failed']
-          && (!('deliveryLocation' in request.resource.data) || validGeoPoint(request.resource.data.deliveryLocation))
-          && validDeliveryTransition());
-      allow delete: if staff();
-    }
-
-    match /deliveryEvents/{id} {
-      allow read: if staff() || developer() || (driver() && resource.data.driverId == request.auth.uid);
-      allow create: if staff() || (driver() && request.resource.data.driverId == request.auth.uid);
-      allow update, delete: if staff();
-    }
-
-    match /payments/{id} {
-      allow read: if staff() || developer() || (signedIn() && resource.data.customerId == request.auth.uid);
-      allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
-      allow update, delete: if staff();
-    }
-
-    match /wallets/{uid} {
-      allow read: if self(uid) || staff() || developer();
-      allow create: if self(uid)
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.currency == 'YER'
-        && request.resource.data.availableBalance == 0
-        && request.resource.data.reservedBalance == 0
-        && request.resource.data.status == 'active'
-        && request.resource.data.version == 1;
-      allow update, delete: if staff();
-    }
-
-    match /walletTransactions/{id} {
-      allow read: if staff() || developer() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow create: if staff();
-      allow update, delete: if false;
-    }
-
-    match /walletOperations/{id} {
-      allow read: if staff() || developer() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow create: if validWalletOperationCreate() || validWalletNonTransferCreate();
-      allow update, delete: if false;
-    }
-
-    match /reviews/{id} {
-      allow read: if true;
-      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if staff() || (signedIn() && resource.data.userId == request.auth.uid);
-    }
-
-    match /settings/{id} {
-      allow read: if signedIn();
-      allow write: if staff();
-    }
-
-    match /securityReports/{id} {
-      allow read: if staff() || developer();
-      allow create: if staff() || (developer() && request.resource.data.actorUid == request.auth.uid);
-      allow update, delete: if staff();
-    }
-
-    match /auditLogs/{id} {
-      allow read: if staff() || developer();
-      allow create: if signedIn()
-        && request.resource.data.actorUid == request.auth.uid
-        && request.resource.data.action is string
-        && request.resource.data.result is string
-        && request.resource.data.source is string
-        && request.resource.data.createdAt == request.time;
-      allow update, delete: if false;
-    }
+    function validLocation(data) { return data.location is latlng && data.latitude is number && data.longitude is number && data.latitude >= -90 && data.latitude <= 90 && data.longitude >= -180 && data.longitude <= 180 && data.location.latitude >= -90 && data.location.latitude <= 90 && data.location.longitude >= -180 && data.location.longitude <= 180; }
+    function validGeoPoint(value) { return value is latlng && value.latitude >= -90 && value.latitude <= 90 && value.longitude >= -180 && value.longitude <= 180; }
+    function validMerchantStatusTransition() { return (resource.data.status == 'pending' && request.resource.data.status in ['accepted', 'cancelled']) || (resource.data.status == 'accepted' && request.resource.data.status in ['preparing', 'cancelled']) || (resource.data.status == 'preparing' && request.resource.data.status == 'ready_for_pickup') || (resource.data.status == request.resource.data.status); }
+    function validDeliveryTransition() { return (resource.data.deliveryStatus == 'awaiting_assignment' && request.resource.data.deliveryStatus == 'assigned') || (resource.data.deliveryStatus == 'assigned' && request.resource.data.deliveryStatus == 'picked_up') || (resource.data.deliveryStatus == 'picked_up' && request.resource.data.deliveryStatus == 'out_for_delivery') || (resource.data.deliveryStatus == 'out_for_delivery' && request.resource.data.deliveryStatus == 'delivered') || (resource.data.deliveryStatus == request.resource.data.deliveryStatus) || (request.resource.data.deliveryStatus == 'failed' && resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery']); }
+    function validWalletOperationBase() { return signedIn() && request.resource.data.uid == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.currency == 'YER' && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.createdAt == request.time; }
+    function validWalletOperationShape() { return request.resource.data.keys().hasOnly(['type', 'recipientUid', 'amount', 'uid', 'status', 'currency', 'createdAt']); }
+    function validWalletOperationCreate() { return validWalletOperationBase() && validWalletOperationShape() && request.resource.data.type == 'transfer' && request.resource.data.recipientUid is string && request.resource.data.recipientUid != request.auth.uid; }
+    function validWalletNonTransferCreate() { return validWalletOperationBase() && request.resource.data.keys().hasOnly(['type', 'amount', 'uid', 'status', 'currency', 'createdAt']) && request.resource.data.type in ['deposit', 'withdraw']; }
+    match /users/{uid} { allow read: if self(uid) || staff() || developer(); allow create: if staff() || (self(uid) && request.resource.data.uid == request.auth.uid && request.resource.data.role == 'customer' && (!('location' in request.resource.data) || validLocation(request.resource.data))); allow update: if staff() || (self(uid) && request.resource.data.get('uid', request.auth.uid) == request.auth.uid && request.resource.data.get('role', resource.data.get('role', 'customer')) == resource.data.get('role', 'customer') && (!('location' in request.resource.data) || validLocation(request.resource.data))); allow delete: if staff(); }
+    match /sections/{id} { allow read: if true; allow create, update, delete: if staff(); }
+    match /stores/{id} { allow read: if resource.data.status == 'approved' || staff() || developer() || (merchant() && resource.data.ownerId == request.auth.uid); allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid && request.resource.data.location is latlng); allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId); allow delete: if staff(); }
+    match /products/{id} { allow read: if resource.data.status == 'active' || staff() || developer() || (merchant() && resource.data.ownerId == request.auth.uid); allow create: if staff() || (merchant() && request.resource.data.ownerId == request.auth.uid); allow update: if staff() || (merchant() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId && request.resource.data.storeId == resource.data.storeId); allow delete: if staff() || (merchant() && request.auth.uid == resource.data.ownerId); }
+    match /carts/{uid} { allow read: if self(uid); allow create: if self(uid) && request.resource.data.ownerId == request.auth.uid; allow update: if self(uid) && (!('ownerId' in resource.data) || resource.data.ownerId == request.auth.uid) && request.resource.data.ownerId == request.auth.uid; allow delete: if self(uid); }
+    match /drivers/{uid} { allow read: if staff() || developer() || self(uid); allow create: if staff() || (driver() && self(uid) && request.resource.data.uid == request.auth.uid && request.resource.data.approved == false); allow update: if staff() || (driver() && self(uid) && request.resource.data.uid == resource.data.uid && request.resource.data.approved == resource.data.approved && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOnline', 'currentLocation', 'lastSeenAt', 'updatedAt', 'activeOrderCount']) && request.resource.data.activeOrderCount >= 0 && request.resource.data.activeOrderCount <= resource.data.activeOrderCount && (!('currentLocation' in request.resource.data) || validGeoPoint(request.resource.data.currentLocation))); allow delete: if staff(); }
+    match /orders/{id} { allow create: if signedIn() && request.resource.data.customerId == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.deliveryStatus == 'awaiting_assignment' && !('driverId' in request.resource.data) && !('deliveredAt' in request.resource.data) && request.resource.data.address is string && request.resource.data.paymentMethod in ['cash_on_delivery', 'al_kuraimi', 'cash_wallet', 'jeeb_wallet'] && request.resource.data.items is list; allow read: if staff() || developer() || (signedIn() && resource.data.customerId == request.auth.uid) || (merchant() && request.auth.uid in resource.data.merchantIds) || (merchant() && resource.data.merchantId == request.auth.uid) || (driver() && resource.data.driverId == request.auth.uid); allow update: if staff() || (merchant() && request.auth.uid in resource.data.merchantIds && request.resource.data.customerId == resource.data.customerId && request.resource.data.merchantIds == resource.data.merchantIds && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) && validMerchantStatusTransition()) || (merchant() && resource.data.merchantId == request.auth.uid && request.resource.data.customerId == resource.data.customerId && request.resource.data.merchantId == resource.data.merchantId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) && validMerchantStatusTransition()) || (driver() && resource.data.driverId == request.auth.uid && request.resource.data.customerId == resource.data.customerId && request.resource.data.driverId == resource.data.driverId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveryLocation', 'updatedAt', 'status', 'deliveredAt']) && request.resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery', 'delivered', 'failed'] && (!('deliveryLocation' in request.resource.data) || validGeoPoint(request.resource.data.deliveryLocation)) && validDeliveryTransition()); allow delete: if staff(); }
+    match /deliveryEvents/{id} { allow read: if staff() || developer() || (driver() && resource.data.driverId == request.auth.uid); allow create: if staff() || (driver() && request.resource.data.driverId == request.auth.uid); allow update, delete: if staff(); }
+    match /payments/{id} { allow read: if staff() || developer() || (signedIn() && resource.data.customerId == request.auth.uid); allow create: if signedIn() && request.resource.data.customerId == request.auth.uid; allow update, delete: if staff(); }
+    match /paymentProviders/{id} { allow read: if staff() || developer() || (signedIn() && resource.data.enabled == true && resource.data.configurationStatus == 'configured'); allow create, update, delete: if staff(); }
+    match /platformAutomation/{id} { allow read: if staff() || developer(); allow write: if false; }
+    match /wallets/{uid} { allow read: if self(uid) || staff() || developer(); allow create: if self(uid) && request.resource.data.uid == request.auth.uid && request.resource.data.currency == 'YER' && request.resource.data.availableBalance == 0 && request.resource.data.reservedBalance == 0 && request.resource.data.status == 'active' && request.resource.data.version == 1; allow update, delete: if staff(); }
+    match /walletTransactions/{id} { allow read: if staff() || developer() || (signedIn() && resource.data.uid == request.auth.uid); allow create: if staff(); allow update, delete: if false; }
+    match /walletOperations/{id} { allow read: if staff() || developer() || (signedIn() && resource.data.uid == request.auth.uid); allow create: if validWalletOperationCreate() || validWalletNonTransferCreate(); allow update, delete: if false; }
+    match /reviews/{id} { allow read: if true; allow create: if signedIn() && request.resource.data.userId == request.auth.uid; allow update, delete: if staff() || (signedIn() && resource.data.userId == request.auth.uid); }
+    match /settings/{id} { allow read: if signedIn(); allow write: if staff(); }
+    match /securityReports/{id} { allow read: if staff() || developer(); allow create: if staff() || (developer() && request.resource.data.actorUid == request.auth.uid); allow update, delete: if staff(); }
+    match /auditLogs/{id} { allow read: if staff() || developer(); allow create: if signedIn() && request.resource.data.actorUid == request.auth.uid && request.resource.data.action is string && request.resource.data.result is string && request.resource.data.source is string && request.resource.data.createdAt == request.time; allow update, delete: if false; }
   }
 }
