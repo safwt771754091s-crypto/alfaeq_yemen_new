@@ -11,6 +11,7 @@ import 'screens/ai_assistant_page.dart';
 import 'screens/auth_gate.dart';
 import 'screens/cart_page.dart';
 import 'screens/developer_page.dart';
+import 'screens/merchant_invite_page.dart';
 import 'screens/my_orders_page.dart';
 import 'services/auth_service.dart';
 
@@ -48,8 +49,16 @@ class AlfaeqYemenApp extends StatelessWidget {
         colorSchemeSeed: const Color(0xFF0B6E4F),
         scaffoldBackgroundColor: const Color(0xFFF7F9F8),
       ),
-      home: const AuthGate(),
+      home: _initialHome(),
     );
+  }
+
+  Widget _initialHome() {
+    if (kIsWeb) {
+      final token = Uri.base.queryParameters['merchant_invite'];
+      if (token != null && token.isNotEmpty) return MerchantInvitePage(token: token);
+    }
+    return const AuthGate();
   }
 }
 
