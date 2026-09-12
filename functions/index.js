@@ -243,3 +243,5 @@ exports.processWalletOperation = onDocumentCreated(
     }
   },
 );
+
+Object.assign(exports, require('./merchant_invites'));
