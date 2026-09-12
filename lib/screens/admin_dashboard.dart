@@ -3,6 +3,7 @@ import '../core/app_sections.dart';
 import 'admin_data_entry.dart';
 import 'dispatch_center_page.dart';
 import 'merchant_approval_page.dart';
+import 'merchant_invites_page.dart';
 import 'merchant_portal_page.dart';
 import 'platform_control_page.dart';
 import 'platform_automation_page.dart';
@@ -27,6 +28,8 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 10),
             FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlatformAutomationPage())), icon: const Icon(Icons.radar_outlined), label: const Text('مركز أتمتة وجاهزية المنصة')),
             const SizedBox(height: 10),
+            FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MerchantInvitesPage())), icon: const Icon(Icons.add_link), label: const Text('روابط التجار وإضافة التجار')),
+            const SizedBox(height: 10),
             FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DispatchCenterPage())), icon: const Icon(Icons.auto_awesome_motion_outlined), label: const Text('مركز التوزيع الذكي')),
             const SizedBox(height: 10),
             FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MerchantApprovalPage())), icon: const Icon(Icons.fact_check_outlined), label: const Text('طلبات اعتماد المتاجر')),
@@ -36,6 +39,7 @@ class AdminDashboard extends StatelessWidget {
             OutlinedButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDataEntry())), icon: const Icon(Icons.add_business), label: const Text('إضافة بيانات إدارية مباشرة')),
             const SizedBox(height: 12),
             _ActionCard(icon: Icons.store, title: 'اعتماد وإدارة التجار', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MerchantApprovalPage()))),
+            _ActionCard(icon: Icons.link, title: 'إنشاء روابط التجار', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MerchantInvitesPage()))),
             _ActionCard(icon: Icons.delivery_dining, title: 'المندوبون والتوزيع', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DispatchCenterPage()))),
             _ActionCard(icon: Icons.category, title: 'إدارة الأقسام', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlatformControlPage()))),
             _ActionCard(icon: Icons.account_balance_wallet_outlined, title: 'مزودو الدفع والمحافظ', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlatformControlPage()))),
