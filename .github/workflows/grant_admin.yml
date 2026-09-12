@@ -1,0 +1,41 @@
+name: Grant Alfaeq Yemen Admin
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "بريد المستخدم الذي يمنح الصلاحية"
+        required: true
+        type: string
+      role:
+        description: "الدور المطلوب"
+        required: true
+        default: owner
+        type: choice
+        options:
+          - owner
+          - admin
+          - developer
+          - vendor
+          - driver
+          - customer
+
+permissions:
+  contents: read
+
+jobs:
+  grant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install firebase-admin
+        run: npm install --no-save firebase-admin@12
+      - name: Grant role
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          TARGET_EMAIL: ${{ inputs.email }}
+          TARGET_ROLE: ${{ inputs.role }}
+        run: node scripts/grant_admin.js
