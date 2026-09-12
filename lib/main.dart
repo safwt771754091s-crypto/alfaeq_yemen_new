@@ -123,7 +123,26 @@ class HomePage extends StatelessWidget {
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.08),
                 itemBuilder: (context, index) {
                   final section = appSections[index];
-                  return Card(elevation: 0, child: InkWell(borderRadius: BorderRadius.circular(12), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SectionPage(section: section))), child: Padding(padding: const EdgeInsets.all(14), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(_icon(section.icon), size: 36, color: const Color(0xFF0B6E4F)), const SizedBox(height: 10), Text(section.title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)), const SizedBox(height: 5), Text(section.subtitle, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.grey))])));
+                  return Card(
+                    elevation: 0,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SectionPage(section: section))),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(_icon(section.icon), size: 36, color: const Color(0xFF0B6E4F)),
+                            const SizedBox(height: 10),
+                            Text(section.title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 5),
+                            Text(section.subtitle, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
                 },
               ),
             ],
