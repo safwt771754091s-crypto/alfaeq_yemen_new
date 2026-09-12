@@ -26,7 +26,7 @@ service cloud.firestore {
     function validMerchantStatusTransition() {
       return (resource.data.status == 'pending' && request.resource.data.status in ['accepted', 'cancelled'])
         || (resource.data.status == 'accepted' && request.resource.data.status in ['preparing', 'cancelled'])
-        || (resource.data.status == 'preparing' && request.resource.data.status == 'ready_for_pickup')
+        || (resource.data.status == 'preparing' && request.resource.data.status in ['ready_for_pickup'])
         || (resource.data.status == request.resource.data.status);
     }
     function validDeliveryTransition() {
@@ -73,11 +73,8 @@ service cloud.firestore {
     }
 
     match /carts/{uid} {
-      // The document path is already the authenticated user's UID, so legacy carts without ownerId remain readable.
       allow read: if self(uid);
-      // New carts must record their owner explicitly.
       allow create: if self(uid) && request.resource.data.ownerId == request.auth.uid;
-      // Permit a one-time safe migration of legacy carts that lack ownerId, while every resulting cart is owned by the caller.
       allow update: if self(uid)
         && (!('ownerId' in resource.data) || resource.data.ownerId == request.auth.uid)
         && request.resource.data.ownerId == request.auth.uid;
@@ -126,7 +123,7 @@ service cloud.firestore {
           && validMerchantStatusTransition())
         || (driver() && resource.data.driverId == request.auth.uid
           && request.resource.data.customerId == resource.data.customerId
-          && request.resource.data.driverId == resource.data.driverId
+          && request.resource.data.driverId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveryLocation', 'updatedAt', 'status', 'deliveredAt'])
           && request.resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery', 'delivered', 'failed']
           && (!('deliveryLocation' in request.resource.data) || validGeoPoint(request.resource.data.deliveryLocation))
@@ -144,6 +141,11 @@ service cloud.firestore {
       allow read: if staff() || developer() || (signedIn() && resource.data.customerId == request.auth.uid);
       allow create: if signedIn() && request.resource.data.customerId == request.auth.uid;
       allow update, delete: if staff();
+    }
+
+    match /paymentProviders/{id} {
+      allow read: if staff() || developer() || (signedIn() && resource.data.enabled == true && resource.data.configurationStatus == 'configured');
+      allow create, update, delete: if staff();
     }
 
     match /reviews/{id} {
@@ -171,6 +173,36 @@ service cloud.firestore {
         && request.resource.data.result is string
         && request.resource.data.source is string
         && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    match /platformAutomation/{id} {
+      allow read: if staff() || developer();
+      allow write: if false;
+    }
+
+    match /wallets/{uid} {
+      allow read: if self(uid) || staff() || developer();
+      allow create: if staff() || self(uid);
+      allow update: if staff();
+      allow delete: if false;
+    }
+
+    match /walletTransactions/{id} {
+      allow read: if staff() || developer() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    match /walletOperations/{id} {
+      allow read: if staff() || developer() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.currency == 'YER'
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && request.resource.data.amount <= 100000000
+        && request.resource.data.type in ['deposit', 'withdraw', 'transfer'];
       allow update, delete: if false;
     }
   }
