@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../services/auth_service.dart';
+import 'auth_gate.dart';
 
 class MerchantInvitePage extends StatefulWidget {
   final String token;
@@ -44,7 +45,9 @@ class _MerchantInvitePageState extends State<MerchantInvitePage> {
       if (!mounted) return;
       setState(() => _message = 'تم تفعيل حساب التاجر. يمكنك الآن الدخول إلى مركز التاجر وإضافة المتجر والأصناف.');
       await Future<void>.delayed(const Duration(milliseconds: 800));
-      if (mounted) Navigator.of(context).pushReplacementNamed('/');
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const AuthGate()), (_) => false);
+      }
     } on FirebaseFunctionsException catch (e) {
       setState(() => _message = e.message ?? 'تعذر تفعيل دعوة التاجر.');
     } on FirebaseException catch (e) {
