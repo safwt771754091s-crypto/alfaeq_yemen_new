@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../core/app_sections.dart';
 import '../services/auth_service.dart';
 import 'admin_data_entry.dart';
+import 'admin_user_management_page.dart';
 import 'developer_page.dart';
 import 'dispatch_center_page.dart';
 import 'merchant_approval_page.dart';
@@ -57,6 +58,7 @@ class AdminDashboard extends StatelessWidget {
                 const SizedBox(height: 18),
                 const Text('الإدارة الأساسية', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 8),
+                _ActionCard(icon: Icons.manage_accounts_outlined, title: 'المستخدمون والأدوار', subtitle: 'إدارة الأدوار والصلاحيات وتعطيل الحسابات وإلغاء الجلسات', onTap: () => _open(context, const AdminUserManagementPage())),
                 _ActionCard(icon: Icons.tune_outlined, title: 'مركز تشغيل المنصة', subtitle: 'الأقسام، الدفع، التجار والإعدادات التشغيلية', onTap: () => _open(context, const PlatformControlPage())),
                 _ActionCard(icon: Icons.radar_outlined, title: 'أتمتة وجاهزية المنصة', subtitle: 'قراءة حالة الجاهزية القادمة من الخادم', onTap: () => _open(context, const PlatformAutomationPage())),
                 _ActionCard(icon: Icons.fact_check_outlined, title: 'اعتماد المتاجر', subtitle: 'مراجعة واعتماد طلبات التجار', onTap: () => _open(context, const MerchantApprovalPage())),
@@ -161,10 +163,10 @@ class AdminDashboard extends StatelessWidget {
 
   Widget _grid(BuildContext context) {
     final actions = <_QuickAction>[
+      _QuickAction(Icons.manage_accounts, 'المستخدمون', () => _open(context, const AdminUserManagementPage())),
       _QuickAction(Icons.store, 'اعتماد المتاجر', () => _open(context, const MerchantApprovalPage())),
       _QuickAction(Icons.add_business, 'إضافة بيانات', () => _open(context, const AdminDataEntry())),
       _QuickAction(Icons.account_balance_wallet_outlined, 'الدفع والمحافظ', () => _open(context, const PlatformControlPage())),
-      _QuickAction(Icons.inventory_2_outlined, 'المنتجات', () => _open(context, const MerchantPortalPage())),
       _QuickAction(Icons.delivery_dining_outlined, 'التوزيع', () => _open(context, const DispatchCenterPage())),
       _QuickAction(Icons.security_outlined, 'الأمن والتدقيق', () => _open(context, const DeveloperPage())),
     ];
