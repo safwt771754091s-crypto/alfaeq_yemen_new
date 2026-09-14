@@ -4,6 +4,7 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const db = getFirestore();
 const ALLOWED_ROLES = new Set(['owner', 'admin', 'developer', 'finance', 'merchant', 'driver', 'customer']);
+const PRIMARY_ADMIN_EMAIL = 'albyysks@gmail.com';
 
 function assertStaff(request) {
   const auth = request.auth;
@@ -43,6 +44,47 @@ function claimsForRole(role) {
   if (role === 'developer') claims.developer = true;
   return claims;
 }
+
+// One-time bootstrap for the already-created primary administrator account.
+// The account must authenticate first; the server verifies the exact email before
+// granting owner/admin/developer claims. No password or credential is stored here.
+exports.bootstrapPrimaryAdmin = onCall({ region: 'us-central1' }, async (request) => {
+  const auth = request.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'Authentication required.');
+
+  const email = String(auth.token?.email || '').trim().toLowerCase();
+  if (email !== PRIMARY_ADMIN_EMAIL) {
+    throw new HttpsError('permission-denied', 'This account is not the primary administrator account.');
+  }
+
+  const user = await getAuth().getUser(auth.uid);
+  if ((user.email || '').trim().toLowerCase() !== PRIMARY_ADMIN_EMAIL) {
+    throw new HttpsError('permission-denied', 'Authenticated account does not match the primary administrator.');
+  }
+
+  const claims = { owner: true, admin: true, developer: true, role: 'owner', accessLevel: 10 };
+  await getAuth().setCustomUserClaims(user.uid, claims);
+  await db.collection('users').doc(user.uid).set({
+    uid: user.uid,
+    email: PRIMARY_ADMIN_EMAIL,
+    name: user.displayName || 'مدير منصة الفائق يمن',
+    role: 'owner',
+    admin: true,
+    developer: true,
+    accessLevel: 10,
+    roleUpdatedAt: FieldValue.serverTimestamp(),
+    roleUpdatedBy: 'primary_admin_bootstrap',
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  await audit(user.uid, 'admin.primary_bootstrap', 'success', user.uid, {
+    email: PRIMARY_ADMIN_EMAIL,
+    role: 'owner',
+    permissions: ['admin', 'developer'],
+  });
+
+  return { ok: true, uid: user.uid, role: 'owner', claims };
+});
 
 exports.listManagedUsers = onCall({ region: 'us-central1' }, async (request) => {
   const auth = assertStaff(request);
