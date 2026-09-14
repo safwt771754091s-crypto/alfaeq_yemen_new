@@ -80,9 +80,9 @@ void main() {
       expect(driver, contains("where('driverId', isEqualTo: user.uid)"));
       expect(driver, contains("status == 'assigned'"));
       expect(driver, contains("status == 'delivered'"));
+      expect(gate, contains('final role = roleSnapshot.data ?? \'customer\';'));
       expect(gate, contains("case 'driver':"));
       expect(gate, contains('DriverCenterPage()'));
-      expect(gate, contains("role == 'driver'"));
       expect(rules, contains('match /drivers/{uid}'));
       expect(rules, contains("request.resource.data.approved == resource.data.approved"));
       expect(rules, contains("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOnline', 'currentLocation', 'lastSeenAt', 'updatedAt', 'activeOrderCount'])"));
