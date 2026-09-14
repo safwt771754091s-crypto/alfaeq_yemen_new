@@ -80,7 +80,7 @@ void main() {
       expect(driver, contains("where('driverId', isEqualTo: user.uid)"));
       expect(driver, contains("status == 'assigned'"));
       expect(driver, contains("status == 'delivered'"));
-      expect(gate, contains("role == 'driver'"));
+      expect(gate, contains("case 'driver':"));
       expect(gate, contains('DriverCenterPage()'));
       expect(rules, contains('match /drivers/{uid}'));
       expect(rules, contains("request.resource.data.approved == resource.data.approved"));
