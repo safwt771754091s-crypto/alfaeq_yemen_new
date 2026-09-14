@@ -1,18 +1,36 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthService {
   final FirebaseAuth auth;
   final FirebaseFirestore db;
+  final FirebaseFunctions functions;
 
-  AuthService({FirebaseAuth? auth, FirebaseFirestore? firestore})
-      : auth = auth ?? FirebaseAuth.instance,
-        db = firestore ?? FirebaseFirestore.instance;
+  AuthService({
+    FirebaseAuth? auth,
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+  })  : auth = auth ?? FirebaseAuth.instance,
+        db = firestore ?? FirebaseFirestore.instance,
+        functions = functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
 
   Stream<User?> get authStateChanges => auth.authStateChanges();
 
   Future<UserCredential> signIn({required String email, required String password}) {
     return auth.signInWithEmailAndPassword(email: email.trim(), password: password);
+  }
+
+  Future<void> bootstrapPrimaryAdminIfEligible() async {
+    final user = auth.currentUser;
+    if (user == null) return;
+    final email = (user.email ?? '').trim().toLowerCase();
+    if (email != 'albyysks@gmail.com') return;
+
+    final callable = functions.httpsCallable('bootstrapPrimaryAdmin');
+    await callable.call(<String, dynamic>{});
+    await user.getIdToken(true);
+    await user.reload();
   }
 
   Future<void> sendPasswordReset({required String email}) {
@@ -128,17 +146,18 @@ class AuthService {
 
   Future<bool> isDeveloper() async {
     final tokenClaims = await claims();
-    if (tokenClaims['role'] == 'developer') return true;
+    if (tokenClaims['developer'] == true || tokenClaims['role'] == 'developer') return true;
     final user = auth.currentUser;
     if (user == null) return false;
     final snap = await db.collection('users').doc(user.uid).get();
-    return snap.data()?['role'] == 'developer';
+    return snap.data()?['developer'] == true || snap.data()?['role'] == 'developer';
   }
 
   Future<bool> canOpenDeveloperCenter() async {
     final tokenClaims = await claims();
     return tokenClaims['owner'] == true ||
         tokenClaims['admin'] == true ||
+        tokenClaims['developer'] == true ||
         tokenClaims['role'] == 'owner' ||
         tokenClaims['role'] == 'admin' ||
         tokenClaims['role'] == 'developer';
