@@ -245,3 +245,4 @@ exports.processWalletOperation = onDocumentCreated(
 );
 
 Object.assign(exports, require('./merchant_invites'));
+Object.assign(exports, require('./admin_users'));
