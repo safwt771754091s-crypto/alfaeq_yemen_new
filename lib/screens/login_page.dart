@@ -26,6 +26,7 @@ class _LoginPageState extends State<LoginPage> {
         await _auth.register(name: _name.text, email: _email.text, password: _password.text);
       } else {
         await _auth.signIn(email: _email.text, password: _password.text);
+        await _auth.bootstrapPrimaryAdminIfEligible();
       }
     } on Exception catch (e) {
       if (!mounted) return;
@@ -48,6 +49,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   String _authMessage(String error) {
+    if (error.contains('permission-denied')) return 'تم تسجيل الدخول، لكن الحساب لا يملك الصلاحيات المطلوبة.';
     if (error.contains('invalid-credential') || error.contains('wrong-password')) return 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
     if (error.contains('user-not-found')) return 'لا يوجد حساب بهذا البريد الإلكتروني.';
     if (error.contains('email-already-in-use')) return 'البريد الإلكتروني مستخدم بالفعل.';
