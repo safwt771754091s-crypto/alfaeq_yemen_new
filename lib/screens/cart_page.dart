@@ -149,7 +149,7 @@ class CartPage extends StatelessWidget {
                 return Card(child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.shopping_bag_outlined)),
                   title: Text(name, style: const TextStyle(fontWeight: FontWeight.w900)),
-                  subtitle: Text('$price $currency • المجموع: ${price is num ? price * quantity : 0} $currency'),
+                  subtitle: Text('$price $currency • المجموع: ${price * quantity} $currency'),
                   trailing: SizedBox(width: 150, child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
                     IconButton(onPressed: productId.isEmpty ? null : () => _changeQuantity(user.uid, productId, -1), icon: const Icon(Icons.remove_circle_outline)),
                     Text('$quantity', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
