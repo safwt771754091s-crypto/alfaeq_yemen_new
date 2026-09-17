@@ -1,9 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../core/app_sections.dart';
 import '../services/auth_service.dart';
+import 'location_picker_page.dart';
 
 class AdminDataEntry extends StatefulWidget {
   const AdminDataEntry({super.key});
@@ -26,22 +29,32 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
   String _sectionId = appSections.first.id;
   String? _selectedStoreId;
   String? _selectedStoreSectionId;
+  LatLng? _storeLocation;
   bool _saving = false;
 
   @override
   void dispose() {
-    _storeName.dispose();
-    _phone.dispose();
-    _address.dispose();
-    _productName.dispose();
-    _description.dispose();
-    _price.dispose();
-    _stock.dispose();
-    _imageUrl.dispose();
+    for (final c in [_storeName, _phone, _address, _productName, _description, _price, _stock, _imageUrl]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   Future<bool> _allowed() async => _auth.hasAdminClaim();
+
+  Future<void> _pickStoreLocation({LatLng? initial}) async {
+    final result = await Navigator.push<LatLng>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LocationPickerPage(
+          initialLatitude: initial?.latitude,
+          initialLongitude: initial?.longitude,
+          title: 'تحديد موقع المتجر بدقة',
+        ),
+      ),
+    );
+    if (result != null && mounted) setState(() => _storeLocation = result);
+  }
 
   Future<void> _createStore() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -51,9 +64,14 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
       _message('أدخل اسم المتجر ورقم الهاتف.');
       return;
     }
+    if (_storeLocation == null) {
+      _message('حدد موقع المتجر على الخريطة قبل الحفظ.');
+      return;
+    }
 
     setState(() => _saving = true);
     try {
+      final point = GeoPoint(_storeLocation!.latitude, _storeLocation!.longitude);
       final ref = await FirebaseFirestore.instance.collection('stores').add({
         'name': name,
         'phone': phone,
@@ -63,6 +81,11 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
         'ownerId': user.uid,
         'createdBy': user.uid,
         'ownerType': 'platform_admin',
+        'location': point,
+        'latitude': point.latitude,
+        'longitude': point.longitude,
+        'locationSource': 'admin_map_picker',
+        'locationUpdatedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -73,7 +96,8 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
       _storeName.clear();
       _phone.clear();
       _address.clear();
-      _message('تم حفظ المتجر الحقيقي في Firestore واعتماده للعرض.');
+      _storeLocation = null;
+      _message('تم حفظ المتجر مع إحداثياته الدقيقة في Firestore.');
     } on FirebaseException catch (e) {
       _message('تعذر حفظ المتجر: ${e.message ?? e.code}');
     } finally {
@@ -179,6 +203,19 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
                         TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'رقم الهاتف')),
                         TextField(controller: _address, decoration: const InputDecoration(labelText: 'العنوان')),
                         const SizedBox(height: 12),
+                        Card(
+                          elevation: 0,
+                          child: ListTile(
+                            leading: Icon(_storeLocation == null ? Icons.location_off_outlined : Icons.location_on),
+                            title: Text(_storeLocation == null ? 'موقع المتجر غير محدد' : 'تم تحديد موقع المتجر'),
+                            subtitle: Text(_storeLocation == null ? 'اضغط لتحديد الموقع على الخريطة' : '${_storeLocation!.latitude.toStringAsFixed(6)}, ${_storeLocation!.longitude.toStringAsFixed(6)}'),
+                            trailing: const Icon(Icons.map_outlined),
+                            onTap: _saving ? null : () => _pickStoreLocation(initial: _storeLocation),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _saving ? null : () => _pickStoreLocation(initial: _storeLocation), icon: const Icon(Icons.pin_drop_outlined), label: const Text('تحديد موقع المتجر على الخريطة'))),
+                        const SizedBox(height: 8),
                         SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _saving ? null : _createStore, icon: const Icon(Icons.add_business), label: const Text('حفظ المتجر في قاعدة البيانات'))),
                       ],
                     ),
@@ -226,12 +263,15 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
           return Column(children: docs.map((doc) {
             final data = doc.data();
             final selected = _selectedStoreId == doc.id;
+            final lat = data['latitude'];
+            final lng = data['longitude'];
             return Card(
               child: ListTile(
                 selected: selected,
-                leading: const Icon(Icons.storefront_outlined),
+                leading: Icon(data['location'] is GeoPoint ? Icons.location_on : Icons.location_off_outlined),
                 title: Text('${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900)),
-                subtitle: Text('${data['status'] ?? 'pending'} • ${data['phone'] ?? ''}'),
+                subtitle: Text('${data['status'] ?? 'pending'} • ${data['phone'] ?? ''}\n${lat is num && lng is num ? 'الموقع: ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}' : 'الموقع غير محدد'}'),
+                isThreeLine: true,
                 trailing: selected ? const Icon(Icons.check_circle) : const Icon(Icons.chevron_left),
                 onTap: () => setState(() {
                   _selectedStoreId = doc.id;
