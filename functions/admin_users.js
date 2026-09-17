@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getAuth } = require('firebase-admin/auth');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 
 const db = getFirestore();
 const ALLOWED_ROLES = new Set(['owner', 'admin', 'developer', 'finance', 'merchant', 'driver', 'customer']);
@@ -90,18 +90,43 @@ exports.listManagedUsers = onCall({ region: 'us-central1' }, async (request) => 
   const auth = assertStaff(request);
   const result = [];
   let pageToken;
+  const presenceSnap = await db.collection('users').get();
+  const presenceByUid = new Map();
+
+  for (const doc of presenceSnap.docs) {
+    const data = doc.data() || {};
+    presenceByUid.set(doc.id, {
+      isOnline: data.isOnline === true,
+      lastSeen: data.lastSeen || null,
+      profileName: data.name || data.displayName || '',
+    });
+  }
+
+  const onlineCutoff = Date.now() - (2 * 60 * 1000);
+
   do {
     const page = await getAuth().listUsers(1000, pageToken);
     for (const user of page.users) {
+      const presence = presenceByUid.get(user.uid) || {};
+      const lastSeen = presence.lastSeen;
+      const lastSeenMillis = lastSeen instanceof Timestamp
+        ? lastSeen.toMillis()
+        : (lastSeen?.toMillis ? lastSeen.toMillis() : null);
+      const isOnline = presence.isOnline === true
+        && lastSeenMillis != null
+        && lastSeenMillis >= onlineCutoff;
+
       result.push({
         uid: user.uid,
         email: user.email || '',
         phoneNumber: user.phoneNumber || '',
-        displayName: user.displayName || '',
+        displayName: user.displayName || presence.profileName || '',
         disabled: user.disabled,
         emailVerified: user.emailVerified,
         createdAt: user.metadata.creationTime || null,
         lastSignInAt: user.metadata.lastSignInTime || null,
+        lastSeen: lastSeenMillis != null ? new Date(lastSeenMillis).toISOString() : null,
+        isOnline,
         role: user.customClaims?.role || (user.customClaims?.owner ? 'owner' : user.customClaims?.admin ? 'admin' : ''),
         claims: user.customClaims || {},
       });
