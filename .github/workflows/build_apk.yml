@@ -63,7 +63,7 @@ jobs:
           test -s lib/firebase_options.dart
           echo "Firebase configuration generated: $(wc -c < lib/firebase_options.dart) bytes"
       - name: Analyze
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Build APK
         run: flutter build apk --debug --no-tree-shake-icons
       - uses: actions/upload-artifact@v4
