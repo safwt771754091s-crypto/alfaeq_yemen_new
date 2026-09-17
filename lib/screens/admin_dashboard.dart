@@ -43,8 +43,8 @@ class AdminDashboard extends StatelessWidget {
           actions: [
             IconButton(tooltip: 'الخريطة', onPressed: () => _open(context, LocationPickerPage(title: 'خريطة المنصة')), icon: const Icon(Icons.map_outlined)),
             IconButton(tooltip: 'السلة', onPressed: () => _open(context, CartPage()), icon: const Icon(Icons.shopping_cart_outlined)),
-            IconButton(tooltip: 'تسجيل الخروج', onPressed: () => _signOut(context), icon: const Icon(Icons.logout_outlined)),
-            IconButton(tooltip: 'تحديث', onPressed: () => (context as Element).markNeedsBuild(), icon: const Icon(Icons.refresh)),
+            IconButton(tooltip: 'تسجيل الخروج للمالك', onPressed: () => _signOut(context), icon: const Icon(Icons.logout_outlined)),
+            IconButton(tooltip: 'تحديث المؤشرات', onPressed: () => (context as Element).markNeedsBuild(), icon: const Icon(Icons.refresh)),
           ],
         ),
         body: FutureBuilder<bool>(
@@ -58,6 +58,16 @@ class AdminDashboard extends StatelessWidget {
                 _hero(context),
                 const SizedBox(height: 14),
                 _liveOverview(),
+                const SizedBox(height: 12),
+                Card(
+                  child: ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.logout_outlined)),
+                    title: const Text('تسجيل خروج حساب المالك', style: TextStyle(fontWeight: FontWeight.w900)),
+                    subtitle: const Text('إنهاء جلسة حساب المالك والعودة إلى صفحة تسجيل الدخول'),
+                    trailing: const Icon(Icons.chevron_left),
+                    onTap: () => _signOut(context),
+                  ),
+                ),
                 const SizedBox(height: 18),
                 const Text('التشغيل السريع', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 10),
@@ -110,11 +120,15 @@ class AdminDashboard extends StatelessWidget {
           if (snapshot.hasError) return const Card(child: ListTile(leading: Icon(Icons.warning_amber_outlined), title: Text('تعذر تحميل المؤشرات'), subtitle: Text('تحقق من اتصال Firebase وصلاحيات حساب الإدارة.')));
           final stats = snapshot.data!;
           return Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('مؤشرات التشغيل', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+            const Text('مؤشرات الحسابات والتشغيل', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            const Text('المتواجدون الآن = حسابات أرسلت نبضة حضور خلال آخر دقيقتين.', style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 10),
-            Row(children: [Expanded(child: _Metric(label: 'المستخدمون', value: stats.users, icon: Icons.people_outline)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'المتاجر', value: stats.stores, icon: Icons.storefront_outlined)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'المنتجات', value: stats.products, icon: Icons.inventory_2_outlined))]),
+            Row(children: [Expanded(child: _Metric(label: 'الحسابات المسجلة', value: stats.users, icon: Icons.people_outline)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'المتواجدون الآن', value: stats.onlineUsers, icon: Icons.wifi_tethering)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'المتاجر', value: stats.stores, icon: Icons.storefront_outlined))]),
             const SizedBox(height: 8),
-            Row(children: [Expanded(child: _Metric(label: 'الطلبات', value: stats.orders, icon: Icons.receipt_long_outlined)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'عمليات المحفظة', value: stats.walletOperations, icon: Icons.account_balance_wallet_outlined)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'سجل التدقيق', value: stats.auditLogs, icon: Icons.fact_check_outlined))]),
+            Row(children: [Expanded(child: _Metric(label: 'المنتجات', value: stats.products, icon: Icons.inventory_2_outlined)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'الطلبات', value: stats.orders, icon: Icons.receipt_long_outlined)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'عمليات المحفظة', value: stats.walletOperations, icon: Icons.account_balance_wallet_outlined))]),
+            const SizedBox(height: 8),
+            _Metric(label: 'سجل التدقيق', value: stats.auditLogs, icon: Icons.fact_check_outlined),
           ])));
         },
       );
@@ -134,14 +148,40 @@ class AdminDashboard extends StatelessWidget {
 
   Future<_AdminStats> _loadStats() async {
     final db = FirebaseFirestore.instance;
-    final results = await Future.wait([db.collection('users').get(), db.collection('stores').get(), db.collection('products').get(), db.collection('orders').get(), db.collection('walletOperations').get(), db.collection('auditLogs').get()]);
-    return _AdminStats(users: results[0].size, stores: results[1].size, products: results[2].size, orders: results[3].size, walletOperations: results[4].size, auditLogs: results[5].size);
+    final results = await Future.wait([
+      db.collection('users').get(),
+      db.collection('users').where('isOnline', isEqualTo: true).get(),
+      db.collection('stores').get(),
+      db.collection('products').get(),
+      db.collection('orders').get(),
+      db.collection('walletOperations').get(),
+      db.collection('auditLogs').get(),
+    ]);
+    return _AdminStats(users: results[0].size, onlineUsers: results[1].size, stores: results[2].size, products: results[3].size, orders: results[4].size, walletOperations: results[5].size, auditLogs: results[6].size);
   }
 
   static void _open(BuildContext context, Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 }
 
-class _AdminStats { final int users; final int stores; final int products; final int orders; final int walletOperations; final int auditLogs; const _AdminStats({required this.users, required this.stores, required this.products, required this.orders, required this.walletOperations, required this.auditLogs}); }
-class _Metric extends StatelessWidget { final String label; final int value; final IconData icon; const _Metric({required this.label, required this.value, required this.icon}); @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6), decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(14)), child: Column(children: [Icon(icon, size: 22), const SizedBox(height: 5), Text('$value', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10))])); }
+class _AdminStats {
+  final int users;
+  final int onlineUsers;
+  final int stores;
+  final int products;
+  final int orders;
+  final int walletOperations;
+  final int auditLogs;
+  const _AdminStats({required this.users, required this.onlineUsers, required this.stores, required this.products, required this.orders, required this.walletOperations, required this.auditLogs});
+}
+
+class _Metric extends StatelessWidget {
+  final String label;
+  final int value;
+  final IconData icon;
+  const _Metric({required this.label, required this.value, required this.icon});
+  @override
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6), decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(14)), child: Column(children: [Icon(icon, size: 22), const SizedBox(height: 5), Text('$value', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10))]));
+}
+
 class _QuickAction { final IconData icon; final String title; final VoidCallback onTap; const _QuickAction(this.icon, this.title, this.onTap); }
 class _ActionCard extends StatelessWidget { final IconData icon; final String title; final String subtitle; final VoidCallback onTap; const _ActionCard({required this.icon, required this.title, required this.subtitle, required this.onTap}); @override Widget build(BuildContext context) => Card(child: ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5), leading: CircleAvatar(child: Icon(icon)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text(subtitle), trailing: const Icon(Icons.chevron_left), onTap: onTap)); }
