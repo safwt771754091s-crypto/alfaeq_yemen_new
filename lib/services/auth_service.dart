@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
   final FirebaseAuth auth;
@@ -19,6 +21,59 @@ class AuthService {
 
   Future<UserCredential> signIn({required String email, required String password}) {
     return auth.signInWithEmailAndPassword(email: email.trim(), password: password);
+  }
+
+  /// Google authentication works with Firebase's popup on Web and Google Sign-In
+  /// on Android/iOS, then creates the normal `users/{uid}` profile when needed.
+  Future<UserCredential?> signInWithGoogle() async {
+    UserCredential credential;
+    if (kIsWeb) {
+      final provider = GoogleAuthProvider();
+      provider.setCustomParameters({'prompt': 'select_account'});
+      credential = await auth.signInWithPopup(provider);
+    } else {
+      final google = GoogleSignIn();
+      final account = await google.signIn();
+      if (account == null) return null;
+      final googleAuth = await account.authentication;
+      final oauth = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      credential = await auth.signInWithCredential(oauth);
+    }
+
+    final user = credential.user;
+    if (user == null) return credential;
+    await _ensureUserProfile(user);
+    if ((user.email ?? '').trim().toLowerCase() == 'albyysks@gmail.com') {
+      await bootstrapPrimaryAdminIfEligible();
+    }
+    return credential;
+  }
+
+  Future<void> _ensureUserProfile(User user) async {
+    final ref = db.collection('users').doc(user.uid);
+    final snapshot = await ref.get();
+    if (snapshot.exists) {
+      await ref.set({
+        'email': user.email,
+        'name': (user.displayName ?? '').trim(),
+        'photoUrl': user.photoURL,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      return;
+    }
+    await ref.set({
+      'uid': user.uid,
+      'name': (user.displayName ?? '').trim(),
+      'email': user.email,
+      'photoUrl': user.photoURL,
+      'role': 'customer',
+      'provider': 'google',
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> bootstrapPrimaryAdminIfEligible() async {
@@ -53,6 +108,7 @@ class AuthService {
         'name': name.trim(),
         'email': user.email,
         'role': 'customer',
+        'provider': 'password',
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
