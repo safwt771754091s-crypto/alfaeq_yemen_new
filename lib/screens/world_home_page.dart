@@ -51,12 +51,7 @@ class _HomeTab extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
       children: [
         Row(children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(color: const Color(0xFF0B6E4F), borderRadius: BorderRadius.circular(15)),
-            child: const Icon(Icons.hub_outlined, color: Colors.white),
-          ),
+          Container(width: 48, height: 48, decoration: BoxDecoration(color: const Color(0xFF0B6E4F), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.hub_outlined, color: Colors.white)),
           const SizedBox(width: 12),
           const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('الفائق يمن', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
@@ -68,10 +63,7 @@ class _HomeTab extends StatelessWidget {
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Color(0xFF0B6E4F), Color(0xFF124E78)]),
-            borderRadius: BorderRadius.circular(28),
-          ),
+          decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Color(0xFF0B6E4F), Color(0xFF124E78)]), borderRadius: BorderRadius.circular(28)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Row(children: [Icon(Icons.auto_awesome, color: Colors.white), SizedBox(width: 8), Text('ذكاء الفائق', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800))]),
             const SizedBox(height: 12),
@@ -95,163 +87,78 @@ class _HomeTab extends StatelessWidget {
           TextButton(onPressed: () {}, child: const Text('عرض الكل')),
         ]),
         const SizedBox(height: 8),
-        SizedBox(
-          height: 112,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: appSections.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, i) => _CompactSectionCard(section: appSections[i]),
-          ),
-        ),
+        SizedBox(height: 112, child: ListView.separated(scrollDirection: Axis.horizontal, itemCount: appSections.length, separatorBuilder: (_, __) => const SizedBox(width: 10), itemBuilder: (context, i) => _CompactSectionCard(section: appSections[i]))),
         const SizedBox(height: 26),
         const Text('أقسام الفائق', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
         const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: appSections.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.02),
-          itemBuilder: (_, itemIndex) => _SectionCard(section: appSections[itemIndex]),
-        ),
+        GridView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: appSections.length, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.02), itemBuilder: (_, itemIndex) => _SectionCard(section: appSections[itemIndex])),
       ],
     );
   }
 
   static void _open(BuildContext context, Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
-  static Widget _action(BuildContext context, String title, IconData icon, Widget page) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsetsDirectional.only(start: 5),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(17),
-          onTap: () => _open(context, page),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 3),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17), border: Border.all(color: const Color(0xFFE4EAE7))),
-            child: Column(children: [Icon(icon, color: const Color(0xFF0B6E4F)), const SizedBox(height: 6), Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))]),
-          ),
-        ),
-      ),
-    );
-  }
+  static Widget _action(BuildContext context, String title, IconData icon, Widget page) => Expanded(child: Padding(padding: const EdgeInsetsDirectional.only(start: 5), child: InkWell(borderRadius: BorderRadius.circular(17), onTap: () => _open(context, page), child: Container(padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 3), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17), border: Border.all(color: const Color(0xFFE4EAE7))), child: Column(children: [Icon(icon, color: const Color(0xFF0B6E4F)), const SizedBox(height: 6), Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))])))));
 }
 
 class _CompactSectionCard extends StatelessWidget {
   final AppSection section;
   const _CompactSectionCard({required this.section});
-
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WorldSectionPage(section: section))),
-      child: Container(
-        width: 112,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: const Color(0xFFF7FAF8), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE3EAE6))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xFFE7F3EE), borderRadius: BorderRadius.circular(13)), child: Icon(_SectionCard._icon(section.icon), color: const Color(0xFF0B6E4F), size: 21)),
-          const Spacer(),
-          Text(section.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
-        ]),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => InkWell(borderRadius: BorderRadius.circular(18), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WorldSectionPage(section: section))), child: Container(width: 112, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFF7FAF8), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE3EAE6))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xFFE7F3EE), borderRadius: BorderRadius.circular(13)), child: Icon(_SectionCard._icon(section.icon), color: const Color(0xFF0B6E4F), size: 21)), const Spacer(), Text(section.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900))]));
 }
 
 class _SectionCard extends StatelessWidget {
   final AppSection section;
   const _SectionCard({required this.section});
-
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WorldSectionPage(section: section))),
-        child: Padding(
-          padding: const EdgeInsets.all(15),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Container(width: 50, height: 50, decoration: BoxDecoration(color: const Color(0xFFE7F3EE), borderRadius: BorderRadius.circular(15)), child: Icon(_icon(section.icon), color: const Color(0xFF0B6E4F), size: 27)),
-              const Spacer(),
-              const Icon(Icons.arrow_back_ios_new, size: 14, color: Colors.black38),
-            ]),
-            const Spacer(),
-            Text(section.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 4),
-            Text(section.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Colors.black54, height: 1.25)),
-          ]),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Card(elevation: 0, clipBehavior: Clip.antiAlias, child: InkWell(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WorldSectionPage(section: section))), child: Padding(padding: const EdgeInsets.all(15), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Container(width: 50, height: 50, decoration: BoxDecoration(color: const Color(0xFFE7F3EE), borderRadius: BorderRadius.circular(15)), child: Icon(_icon(section.icon), color: const Color(0xFF0B6E4F), size: 27)), const Spacer(), const Icon(Icons.arrow_back_ios_new, size: 14, color: Colors.black38)]), const Spacer(), Text(section.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(section.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Colors.black54, height: 1.25))]))));
 
-  static IconData _icon(String name) {
-    return switch (name) {
-      'storefront' => Icons.storefront_outlined,
-      'restaurant' => Icons.restaurant_outlined,
-      'pharmacy' => Icons.local_pharmacy_outlined,
-      'beauty' => Icons.face_retouching_natural,
-      'construction' => Icons.construction_outlined,
-      'car' => Icons.directions_car_outlined,
-      'flight' => Icons.flight_takeoff_outlined,
-      'hotel' => Icons.hotel_outlined,
-      'account_balance' => Icons.account_balance_wallet_outlined,
-      'handyman' => Icons.handyman_outlined,
-      'devices' => Icons.devices_outlined,
-      'home' => Icons.home_work_outlined,
-      'work' => Icons.work_outline,
-      'school' => Icons.school_outlined,
-      'medical' => Icons.medical_services_outlined,
-      _ => Icons.explore_outlined,
-    };
-  }
+  static IconData _icon(String name) => switch (name) {
+    'storefront' => Icons.storefront_outlined,
+    'restaurant' => Icons.restaurant_outlined,
+    'pharmacy' => Icons.local_pharmacy_outlined,
+    'beauty' => Icons.face_retouching_natural,
+    'construction' => Icons.construction_outlined,
+    'car' => Icons.directions_car_outlined,
+    'flight' => Icons.flight_takeoff_outlined,
+    'hotel' => Icons.hotel_outlined,
+    'account_balance' => Icons.account_balance_wallet_outlined,
+    'handyman' => Icons.handyman_outlined,
+    'devices' => Icons.devices_outlined,
+    'home' => Icons.home_work_outlined,
+    'work' => Icons.work_outline,
+    'school' => Icons.school_outlined,
+    'medical' => Icons.medical_services_outlined,
+    _ => Icons.explore_outlined,
+  };
 }
 
 class WorldSectionPage extends StatelessWidget {
   final AppSection section;
   const WorldSectionPage({super.key, required this.section});
-
   @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(title: Text(section.title, style: const TextStyle(fontWeight: FontWeight.w900)), actions: [IconButton(onPressed: () => _open(context, const CartPage()), icon: const Icon(Icons.shopping_cart_outlined))]),
-        body: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 28), children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFE7F3EE), Color(0xFFEAF2F8)]), borderRadius: BorderRadius.circular(24)),
-            child: Row(children: [
-              Container(width: 56, height: 56, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17)), child: Icon(_SectionCard._icon(section.icon), color: const Color(0xFF0B6E4F), size: 31)),
-              const SizedBox(width: 13),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(section.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(section.subtitle, style: const TextStyle(color: Colors.black54, height: 1.3))])),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          TextField(decoration: InputDecoration(hintText: 'ابحث في ${section.title}...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none))),
-          const SizedBox(height: 18),
-          Row(children: [const Expanded(child: Text('المتاجر المعتمدة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900))), _Pill(label: 'قريباً')]),
-          const SizedBox(height: 9),
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('stores').where('sectionId', isEqualTo: section.id).where('status', isEqualTo: 'approved').limit(30).snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()));
-              if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المتاجر', text: 'تحقق من الاتصال والصلاحيات.');
-              final stores = snapshot.data?.docs ?? const [];
-              if (stores.isEmpty) return const _Info(title: 'لا توجد متاجر معتمدة بعد', text: 'سيظهر هنا المحتوى الحقيقي عند اعتماد المتاجر.');
-              return Column(children: stores.map((document) => _StoreCard(store: document)).toList());
-            },
-          ),
-        ]),
+  Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
+    appBar: AppBar(title: Text(section.title, style: const TextStyle(fontWeight: FontWeight.w900)), actions: [IconButton(onPressed: () => _open(context, const CartPage()), icon: const Icon(Icons.shopping_cart_outlined))]),
+    body: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 28), children: [
+      Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFE7F3EE), Color(0xFFEAF2F8)]), borderRadius: BorderRadius.circular(24)), child: Row(children: [Container(width: 56, height: 56, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17)), child: Icon(_SectionCard._icon(section.icon), color: const Color(0xFF0B6E4F), size: 31)), const SizedBox(width: 13), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(section.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(section.subtitle, style: const TextStyle(color: Colors.black54, height: 1.3))]))])),
+      const SizedBox(height: 14),
+      TextField(decoration: InputDecoration(hintText: 'ابحث في ${section.title}...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none))),
+      const SizedBox(height: 18),
+      Row(children: [const Expanded(child: Text('المتاجر المعتمدة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900))), _Pill(label: 'قريباً')]),
+      const SizedBox(height: 9),
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance.collection('stores').where('sectionId', isEqualTo: section.id).where('status', isEqualTo: 'approved').limit(30).snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()));
+          if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المتاجر', text: 'تحقق من الاتصال والصلاحيات.');
+          final stores = snapshot.data?.docs ?? const [];
+          if (stores.isEmpty) return const _Info(title: 'لا توجد متاجر معتمدة بعد', text: 'سيظهر هنا المحتوى الحقيقي عند اعتماد المتاجر.');
+          return Column(children: stores.map((document) => _StoreCard(store: document)).toList());
+        },
       ),
-    );
-  }
-
+    ]),
+  ));
   static void _open(BuildContext context, Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 }
 
@@ -266,41 +173,84 @@ class _StoreCard extends StatelessWidget {
   final QueryDocumentSnapshot<Map<String, dynamic>> store;
   const _StoreCard({required this.store});
 
+  Future<void> _addToCart(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> product) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول أولاً.')));
+      return;
+    }
+    final productData = product.data();
+    final price = productData['price'];
+    final stock = productData['stock'];
+    if (price is! num || price < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سعر الصنف غير صالح.')));
+      return;
+    }
+    if (stock is num && stock <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هذا الصنف غير متوفر حالياً.')));
+      return;
+    }
+    final name = (productData['name'] ?? productData['title'] ?? 'صنف').toString();
+    final cartRef = FirebaseFirestore.instance.collection('carts').doc(user.uid);
+    try {
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final cartSnap = await tx.get(cartRef);
+        final cart = cartSnap.data() ?? <String, dynamic>{};
+        final raw = cart['items'];
+        final items = raw is List ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
+        final index = items.indexWhere((item) => item['productId'] == product.id);
+        if (index >= 0) {
+          final current = (items[index]['quantity'] as num?)?.toInt() ?? 1;
+          final next = current + 1;
+          if (stock is num && next > stock.toInt()) throw StateError('لا يمكن تجاوز الكمية المتوفرة.');
+          if (next > 100) throw StateError('الحد الأقصى 100 قطعة للصنف.');
+          items[index]['quantity'] = next;
+        } else {
+          items.add({'productId': product.id, 'name': name, 'price': price, 'currency': productData['currency'] ?? 'YER', 'quantity': 1, 'storeId': productData['storeId'] ?? store.id, 'merchantId': productData['ownerId'] ?? productData['merchantId'] ?? '', 'ownerId': productData['ownerId'] ?? '', 'addedAt': Timestamp.now()});
+        }
+        tx.set(cartRef, {'ownerId': user.uid, 'customerId': user.uid, 'items': items, 'currency': productData['currency'] ?? cart['currency'] ?? 'YER', 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+      });
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تمت إضافة «$name» إلى السلة.')));
+    } on StateError catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } on FirebaseException catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إضافة الصنف: ${e.message ?? e.code}')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = store.data();
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        leading: const CircleAvatar(backgroundColor: Color(0xFFE7F3EE), child: Icon(Icons.storefront_outlined, color: Color(0xFF0B6E4F))),
-        title: Text('${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900)),
-        subtitle: Text('${data['address'] ?? 'عنوان غير محدد'}'),
-        children: [
-          Container(height: 1, color: const Color(0xFFE8ECEA)),
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('products').where('storeId', isEqualTo: store.id).where('status', isEqualTo: 'active').limit(40).snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(12), child: Text('تعذر تحميل الأصناف.'));
-              if (snapshot.connectionState == ConnectionState.waiting) return const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator());
-              final products = snapshot.data?.docs ?? const [];
-              if (products.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد أصناف نشطة حالياً.'));
-              return Column(children: products.map((product) {
-                final productData = product.data();
-                final price = productData['price'];
-                return ListTile(
-                  leading: const Icon(Icons.inventory_2_outlined),
-                  title: Text('${productData['name'] ?? 'صنف'}'),
-                  subtitle: Text('المتوفر: ${productData['stock'] ?? '—'}'),
-                  trailing: price is num ? Text('$price ${productData['currency'] ?? 'YER'}', style: const TextStyle(fontWeight: FontWeight.w900)) : const Text('عند الطلب', style: TextStyle(fontWeight: FontWeight.w800)),
-                );
-              }).toList());
-            },
-          ),
-        ],
-      ),
-    );
+    return Card(elevation: 0, margin: const EdgeInsets.only(bottom: 12), clipBehavior: Clip.antiAlias, child: ExpansionTile(
+      leading: const CircleAvatar(backgroundColor: Color(0xFFE7F3EE), child: Icon(Icons.storefront_outlined, color: Color(0xFF0B6E4F))),
+      title: Text('${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900)),
+      subtitle: Text('${data['address'] ?? 'عنوان غير محدد'}'),
+      children: [
+        Container(height: 1, color: const Color(0xFFE8ECEA)),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance.collection('products').where('storeId', isEqualTo: store.id).where('status', isEqualTo: 'active').limit(40).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(12), child: Text('تعذر تحميل الأصناف.'));
+            if (snapshot.connectionState == ConnectionState.waiting) return const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator());
+            final products = snapshot.data?.docs ?? const [];
+            if (products.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد أصناف نشطة حالياً.'));
+            return Column(children: products.map((product) {
+              final productData = product.data();
+              final price = productData['price'];
+              return ListTile(
+                leading: const Icon(Icons.inventory_2_outlined),
+                title: Text('${productData['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: Text('المتوفر: ${productData['stock'] ?? '—'}'),
+                trailing: Wrap(spacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                  if (price is num) Text('$price ${productData['currency'] ?? 'YER'}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                  FilledButton.icon(onPressed: () => _addToCart(context, product), icon: const Icon(Icons.add_shopping_cart, size: 18), label: const Text('أضف للسلة')),
+                ]),
+              );
+            }).toList());
+          },
+        ),
+      ],
+    ));
   }
 }
 
@@ -316,37 +266,29 @@ class WalletCenterPage extends StatelessWidget {
   const WalletCenterPage({super.key});
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(title: const Text('المحافظ والدفع')),
-        body: ListView(padding: const EdgeInsets.all(16), children: [
-          Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: const Color(0xFF0B6E4F), borderRadius: BorderRadius.circular(24)), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.shield_outlined, color: Colors.white, size: 34), SizedBox(height: 10), Text('مركز الدفع الآمن', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)), SizedBox(height: 7), Text('إنشاء الطلب منفصل عن تنفيذ الدفع. لا تتم أي عملية مالية دون مزود دفع معتمد وموافقة واضحة.', style: TextStyle(color: Colors.white70, height: 1.5))])),
-          const SizedBox(height: 18),
-          const _Info(title: 'الكريمي', text: 'تحويل ودفع محلي — متاح كخيار دفع للطلبات'),
-          const _Info(title: 'كاش / محافظ', text: 'الدفع عند الاستلام وخيارات المحافظ اليمنية'),
-          const _Info(title: 'جيـب', text: 'محفظة إلكترونية — الربط API الحقيقي يحتاج اعتماد المزود'),
-          const _Info(title: 'البنية المالية', text: 'هذه الشاشة حالياً تعريفية فقط. الرصيد والمعاملات الحقيقية ستأتي من دفتر محاسبي غير قابل للتلاعب ومزود دفع معتمد.'),
-        ]),
-      ),
-    );
+    return Directionality(textDirection: TextDirection.rtl, child: Scaffold(appBar: AppBar(title: const Text('المحافظ والدفع')), body: ListView(padding: const EdgeInsets.all(16), children: [
+      Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: const Color(0xFF0B6E4F), borderRadius: BorderRadius.circular(24)), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.shield_outlined, color: Colors.white, size: 34), SizedBox(height: 10), Text('مركز الدفع الآمن', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)), SizedBox(height: 7), Text('إنشاء الطلب منفصل عن تنفيذ الدفع. لا تتم أي عملية مالية دون مزود دفع معتمد وموافقة واضحة.', style: TextStyle(color: Colors.white70, height: 1.5))])),
+      const SizedBox(height: 18),
+      const _Info(title: 'الكريمي', text: 'تحويل ودفع محلي — متاح كخيار دفع للطلبات'),
+      const _Info(title: 'كاش / محافظ', text: 'الدفع عند الاستلام وخيارات المحافظ اليمنية'),
+      const _Info(title: 'جيـب', text: 'محفظة إلكترونية — الربط API الحقيقي يحتاج اعتماد المزود'),
+      const _Info(title: 'البنية المالية', text: 'هذه الشاشة حالياً تعريفية فقط. الرصيد والمعاملات الحقيقية ستأتي من دفتر محاسبي غير قابل للتلاعب ومزود دفع معتمد.'),
+    ]));
   }
 }
 
 class ServicesHubPage extends StatelessWidget {
   const ServicesHubPage({super.key});
   @override
-  Widget build(BuildContext context) {
-    return Directionality(textDirection: TextDirection.rtl, child: Scaffold(appBar: AppBar(title: const Text('مركز الخدمات')), body: ListView(padding: const EdgeInsets.all(16), children: [
-      const Text('منصة واحدة، خدمات مترابطة', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900)),
-      const SizedBox(height: 8),
-      const Text('تجارة، خدمات، دفع، تتبع، ذكاء، وبنية قابلة للتوسع إلى Mini Apps.', style: TextStyle(color: Colors.black54, height: 1.5)),
-      const SizedBox(height: 18),
-      _service(context, 'التتبع والطلبات', Icons.local_shipping_outlined, const MyOrdersPage()),
-      _service(context, 'ذكاء الفائق', Icons.auto_awesome, const AiAssistantPage()),
-      _service(context, 'المحافظ والدفع', Icons.account_balance_wallet_outlined, const WalletCenterPage()),
-    ])));
-  }
+  Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(appBar: AppBar(title: const Text('مركز الخدمات')), body: ListView(padding: const EdgeInsets.all(16), children: [
+    const Text('منصة واحدة، خدمات مترابطة', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900)),
+    const SizedBox(height: 8),
+    const Text('تجارة، خدمات، دفع، تتبع، ذكاء، وبنية قابلة للتوسع إلى Mini Apps.', style: TextStyle(color: Colors.black54, height: 1.5)),
+    const SizedBox(height: 18),
+    _service(context, 'التتبع والطلبات', Icons.local_shipping_outlined, const MyOrdersPage()),
+    _service(context, 'ذكاء الفائق', Icons.auto_awesome, const AiAssistantPage()),
+    _service(context, 'المحافظ والدفع', Icons.account_balance_wallet_outlined, const WalletCenterPage()),
+  ]));
   Widget _service(BuildContext context, String title, IconData icon, Widget page) => Card(elevation: 0, child: ListTile(contentPadding: const EdgeInsets.all(10), leading: CircleAvatar(backgroundColor: const Color(0xFFE7F3EE), child: Icon(icon, color: const Color(0xFF0B6E4F))), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), trailing: const Icon(Icons.chevron_left), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page))));
 }
 
