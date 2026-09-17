@@ -41,8 +41,8 @@ class AdminDashboard extends StatelessWidget {
         appBar: AppBar(
           title: const Text('مركز الإدارة', style: TextStyle(fontWeight: FontWeight.w900)),
           actions: [
-            IconButton(tooltip: 'الخريطة', onPressed: () => _open(context, const LocationPickerPage(title: 'خريطة المنصة')), icon: const Icon(Icons.map_outlined)),
-            IconButton(tooltip: 'السلة', onPressed: () => _open(context, const CartPage()), icon: const Icon(Icons.shopping_cart_outlined)),
+            IconButton(tooltip: 'الخريطة', onPressed: () => _open(context, LocationPickerPage(title: 'خريطة المنصة')), icon: const Icon(Icons.map_outlined)),
+            IconButton(tooltip: 'السلة', onPressed: () => _open(context, CartPage()), icon: const Icon(Icons.shopping_cart_outlined)),
             IconButton(tooltip: 'تسجيل الخروج', onPressed: () => _signOut(context), icon: const Icon(Icons.logout_outlined)),
             IconButton(tooltip: 'تحديث', onPressed: () => (context as Element).markNeedsBuild(), icon: const Icon(Icons.refresh)),
           ],
@@ -65,15 +65,15 @@ class AdminDashboard extends StatelessWidget {
                 const SizedBox(height: 18),
                 const Text('الإدارة الأساسية', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 8),
-                _ActionCard(icon: Icons.manage_accounts_outlined, title: 'المستخدمون والأدوار', subtitle: 'إدارة الأدوار والصلاحيات وتعطيل الحسابات وإلغاء الجلسات', onTap: () => _open(context, const AdminUserManagementPage())),
-                _ActionCard(icon: Icons.tune_outlined, title: 'مركز تشغيل المنصة', subtitle: 'الأقسام، الدفع، التجار والإعدادات التشغيلية', onTap: () => _open(context, const PlatformControlPage())),
-                _ActionCard(icon: Icons.radar_outlined, title: 'أتمتة وجاهزية المنصة', subtitle: 'قراءة حالة الجاهزية القادمة من الخادم', onTap: () => _open(context, const PlatformAutomationPage())),
-                _ActionCard(icon: Icons.fact_check_outlined, title: 'اعتماد المتاجر', subtitle: 'مراجعة واعتماد طلبات التجار', onTap: () => _open(context, const MerchantApprovalPage())),
-                _ActionCard(icon: Icons.add_link, title: 'التجار والروابط', subtitle: 'إنشاء وإدارة دعوات التجار', onTap: () => _open(context, const MerchantInvitesPage())),
-                _ActionCard(icon: Icons.storefront_outlined, title: 'مركز التاجر', subtitle: 'الكتالوج والمنتجات والطلبات', onTap: () => _open(context, const MerchantPortalPage())),
-                _ActionCard(icon: Icons.add_business_outlined, title: 'إدخال البيانات', subtitle: 'إضافة المتاجر والمنتجات مع تحديد موقع المتجر على الخريطة', onTap: () => _open(context, const AdminDataEntry())),
-                _ActionCard(icon: Icons.local_shipping_outlined, title: 'التوزيع والمندوبون', subtitle: 'تشغيل التوزيع ومتابعة الطلبات', onTap: () => _open(context, const DispatchCenterPage())),
-                _ActionCard(icon: Icons.code_outlined, title: 'مركز المطور والأمن', subtitle: 'الفحص، سجل التدقيق، وتقارير الحماية', onTap: () => _open(context, const DeveloperPage())),
+                _ActionCard(icon: Icons.manage_accounts_outlined, title: 'المستخدمون والأدوار', subtitle: 'إدارة الأدوار والصلاحيات وتعطيل الحسابات وإلغاء الجلسات', onTap: () => _open(context, AdminUserManagementPage())),
+                _ActionCard(icon: Icons.tune_outlined, title: 'مركز تشغيل المنصة', subtitle: 'الأقسام، الدفع، التجار والإعدادات التشغيلية', onTap: () => _open(context, PlatformControlPage())),
+                _ActionCard(icon: Icons.radar_outlined, title: 'أتمتة وجاهزية المنصة', subtitle: 'قراءة حالة الجاهزية القادمة من الخادم', onTap: () => _open(context, PlatformAutomationPage())),
+                _ActionCard(icon: Icons.fact_check_outlined, title: 'اعتماد المتاجر', subtitle: 'مراجعة واعتماد طلبات التجار', onTap: () => _open(context, MerchantApprovalPage())),
+                _ActionCard(icon: Icons.add_link, title: 'التجار والروابط', subtitle: 'إنشاء وإدارة دعوات التجار', onTap: () => _open(context, MerchantInvitesPage())),
+                _ActionCard(icon: Icons.storefront_outlined, title: 'مركز التاجر', subtitle: 'الكتالوج والمنتجات والطلبات', onTap: () => _open(context, MerchantPortalPage())),
+                _ActionCard(icon: Icons.add_business_outlined, title: 'إدخال البيانات', subtitle: 'إضافة المتاجر والمنتجات مع تحديد موقع المتجر على الخريطة', onTap: () => _open(context, AdminDataEntry())),
+                _ActionCard(icon: Icons.local_shipping_outlined, title: 'التوزيع والمندوبون', subtitle: 'تشغيل التوزيع ومتابعة الطلبات', onTap: () => _open(context, DispatchCenterPage())),
+                _ActionCard(icon: Icons.code_outlined, title: 'مركز المطور والأمن', subtitle: 'الفحص، سجل التدقيق، وتقارير الحماية', onTap: () => _open(context, DeveloperPage())),
                 const SizedBox(height: 18),
                 const Text('الأقسام الحالية', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 8),
@@ -98,7 +98,7 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 6),
             const Text('الصلاحيات الحقيقية تظل مفروضة من Firebase Security Rules وCustom Claims على الخادم.', style: TextStyle(color: Colors.white70, height: 1.45)),
             const SizedBox(height: 14),
-            FilledButton.icon(onPressed: () => _open(context, const PlatformAutomationPage()), icon: const Icon(Icons.health_and_safety_outlined), label: const Text('فحص جاهزية المنصة')),
+            FilledButton.icon(onPressed: () => _open(context, PlatformAutomationPage()), icon: const Icon(Icons.health_and_safety_outlined), label: const Text('فحص جاهزية المنصة')),
           ]),
         ),
       );
@@ -121,13 +121,13 @@ class AdminDashboard extends StatelessWidget {
 
   Widget _grid(BuildContext context) {
     final actions = <_QuickAction>[
-      _QuickAction(Icons.manage_accounts, 'المستخدمون', () => _open(context, const AdminUserManagementPage())),
-      _QuickAction(Icons.store, 'اعتماد المتاجر', () => _open(context, const MerchantApprovalPage())),
-      _QuickAction(Icons.add_business, 'إضافة بيانات', () => _open(context, const AdminDataEntry())),
-      _QuickAction(Icons.map_outlined, 'خريطة المتاجر', () => _open(context, const LocationPickerPage(title: 'خريطة المنصة'))),
-      _QuickAction(Icons.account_balance_wallet_outlined, 'الدفع والمحافظ', () => _open(context, const PlatformControlPage())),
-      _QuickAction(Icons.delivery_dining_outlined, 'التوزيع', () => _open(context, const DispatchCenterPage())),
-      _QuickAction(Icons.security_outlined, 'الأمن والتدقيق', () => _open(context, const DeveloperPage())),
+      _QuickAction(Icons.manage_accounts, 'المستخدمون', () => _open(context, AdminUserManagementPage())),
+      _QuickAction(Icons.store, 'اعتماد المتاجر', () => _open(context, MerchantApprovalPage())),
+      _QuickAction(Icons.add_business, 'إضافة بيانات', () => _open(context, AdminDataEntry())),
+      _QuickAction(Icons.map_outlined, 'خريطة المتاجر', () => _open(context, LocationPickerPage(title: 'خريطة المنصة'))),
+      _QuickAction(Icons.account_balance_wallet_outlined, 'الدفع والمحافظ', () => _open(context, PlatformControlPage())),
+      _QuickAction(Icons.delivery_dining_outlined, 'التوزيع', () => _open(context, DispatchCenterPage())),
+      _QuickAction(Icons.security_outlined, 'الأمن والتدقيق', () => _open(context, DeveloperPage())),
     ];
     return GridView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: actions.length, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.55), itemBuilder: (_, index) => Card(child: InkWell(onTap: actions[index].onTap, borderRadius: BorderRadius.circular(12), child: Padding(padding: const EdgeInsets.all(12), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(actions[index].icon, size: 28), const SizedBox(height: 8), Text(actions[index].title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800))])))));
   }
