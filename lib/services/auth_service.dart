@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,6 +10,7 @@ class AuthService {
   final FirebaseAuth auth;
   final FirebaseFirestore db;
   final FirebaseFunctions functions;
+  Timer? _presenceTimer;
 
   AuthService({
     FirebaseAuth? auth,
@@ -23,8 +26,6 @@ class AuthService {
     return auth.signInWithEmailAndPassword(email: email.trim(), password: password);
   }
 
-  /// Google authentication works with Firebase's popup on Web and Google Sign-In
-  /// on Android/iOS, then creates the normal `users/{uid}` profile when needed.
   Future<UserCredential?> signInWithGoogle() async {
     UserCredential credential;
     if (kIsWeb) {
@@ -46,6 +47,7 @@ class AuthService {
     final user = credential.user;
     if (user == null) return credential;
     await _ensureUserProfile(user);
+    await startPresence();
     if ((user.email ?? '').trim().toLowerCase() == 'albyysks@gmail.com') {
       await bootstrapPrimaryAdminIfEligible();
     }
@@ -81,7 +83,6 @@ class AuthService {
     if (user == null) return;
     final email = (user.email ?? '').trim().toLowerCase();
     if (email != 'albyysks@gmail.com') return;
-
     final callable = functions.httpsCallable('bootstrapPrimaryAdmin');
     await callable.call(<String, dynamic>{});
     await user.getIdToken(true);
@@ -127,13 +128,13 @@ class AuthService {
       rethrow;
     }
     await user.reload();
+    await startPresence();
     return credential;
   }
 
   Future<void> saveUserLocation({required GeoPoint location, String source = 'device'}) async {
     final user = auth.currentUser;
     if (user == null) throw StateError('User is not signed in.');
-
     final ref = db.collection('users').doc(user.uid);
     final snapshot = await ref.get();
     final existing = snapshot.data();
@@ -148,14 +149,12 @@ class AuthService {
       'name': (user.displayName ?? '').trim(),
       'email': user.email,
     };
-
     if (!snapshot.exists) {
       update['role'] = 'customer';
       update['createdAt'] = FieldValue.serverTimestamp();
     } else if (existing?['role'] == null) {
       update['role'] = 'customer';
     }
-
     await ref.set(update, SetOptions(merge: true));
   }
 
@@ -165,12 +164,48 @@ class AuthService {
     final snap = await db.collection('users').doc(user.uid).get();
     final data = snap.data();
     final location = data?['location'];
-    return location is GeoPoint &&
-        (data?['latitude'] is num) &&
-        (data?['longitude'] is num);
+    return location is GeoPoint && (data?['latitude'] is num) && (data?['longitude'] is num);
   }
 
-  Future<void> signOut() => auth.signOut();
+  Future<void> startPresence() async {
+    final user = auth.currentUser;
+    if (user == null) return;
+    _presenceTimer?.cancel();
+    await _touchPresence(user);
+    _presenceTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      final current = auth.currentUser;
+      if (current != null) _touchPresence(current);
+    });
+  }
+
+  Future<void> _touchPresence(User user) async {
+    try {
+      await db.collection('users').doc(user.uid).set({
+        'lastSeen': FieldValue.serverTimestamp(),
+        'isOnline': true,
+      }, SetOptions(merge: true));
+    } catch (_) {
+      // Presence must never prevent login or navigation.
+    }
+  }
+
+  Future<void> stopPresence() async {
+    _presenceTimer?.cancel();
+    _presenceTimer = null;
+    final user = auth.currentUser;
+    if (user == null) return;
+    try {
+      await db.collection('users').doc(user.uid).set({
+        'isOnline': false,
+        'lastSeen': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  Future<void> signOut() async {
+    await stopPresence();
+    await auth.signOut();
+  }
 
   Future<Map<String, dynamic>> claims({bool forceRefresh = true}) async {
     final user = auth.currentUser;
