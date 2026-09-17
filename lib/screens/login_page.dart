@@ -34,6 +34,16 @@ class _LoginPageState extends State<LoginPage> {
     } finally { if (mounted) setState(() => _loading = false); }
   }
 
+  Future<void> _google() async {
+    setState(() => _loading = true);
+    try {
+      await _auth.signInWithGoogle();
+    } on Exception catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_authMessage(e.toString()))));
+    } finally { if (mounted) setState(() => _loading = false); }
+  }
+
   Future<void> _forgotPassword() async {
     final email = _email.text.trim();
     if (!email.contains('@')) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل بريدك الإلكتروني أولاً.'))); return; }
@@ -49,6 +59,9 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   String _authMessage(String error) {
+    if (error.contains('popup-closed-by-user')) return 'تم إغلاق نافذة Google قبل إكمال الدخول.';
+    if (error.contains('cancelled') || error.contains('canceled')) return 'تم إلغاء تسجيل الدخول بحساب Google.';
+    if (error.contains('account-exists-with-different-credential')) return 'يوجد حساب بهذا البريد بطريقة دخول أخرى. استخدم البريد وكلمة المرور أولاً.';
     if (error.contains('permission-denied')) return 'تم تسجيل الدخول، لكن الحساب لا يملك الصلاحيات المطلوبة.';
     if (error.contains('invalid-credential') || error.contains('wrong-password')) return 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
     if (error.contains('user-not-found')) return 'لا يوجد حساب بهذا البريد الإلكتروني.';
@@ -78,8 +91,13 @@ class _LoginPageState extends State<LoginPage> {
             TextFormField(controller: _email, keyboardType: TextInputType.emailAddress, textInputAction: TextInputAction.next, decoration: const InputDecoration(labelText: 'البريد الإلكتروني', prefixIcon: Icon(Icons.email_outlined)), validator: (v) => v == null || !v.contains('@') ? 'أدخل بريدًا صحيحًا' : null), const SizedBox(height: 12),
             TextFormField(controller: _password, obscureText: _obscure, onFieldSubmitted: (_) => _submit(), decoration: InputDecoration(labelText: 'كلمة المرور', prefixIcon: const Icon(Icons.lock_outline), suffixIcon: IconButton(onPressed: () => setState(() => _obscure = !_obscure), icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off))), validator: (v) => v == null || v.length < 6 ? 'كلمة المرور 6 أحرف على الأقل' : null),
             if (!_register) ...[const SizedBox(height: 8), SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _loading ? null : _forgotPassword, icon: const Icon(Icons.lock_reset_rounded), label: const Text('نسيت كلمة المرور؟', style: TextStyle(fontWeight: FontWeight.w800))))],
-            const SizedBox(height: 12), SizedBox(width: double.infinity, child: FilledButton(onPressed: _loading ? null : _submit, child: _loading ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)) : Text(_register ? 'إنشاء الحساب' : 'تسجيل الدخول'))),
+            const SizedBox(height: 14), SizedBox(width: double.infinity, child: FilledButton(onPressed: _loading ? null : _submit, child: _loading ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)) : Text(_register ? 'إنشاء الحساب' : 'تسجيل الدخول'))),
+            const SizedBox(height: 10),
+            Row(children: const [Expanded(child: Divider()), Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Text('أو')), Expanded(child: Divider())]),
+            const SizedBox(height: 10),
+            SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _loading ? null : _google, icon: const Icon(Icons.g_mobiledata, size: 30), label: const Text('الدخول عبر حساب Google', style: TextStyle(fontWeight: FontWeight.w800)))),
             TextButton(onPressed: _loading ? null : () => setState(() => _register = !_register), child: Text(_register ? 'لديك حساب؟ تسجيل الدخول' : 'ليس لديك حساب؟ إنشاء حساب')),
+            if (!_register) const Padding(padding: EdgeInsets.only(top: 4), child: Text('روابط التجار تُفتح تلقائياً عند الدخول من رابط دعوة التاجر.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 12))),
           ])))),
         ]),
       )))),
