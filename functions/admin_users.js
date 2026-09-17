@@ -87,7 +87,15 @@ exports.listManagedUsers = onCall({ region: 'us-central1' }, async (request) => 
     pageToken = page.pageToken;
   } while (pageToken);
   await audit(auth.uid, 'admin.users.list', 'success', null, { count: result.length });
-  return { users: result };
+  return {
+    users: result,
+    currentUser: {
+      uid: auth.uid,
+      role: auth.token?.role || (auth.token?.owner === true ? 'owner' : auth.token?.admin === true ? 'admin' : ''),
+      owner: auth.token?.owner === true,
+      admin: auth.token?.admin === true,
+    },
+  };
 });
 
 exports.setManagedUserRole = onCall({ region: 'us-central1' }, async (request) => {
