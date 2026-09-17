@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'admin_dashboard.dart';
+import 'customer_session_shell.dart';
 import 'developer_page.dart';
 import 'driver_center_page.dart';
 import 'login_page.dart';
@@ -85,7 +86,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
               case 'finance':
               case 'support':
               default:
-                return const WorldHomePage();
+                return const CustomerSessionShell(child: WorldHomePage());
             }
           },
         );
