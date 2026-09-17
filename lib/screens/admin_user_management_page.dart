@@ -118,11 +118,12 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final onlineCount = _users.where((u) => u['isOnline'] == true).length;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('إدارة المستخدمين والأدوار'),
+          title: const Text('حسابات المنصة'),
           actions: [IconButton(onPressed: _loading ? null : _loadUsers, icon: const Icon(Icons.refresh))],
         ),
         body: _loading
@@ -139,15 +140,16 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.admin_panel_settings),
-                            SizedBox(width: 8),
-                            Expanded(child: Text('صلاحيات server-side', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                            const Icon(Icons.admin_panel_settings),
+                            const SizedBox(width: 8),
+                            const Expanded(child: Text('إدارة الحسابات والحضور', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                            Chip(avatar: const Icon(Icons.circle, size: 10), label: Text('$onlineCount متصل الآن')),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        const Text('تغيير الدور يتم عبر Firebase Admin SDK وليس من التطبيق مباشرة. هذا يمنع المستخدم من منح نفسه صلاحيات إدارية.'),
+                        const Text('يعرض حساب المالك أسماء الحسابات المسجلة وحالة الاتصال الحالية. حالة "متصل" تعتمد على آخر نبضة حضور خلال دقيقتين.'),
                         const SizedBox(height: 12),
                         TextField(
                           onChanged: (v) => setState(() => _filter = v),
@@ -181,10 +183,12 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
   Widget _userCard(Map<String, dynamic> user) {
     final role = user['role'] as String? ?? '';
     final disabled = user['disabled'] == true;
+    final online = user['isOnline'] == true;
     final name = (user['displayName'] as String? ?? '').trim();
     final email = user['email'] as String? ?? '';
     final phone = user['phoneNumber'] as String? ?? '';
     final title = name.isEmpty ? (email.isEmpty ? phone : email) : name;
+    final initial = title.isEmpty ? '?' : title.characters.first.toUpperCase();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -194,8 +198,32 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
           children: [
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(child: Text(title.isEmpty ? '?' : title.substring(0, 1).toUpperCase())),
-              title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              leading: Stack(
+                children: [
+                  CircleAvatar(child: Text(initial)),
+                  if (online)
+                    Positioned(
+                      left: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 13,
+                        height: 13,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.green,
+                          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              title: Row(
+                children: [
+                  Expanded(child: Text(title.isEmpty ? 'حساب بدون اسم' : title, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  const SizedBox(width: 8),
+                  Text(online ? 'متصل الآن' : 'غير متصل', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: online ? Colors.green : Colors.grey)),
+                ],
+              ),
               subtitle: Text('${roles[role] ?? 'بدون دور'} • ${disabled ? 'معطل' : 'نشط'}'),
               trailing: PopupMenuButton<String>(
                 onSelected: (action) {
@@ -210,7 +238,7 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
               ),
             ),
             DropdownButtonFormField<String>(
-              value: roles.containsKey(role) ? role : null,
+              initialValue: roles.containsKey(role) ? role : null,
               decoration: const InputDecoration(labelText: 'الدور', border: OutlineInputBorder()),
               items: roles.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
               onChanged: (value) {
@@ -223,6 +251,14 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
                 child: Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text([email, phone].where((e) => e.isNotEmpty).join(' • '), style: Theme.of(context).textTheme.bodySmall),
+                ),
+              ),
+            if (user['lastSeen'] != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text('آخر حضور: ${user['lastSeen']}', style: Theme.of(context).textTheme.bodySmall),
                 ),
               ),
           ],
