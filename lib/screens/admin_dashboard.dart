@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
 import '../services/auth_service.dart';
 import 'admin_data_entry.dart';
 import 'admin_user_management_page.dart';
+import 'cart_page.dart';
 import 'developer_page.dart';
 import 'dispatch_center_page.dart';
 import 'location_picker_page.dart';
@@ -42,7 +42,7 @@ class AdminDashboard extends StatelessWidget {
           title: const Text('مركز الإدارة', style: TextStyle(fontWeight: FontWeight.w900)),
           actions: [
             IconButton(tooltip: 'الخريطة', onPressed: () => _open(context, const LocationPickerPage(title: 'خريطة المنصة')), icon: const Icon(Icons.map_outlined)),
-            IconButton(tooltip: 'السلة', onPressed: () => _open(context, const _OwnerCartInfoPage()), icon: const Icon(Icons.shopping_cart_outlined)),
+            IconButton(tooltip: 'السلة', onPressed: () => _open(context, const CartPage()), icon: const Icon(Icons.shopping_cart_outlined)),
             IconButton(tooltip: 'تسجيل الخروج', onPressed: () => _signOut(context), icon: const Icon(Icons.logout_outlined)),
             IconButton(tooltip: 'تحديث', onPressed: () => (context as Element).markNeedsBuild(), icon: const Icon(Icons.refresh)),
           ],
@@ -139,12 +139,6 @@ class AdminDashboard extends StatelessWidget {
   }
 
   static void _open(BuildContext context, Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
-}
-
-class _OwnerCartInfoPage extends StatelessWidget {
-  const _OwnerCartInfoPage();
-  @override
-  Widget build(BuildContext context) => const Directionality(textDirection: TextDirection.rtl, child: Scaffold(appBar: AppBar(title: Text('سلة المالك')), body: Center(child: Padding(padding: EdgeInsets.all(24), child: Text('سلة المالك تستخدم نفس نظام السلة في المنصة. افتح قسم الطلبات/المنتجات لإضافة الأصناف إلى السلة.')))));
 }
 
 class _AdminStats { final int users; final int stores; final int products; final int orders; final int walletOperations; final int auditLogs; const _AdminStats({required this.users, required this.stores, required this.products, required this.orders, required this.walletOperations, required this.auditLogs}); }
