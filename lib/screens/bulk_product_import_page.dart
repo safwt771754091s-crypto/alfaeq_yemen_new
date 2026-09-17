@@ -177,7 +177,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
 
   String _cellText(dynamic value) {
     if (value == null) return '';
-    if (value is TextCellValue) return value.value.text;
+    if (value is TextCellValue) return value.value.text ?? '';
     if (value is IntCellValue) return value.value.toString();
     if (value is DoubleCellValue) return value.value.toString();
     if (value is BoolCellValue) return value.value.toString();
@@ -200,7 +200,6 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
 
       final importable = _preview.where((row) => !existing.contains(row.reference)).toList();
       final skipped = _preview.length - importable.length;
-      final failed = <_ImportError>[];
 
       for (var start = 0; start < importable.length; start += 400) {
         final batch = db.batch();
@@ -334,7 +333,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
             ),
             if (_fileName != null) Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('الملف: $_fileName', style: const TextStyle(fontWeight: FontWeight.w800))),
             if (_busy) const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: LinearProgressIndicator()),
-            if (_fileName != null && !_busy) Card(child: ListTile(leading: const Icon(Icons.fact_check_outlined), title: Text('جاهز للمراجعة'), subtitle: Text('صالح: $_validCount • أخطاء: ${_errors.length} • مراجع مكررة: $_duplicateCount'))),
+            if (_fileName != null && !_busy) Card(child: ListTile(leading: const Icon(Icons.fact_check_outlined), title: const Text('جاهز للمراجعة'), subtitle: Text('صالح: $_validCount • أخطاء: ${_errors.length} • مراجع مكررة: $_duplicateCount'))),
             if (_errors.isNotEmpty) ...[
               const SizedBox(height: 12),
               const Text('الأخطاء التي لن تدخل قاعدة البيانات', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
