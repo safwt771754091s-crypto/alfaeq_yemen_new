@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MerchantInvitesPage extends StatefulWidget {
   const MerchantInvitesPage({super.key});
@@ -21,18 +22,24 @@ class _MerchantInvitesPageState extends State<MerchantInvitesPage> {
   }
 
   Future<void> _createInvite() async {
+    if (_busy) return;
     final label = _label.text.trim();
     setState(() => _busy = true);
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable('createMerchantInvite');
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('createMerchantInvite');
       final result = await callable.call(<String, dynamic>{'label': label});
-      final data = Map<String, dynamic>.from(result.data as Map);
-      final link = '${data['url']}';
+      final raw = result.data;
+      final data = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+      final link = data['url']?.toString().trim() ?? '';
+      if (link.isEmpty || !Uri.tryParse(link).toString().startsWith('http')) {
+        throw StateError('لم يعُد الخادم رابط دعوة صالحاً.');
+      }
       if (!mounted) return;
       setState(() => _lastLink = link);
       _label.clear();
       await Clipboard.setData(ClipboardData(text: link));
-      _message('تم إنشاء رابط تاجر آمن ونسخه للحافظة.');
+      _message('تم إنشاء الرابط وعرضه ونسخه للحافظة.');
     } on FirebaseFunctionsException catch (e) {
       _message(e.message ?? 'تعذر إنشاء رابط التاجر.');
     } catch (e) {
@@ -44,14 +51,49 @@ class _MerchantInvitesPageState extends State<MerchantInvitesPage> {
 
   Future<void> _copy() async {
     final link = _lastLink;
-    if (link == null) return;
+    if (link == null || link.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: link));
-    _message('تم نسخ الرابط. أرسله للتاجر عبر واتساب أو أي قناة موثوقة.');
+    _message('تم نسخ رابط التاجر.');
+  }
+
+  Future<void> _openWhatsApp() async {
+    final link = _lastLink;
+    if (link == null || link.isEmpty) {
+      _message('أنشئ رابط التاجر أولاً.');
+      return;
+    }
+    final message = 'مرحباً، نرسل لك رابط التسجيل كتاجر في الفائق يمن:\n$link';
+    final encoded = Uri.encodeComponent(message);
+    final appUri = Uri.parse('whatsapp://send?text=$encoded');
+    final webUri = Uri.parse('https://wa.me/?text=$encoded');
+    try {
+      if (await canLaunchUrl(appUri)) {
+        await launchUrl(appUri, mode: LaunchMode.externalApplication);
+        return;
+      }
+      if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+        return;
+      }
+      _message('تعذر فتح واتساب على هذا الجهاز. تم نسخ الرابط، ويمكنك إرساله يدويًا.');
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: link));
+      _message('تعذر فتح واتساب؛ تم نسخ الرابط للحافظة.');
+    }
+  }
+
+  Future<void> _shareInvite() async {
+    final link = _lastLink;
+    if (link == null || link.isEmpty) return;
+    await _copy();
+    _message('الرابط جاهز للمشاركة. استخدم زر واتساب لإرساله مباشرة.');
   }
 
   void _message(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
@@ -72,11 +114,24 @@ class _MerchantInvitesPageState extends State<MerchantInvitesPage> {
                   const SizedBox(height: 10),
                   const Text('دعوة تاجر حقيقي', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 8),
-                  const Text('أنشئ رابطاً لمرة واحدة. التاجر يفتحه، ينشئ حسابه، ثم يتحول حسابه تلقائياً إلى حساب تاجر معتمد من الدعوة.'),
+                  const Text('أنشئ رابط دعوة صالحاً للتسجيل. يظهر الرابط داخل الصفحة ويبقى متاحاً للنسخ والمشاركة عبر واتساب.'),
                   const SizedBox(height: 16),
-                  TextField(controller: _label, decoration: const InputDecoration(labelText: 'اسم أو وصف التاجر (اختياري)', border: OutlineInputBorder())),
+                  TextField(
+                    controller: _label,
+                    decoration: const InputDecoration(
+                      labelText: 'اسم أو وصف التاجر (اختياري)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
                   const SizedBox(height: 12),
-                  SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _busy ? null : _createInvite, icon: const Icon(Icons.add_link), label: Text(_busy ? 'جاري الإنشاء...' : 'إنشاء رابط تاجر'))),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _busy ? null : _createInvite,
+                      icon: const Icon(Icons.add_link),
+                      label: Text(_busy ? 'جاري الإنشاء...' : 'إنشاء رابط تاجر'),
+                    ),
+                  ),
                 ]),
               ),
             ),
@@ -87,11 +142,48 @@ class _MerchantInvitesPageState extends State<MerchantInvitesPage> {
                 child: Padding(
                   padding: const EdgeInsets.all(18),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('آخر رابط تم إنشاؤه', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                    const Row(children: [
+                      Icon(Icons.verified_outlined),
+                      SizedBox(width: 8),
+                      Expanded(child: Text('رابط التاجر جاهز', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
+                    ]),
                     const SizedBox(height: 10),
-                    SelectableText(_lastLink!, style: const TextStyle(fontSize: 13, height: 1.5)),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Theme.of(context).dividerColor),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: SelectableText(_lastLink!, style: const TextStyle(fontSize: 13, height: 1.5)),
+                    ),
                     const SizedBox(height: 12),
-                    SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _copy, icon: const Icon(Icons.copy), label: const Text('نسخ الرابط'))),
+                    Row(children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _copy,
+                          icon: const Icon(Icons.copy),
+                          label: const Text('نسخ'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _openWhatsApp,
+                          icon: const Icon(Icons.chat),
+                          label: const Text('واتساب'),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: _shareInvite,
+                        icon: const Icon(Icons.share_outlined),
+                        label: const Text('نسخ وتجهيز المشاركة'),
+                      ),
+                    ),
                   ]),
                 ),
               ),
