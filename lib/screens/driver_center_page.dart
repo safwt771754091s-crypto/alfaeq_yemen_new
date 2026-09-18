@@ -104,7 +104,7 @@ class _DriverCenterPageState extends State<DriverCenterPage> {
       final batch = _db.batch();
       for (final order in activeOrders.docs) {
         batch.update(order.reference, {
-          'deliveryLocation': location,
+          'driverLocation': location,
           'updatedAt': now,
         });
       }
