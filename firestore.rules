@@ -181,6 +181,21 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /whatsappConnections/{id} {
+      allow read: if staff() || developer() || (merchant() && resource.data.merchantUid == request.auth.uid);
+      allow create, update, delete: if staff();
+    }
+
+    match /whatsappMessages/{id} {
+      allow read: if staff() || developer() || (merchant() && resource.data.merchantUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /whatsappProductImports/{id} {
+      allow read: if staff() || developer() || (merchant() && resource.data.merchantUid == request.auth.uid);
+      allow write: if false;
+    }
+
     match /wallets/{uid} {
       allow read: if self(uid) || staff() || developer();
       allow create: if staff()
