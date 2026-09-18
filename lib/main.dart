@@ -201,6 +201,89 @@ class _StoreCatalogCard extends StatelessWidget {
   final QueryDocumentSnapshot<Map<String, dynamic>> store;
   const _StoreCatalogCard({required this.store});
 
+  Future<void> _addToCart(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> product) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول أولاً.')));
+      return;
+    }
+    final p = product.data();
+    final productId = product.id;
+    final name = (p['name'] ?? 'صنف').toString();
+    final price = p['price'];
+    final stock = (p['stock'] as num?)?.toInt() ?? 0;
+    final currency = (p['currency'] ?? 'YER').toString();
+    if (price is! num || price < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سعر الصنف غير صالح.')));
+      return;
+    }
+    if (stock <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هذا الصنف غير متوفر حالياً.')));
+      return;
+    }
+
+    try {
+      final ref = FirebaseFirestore.instance.collection('carts').doc(user.uid);
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        final data = snap.data() ?? <String, dynamic>{};
+        final raw = data['items'];
+        final items = raw is List
+            ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+            : <Map<String, dynamic>>[];
+        final index = items.indexWhere((e) => e['productId'] == productId);
+
+        if (index >= 0) {
+          final current = (items[index]['quantity'] as num?)?.toInt() ?? 1;
+          if (current >= stock || current >= 100) {
+            throw StateError('الكمية المطلوبة غير متوفرة في المخزون.');
+          }
+          items[index]['quantity'] = current + 1;
+          items[index]['price'] = price;
+          items[index]['name'] = name;
+          items[index]['currency'] = currency;
+          items[index]['storeId'] = (p['storeId'] ?? store.id).toString();
+        } else {
+          items.add({
+            'productId': productId,
+            'storeId': (p['storeId'] ?? store.id).toString(),
+            'name': name,
+            'price': price,
+            'currency': currency,
+            'quantity': 1,
+          });
+        }
+
+        tx.set(
+          ref,
+          {
+            'ownerId': user.uid,
+            'items': items,
+            'currency': currency,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
+      });
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تمت إضافة «$name» إلى السلة.'),
+            action: SnackBarAction(
+              label: 'فتح السلة',
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage())),
+            ),
+          ),
+        );
+      }
+    } on StateError catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } on FirebaseException catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إضافة الصنف للسلة: ${e.message ?? e.code}')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = store.data();
@@ -209,7 +292,12 @@ class _StoreCatalogCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          ListTile(contentPadding: EdgeInsets.zero, leading: const CircleAvatar(child: Icon(Icons.storefront_outlined)), title: Text('${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)), subtitle: Text('${data['address'] ?? ''} • ${data['phone'] ?? ''}')),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const CircleAvatar(child: Icon(Icons.storefront_outlined)),
+            title: Text('${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+            subtitle: Text('${data['address'] ?? ''} • ${data['phone'] ?? ''}'),
+          ),
           const Divider(),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: FirebaseFirestore.instance.collection('products').where('storeId', isEqualTo: store.id).where('status', isEqualTo: 'active').limit(50).snapshots(),
@@ -220,7 +308,35 @@ class _StoreCatalogCard extends StatelessWidget {
               if (products.isEmpty) return const Padding(padding: EdgeInsets.all(8), child: Text('لا توجد أصناف مضافة لهذا المتجر بعد.'));
               return Column(children: products.map((product) {
                 final p = product.data();
-                return ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.inventory_2_outlined), title: Text('${p['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${p['description'] ?? ''}\nالمتوفر: ${p['stock'] ?? 0}'), isThreeLine: true, trailing: Text('${p['price'] ?? 0} ${p['currency'] ?? 'YER'}', style: const TextStyle(fontWeight: FontWeight.w900)));
+                final stock = (p['stock'] as num?)?.toInt() ?? 0;
+                final price = p['price'] ?? 0;
+                final currency = p['currency'] ?? 'YER';
+                return Card(
+                  elevation: 0,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    leading: CircleAvatar(child: Icon(stock > 0 ? Icons.inventory_2_outlined : Icons.remove_shopping_cart_outlined)),
+                    title: Text('${p['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                    subtitle: Text('${p['description'] ?? ''}\nالمتوفر: $stock', maxLines: 3, overflow: TextOverflow.ellipsis),
+                    isThreeLine: true,
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('$price $currency', style: const TextStyle(fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 5),
+                        SizedBox(
+                          height: 34,
+                          child: FilledButton.icon(
+                            onPressed: stock > 0 ? () => _addToCart(context, product) : null,
+                            icon: const Icon(Icons.add_shopping_cart, size: 18),
+                            label: Text(stock > 0 ? 'أضف للسلة' : 'نفد'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
               }).toList());
             },
           ),
