@@ -247,5 +247,5 @@ exports.processWalletOperation = onDocumentCreated(
 Object.assign(exports, require('./inventory'));
 Object.assign(exports, require('./merchant_invites'));
 Object.assign(exports, require('./admin_users'));
-
 Object.assign(exports, require('./order_checkout'));
+Object.assign(exports, require('./whatsapp'));
