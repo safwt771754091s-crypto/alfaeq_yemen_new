@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
 import '../services/location_service.dart';
+import '../core/product_units.dart';
 
 class MerchantCenterPage extends StatefulWidget {
   const MerchantCenterPage({super.key});
@@ -21,6 +22,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
   final _stock = TextEditingController();
   String _sectionId = appSections.first.id;
   String? _selectedStoreId;
+  String _saleUnit = 'piece';
   bool _saving = false;
 
   @override
@@ -65,12 +67,12 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
   }
 
   Future<void> _createProduct() async {
-    final user = _user; final storeId = _selectedStoreId; final name = _productName.text.trim(); final price = num.tryParse(_price.text.trim()); final stock = int.tryParse(_stock.text.trim());
+    final user = _user; final storeId = _selectedStoreId; final name = _productName.text.trim(); final price = num.tryParse(_price.text.trim()); final stock = num.tryParse(_stock.text.trim());
     if (user == null || storeId == null || name.isEmpty) { _message('اختر متجراً وأدخل اسم الصنف.'); return; }
     if (price == null || price < 0 || stock == null || stock < 0) { _message('السعر والكمية يجب أن يكونا أرقاماً صحيحة وغير سالبة.'); return; }
     setState(() => _saving = true);
     try {
-      await FirebaseFirestore.instance.collection('products').add({'storeId': storeId, 'ownerId': user.uid, 'createdBy': user.uid, 'name': name, 'price': price, 'currency': 'YER', 'stock': stock, 'status': 'active', 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp()});
+      await FirebaseFirestore.instance.collection('products').add({'storeId': storeId, 'ownerId': user.uid, 'createdBy': user.uid, 'name': name, 'price': price, 'currency': 'YER', 'stock': stock, 'stockBase': ProductUnit.fromId(_saleUnit).toBase(stock).round(), 'saleUnit': _saleUnit, 'unitLabel': ProductUnit.fromId(_saleUnit).label, 'baseUnit': ProductUnit.fromId(_saleUnit).baseUnit, 'unitScale': ProductUnit.fromId(_saleUnit).scale, 'stepBase': ProductUnit.fromId(_saleUnit).defaultStepBase, 'minOrderBase': ProductUnit.fromId(_saleUnit).defaultStepBase, 'soldQuantity': 0, 'soldQuantityBase': 0, 'status': 'active', 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp()});
       _productName.clear(); _price.clear(); _stock.clear(); _message('تم حفظ الصنف بنجاح.');
     } on FirebaseException catch (e) { _message('تعذر حفظ الصنف: ${e.message ?? e.code}'); }
     finally { if (mounted) setState(() => _saving = false); }
@@ -113,7 +115,8 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _saving ? null : _createStore, icon: const Icon(Icons.my_location), label: const Text('إرسال المتجر مع الموقع للمراجعة')))
   ])));
 
-  Widget _productForm() => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [if (_selectedStoreId == null) const Align(alignment: Alignment.centerRight, child: Text('اختر متجراً أولاً من القائمة أعلاه.', style: TextStyle(color: Colors.black54))), TextField(controller: _productName, decoration: const InputDecoration(labelText: 'اسم الصنف')), TextField(controller: _price, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر بالريال اليمني')), TextField(controller: _stock, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المخزون')), const SizedBox(height: 12), SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _saving || _selectedStoreId == null ? null : _createProduct, icon: const Icon(Icons.add), label: const Text('حفظ الصنف')))])));
+  Widget _productForm() => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [if (_selectedStoreId == null) const Align(alignment: Alignment.centerRight, child: Text('اختر متجراً أولاً من القائمة أعلاه.', style: TextStyle(color: Colors.black54))), TextField(controller: _productName, decoration: const InputDecoration(labelText: 'اسم الصنف')), TextField(controller: _price, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر بالريال اليمني')), TextField(controller: _stock, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'المخزون بـ ${ProductUnit.fromId(_saleUnit).label}')),
+    DropdownButtonFormField<String>(initialValue: _saleUnit, decoration: const InputDecoration(labelText: 'وحدة البيع'), items: [for (final u in ProductUnit.all) DropdownMenuItem(value: u.id, child: Text(u.label))], onChanged: (value) { if (value != null) setState(() => _saleUnit = value); }), const SizedBox(height: 12), SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _saving || _selectedStoreId == null ? null : _createProduct, icon: const Icon(Icons.add), label: const Text('حفظ الصنف')))])));
 
   Widget _products(String uid) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: FirebaseFirestore.instance.collection('products').where('ownerId', isEqualTo: uid).limit(100).snapshots(), builder: (context, snapshot) {
     if (snapshot.hasError) return _error(snapshot.error.toString());
