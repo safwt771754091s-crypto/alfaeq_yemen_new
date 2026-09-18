@@ -325,3 +325,46 @@ exports.listWhatsAppProductImports = onCall(
     };
   },
 );
+
+
+exports.setWhatsAppConnection = onCall(
+  { region: 'us-central1', enforceAppCheck: true },
+  async (request) => {
+    const auth = assertStaff(request);
+    const phone = normalizePhone(request.data?.phone);
+    const storeId = String(request.data?.storeId || '').trim();
+    const merchantUid = String(request.data?.merchantUid || '').trim();
+    const autoPublish = request.data?.autoPublish === true;
+
+    if (!/^([0-9]{8,15})$/.test(phone)) throw new HttpsError('invalid-argument', 'A valid WhatsApp phone number is required.');
+    if (!storeId || !merchantUid) throw new HttpsError('invalid-argument', 'storeId and merchantUid are required.');
+
+    const storeSnap = await db.collection('stores').doc(storeId).get();
+    if (!storeSnap.exists) throw new HttpsError('not-found', 'Store not found.');
+    const store = storeSnap.data() || {};
+    if (store.ownerId !== merchantUid) throw new HttpsError('failed-precondition', 'merchantUid must own the selected store.');
+
+    await db.collection('whatsappConnections').doc(phone).set({
+      phone,
+      storeId,
+      merchantUid,
+      autoPublish,
+      enabled: true,
+      updatedBy: auth.uid,
+      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    await audit(auth.uid, 'whatsapp.connection.updated', 'success', { phone, storeId, merchantUid, autoPublish });
+    return { ok: true, phone, storeId, merchantUid, autoPublish };
+  },
+);
+
+exports.listWhatsAppConnections = onCall(
+  { region: 'us-central1', enforceAppCheck: true },
+  async (request) => {
+    assertStaff(request);
+    const snap = await db.collection('whatsappConnections').orderBy('updatedAt', 'desc').limit(100).get();
+    return { connections: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
+  },
+);
