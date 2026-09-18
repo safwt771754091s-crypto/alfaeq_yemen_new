@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
+import 'location_picker_page.dart';
 
 class CartPage extends StatelessWidget {
   const CartPage({super.key});
@@ -40,6 +43,7 @@ class CartPage extends StatelessWidget {
   Future<void> _checkout(BuildContext context, String uid, List<Map<String, dynamic>> items, num total, String currency) async {
     final addressController = TextEditingController();
     String paymentMethod = 'cash_on_delivery';
+    LatLng? deliveryPoint;
     final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -58,6 +62,15 @@ class CartPage extends StatelessWidget {
                 DropdownMenuItem(value: 'jeeb_wallet', child: Text('جيـب')),
               ],
               onChanged: (value) => setState(() => paymentMethod = value ?? 'cash_on_delivery'),
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final point = await Navigator.push<LatLng>(context, MaterialPageRoute(builder: (_) => const LocationPickerPage(title: 'تحديد موقع التوصيل')));
+                if (point != null) setState(() => deliveryPoint = point);
+              },
+              icon: Icon(deliveryPoint == null ? Icons.location_on_outlined : Icons.location_on),
+              label: Text(deliveryPoint == null ? 'حدد موقع التوصيل على الخريطة' : 'تم تحديد موقع التوصيل'),
             ),
             const SizedBox(height: 14),
             Text('الإجمالي: $total $currency', style: const TextStyle(fontWeight: FontWeight.w900)),
@@ -82,32 +95,29 @@ class CartPage extends StatelessWidget {
       return;
     }
     try {
-      final merchantIds = items.map((e) => (e['merchantId'] ?? e['ownerId'] ?? '').toString()).where((e) => e.isNotEmpty).toSet().toList();
-      final orderItems = items.map((e) => {
-        'productId': e['productId'],
-        'name': e['name'],
-        'quantity': (e['quantity'] as num?)?.toInt() ?? 1,
-        'price': (e['price'] as num?) ?? 0,
-        'storeId': e['storeId'],
-      }).toList();
-      final orderRef = FirebaseFirestore.instance.collection('orders').doc();
-      await orderRef.set({
-        'customerId': uid,
-        'merchantIds': merchantIds,
-        'items': orderItems,
-        'total': total,
-        'currency': currency,
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1').httpsCallable('createOrderFromCart');
+      final response = await callable.call({
         'address': address,
         'paymentMethod': paymentMethod,
-        'status': 'pending',
-        'deliveryStatus': 'awaiting_assignment',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
+        if (deliveryPoint != null)
+          'deliveryLocation': {
+            'latitude': deliveryPoint!.latitude,
+            'longitude': deliveryPoint!.longitude,
+          },
       });
-      await FirebaseFirestore.instance.collection('carts').doc(uid).set({'ownerId': uid, 'items': [], 'currency': currency, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+      final resultData = Map<String, dynamic>.from(response.data as Map);
       if (context.mounted) {
-        await showDialog<void>(context: context, builder: (_) => AlertDialog(title: const Text('تم إنشاء الطلب'), content: Text('رقم الطلب: ${orderRef.id}\nالإجمالي: $total $currency'), actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))]));
+        await showDialog<void>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('تم إنشاء الطلب'),
+            content: Text('رقم الطلب: ${resultData['orderId']}\\nالإجمالي: ${resultData['total'] ?? total} ${resultData['currency'] ?? currency}\\nتم تثبيت المخزون بشكل آمن.'),
+            actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
+          ),
+        );
       }
+    } on FirebaseFunctionsException catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء الطلب: ${e.message ?? e.code}')));
     } on FirebaseException catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء الطلب: ${e.message ?? e.code}')));
     }
