@@ -28,18 +28,37 @@ class LiveTrackingMapPage extends StatelessWidget {
             if (uid == null || data['customerId'] != uid) {
               return const Center(child: Text('لا تملك صلاحية عرض هذا التتبع.'));
             }
-            final location = data['deliveryLocation'];
-            if (location is! GeoPoint) {
+            final customerLocation = data['deliveryLocation'];
+            final driverLocation = data['driverLocation'];
+            if (customerLocation is! GeoPoint && driverLocation is! GeoPoint) {
               return const Center(
                 child: Padding(
                   padding: EdgeInsets.all(24),
-                  child: Text('لم يبدأ تتبع الموقع بعد. ستظهر الخريطة تلقائياً عندما يسجل المندوب موقعه.'),
+                  child: Text('لم يبدأ التتبع بعد. ستظهر الخريطة عند تحديد موقع التسليم وبدء المندوب للتتبع الحي.'),
                 ),
               );
             }
 
-            final point = LatLng(location.latitude, location.longitude);
+            final primary = driverLocation is GeoPoint ? driverLocation : customerLocation as GeoPoint;
+            final point = LatLng(primary.latitude, primary.longitude);
             final status = (data['deliveryStatus'] ?? 'awaiting_assignment').toString();
+            final markers = <Marker>[];
+            if (customerLocation is GeoPoint) {
+              markers.add(Marker(
+                point: LatLng(customerLocation.latitude, customerLocation.longitude),
+                width: 70,
+                height: 70,
+                child: const Icon(Icons.location_on, size: 50),
+              ));
+            }
+            if (driverLocation is GeoPoint) {
+              markers.add(Marker(
+                point: LatLng(driverLocation.latitude, driverLocation.longitude),
+                width: 70,
+                height: 70,
+                child: const Icon(Icons.delivery_dining, size: 50),
+              ));
+            }
             return Stack(
               children: [
                 FlutterMap(
@@ -49,14 +68,7 @@ class LiveTrackingMapPage extends StatelessWidget {
                       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.alfaeq.alfaeq_yemen',
                     ),
-                    MarkerLayer(markers: [
-                      Marker(
-                        point: point,
-                        width: 64,
-                        height: 64,
-                        child: const Icon(Icons.delivery_dining, size: 50),
-                      ),
-                    ]),
+                    MarkerLayer(markers: markers),
                     const RichAttributionWidget(
                       attributions: [TextSourceAttribution('OpenStreetMap contributors')],
                     ),
@@ -76,7 +88,7 @@ class LiveTrackingMapPage extends StatelessWidget {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'تتبع حي • ${_statusLabel(status)}\nآخر موقع: ${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}',
+                              'تتبع حي • ${_statusLabel(status)}\n' + (driverLocation is GeoPoint ? 'موقع المندوب: ${driverLocation.latitude.toStringAsFixed(5)}, ${driverLocation.longitude.toStringAsFixed(5)}' : 'تم تحديد موقع التسليم بانتظار المندوب.'),
                               style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
                           ),
