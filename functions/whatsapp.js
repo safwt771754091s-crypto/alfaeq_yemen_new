@@ -30,16 +30,18 @@ function parseProductText(text) {
 
   const name = find([/^(?:اسم|المنتج|name)\\s*[:：-]\\s*(.+)$/i]) || (lines[0] && !/^(?:سعر|price|stock|المخزون)/i.test(lines[0]) ? lines[0] : '');
   const priceText = find([/^(?:سعر|price)\\s*[:：-]\\s*([0-9]+(?:[.,][0-9]+)?)/i]);
-  const stockText = find([/^(?:المخزون|مخزون|stock|qty|quantity)\\s*[:：-]\\s*([0-9]+)/i]);
+  const stockText = find([/^(?:المخزون|مخزون|stock|qty|quantity)\\s*[:：-]\\s*([0-9]+(?:[.,][0-9]+)?)/i]);
+  const unitText = find([/^(?:الوحدة|وحدة|unit)\\s*[:：-]\\s*(.+)$/i]);
+  const stepText = find([/^(?:الخطوة|step)\\s*[:：-]\\s*([0-9]+(?:[.,][0-9]+)?)/i]);
+  const minText = find([/^(?:الحد الأدنى|اقل كمية|أقل كمية|min)\\s*[:：-]\\s*([0-9]+(?:[.,][0-9]+)?)/i]);
   const price = priceText ? Number(priceText.replace(',', '.')) : null;
-  const stock = stockText ? Number.parseInt(stockText, 10) : null;
-
-  return {
-    rawText: raw,
-    name: name || null,
-    price: Number.isFinite(price) ? price : null,
-    stock: Number.isInteger(stock) ? stock : null,
-  };
+  const stock = stockText ? Number(stockText.replace(',', '.')) : null;
+  const unitAliases = { 'كجم':'kg','كيلو':'kg','كيلوجرام':'kg','kg':'kg','جرام':'g','غرام':'g','g':'g','لتر':'l','ل':'l','liter':'l','l':'l','مل':'ml','ملي':'ml','ml':'ml','متر':'m','m':'m','قطعة':'piece','قطعه':'piece','حبة':'piece','قطعة/حبة':'piece','piece':'piece' };
+  const normalizedUnit = unitText ? unitAliases[String(unitText).trim().toLowerCase()] || 'piece' : 'piece';
+  const unitScale = { piece:1, kg:1000, g:1, l:1000, ml:1, m:1 }[normalizedUnit] || 1;
+  const step = stepText ? Number(stepText.replace(',', '.')) : (normalizedUnit === 'kg' || normalizedUnit === 'l' ? 0.25 : (normalizedUnit === 'g' || normalizedUnit === 'ml' ? 50 : 1));
+  const min = minText ? Number(minText.replace(',', '.')) : step;
+  return { rawText: raw, name: name || null, price: Number.isFinite(price) ? price : null, stock: Number.isFinite(stock) ? stock : null, saleUnit: normalizedUnit, unitScale, step, minOrder: min };
 }
 
 function signatureIsValid(req) {
@@ -56,7 +58,7 @@ function signatureIsValid(req) {
 async function sendWhatsAppText(to, body) {
   const token = WHATSAPP_ACCESS_TOKEN.value();
   const phoneNumberId = WHATSAPP_PHONE_NUMBER_ID.value();
-  const version = WHATSAPP_API_VERSION.value() || 'v23.0';
+  const version = WHATSAPP_API_VERSION.value() || 'v26.0';
   if (!token || !phoneNumberId) throw new Error('WHATSAPP_CREDENTIALS_NOT_CONFIGURED');
 
   const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
@@ -183,6 +185,10 @@ exports.whatsappWebhook = onRequest(
               messageType: message.type || 'unknown',
               text: textBody,
               parsed,
+              unit: parsed.saleUnit || 'piece',
+              unitScale: parsed.unitScale || 1,
+              step: parsed.step || 1,
+              minOrder: parsed.minOrder || parsed.step || 1,
               mediaId: message.image?.id || message.document?.id || null,
               createdAt: FieldValue.serverTimestamp(),
               updatedAt: FieldValue.serverTimestamp(),
@@ -200,8 +206,8 @@ exports.whatsappWebhook = onRequest(
               const summary = [
                 'تم استلام بيانات المنتج عبر واتساب ✅',
                 parsed.name ? `الاسم: ${parsed.name}` : 'الاسم: غير محدد',
-                parsed.price != null ? `السعر: ${parsed.price} ر.ي` : 'السعر: غير محدد',
-                parsed.stock != null ? `المخزون: ${parsed.stock}` : 'المخزون: غير محدد',
+                parsed.price != null ? `السعر: ${parsed.price} ر.ي / ${parsed.saleUnit || 'قطعة'}` : 'السعر: غير محدد',
+                parsed.stock != null ? `المخزون: ${parsed.stock} ${parsed.saleUnit || 'قطعة'}` : 'المخزون: غير محدد',
                 '',
                 'تم إنشاء مسودة آمنة داخل مركز التاجر. لن يتم نشر المنتج تلقائيًا إلا إذا كان الإعداد autoPublish مفعّلًا.',
               ].join('\\n');
@@ -264,12 +270,17 @@ exports.confirmWhatsAppProductImport = onCall(
     const parsed = data.parsed || {};
     const name = String(request.data?.name || parsed.name || '').trim();
     const price = Number(request.data?.price ?? parsed.price);
-    const stock = Number.parseInt(String(request.data?.stock ?? parsed.stock ?? 0), 10);
+    const stock = Number(String(request.data?.stock ?? parsed.stock ?? 0));
+    const saleUnit = String(request.data?.saleUnit || parsed.saleUnit || 'piece');
+    const unitScale = { piece:1, kg:1000, g:1, l:1000, ml:1, m:1 }[saleUnit] || 1;
+    const step = Number(request.data?.step ?? parsed.step ?? 1);
+    const minOrder = Number(request.data?.minOrder ?? parsed.minOrder ?? step);
     const storeId = String(request.data?.storeId || data.storeId || '').trim();
 
     if (!name) throw new HttpsError('invalid-argument', 'Product name is required.');
     if (!Number.isFinite(price) || price < 0 || price > 100000000) throw new HttpsError('invalid-argument', 'Valid product price is required.');
-    if (!Number.isInteger(stock) || stock < 0 || stock > 100000000) throw new HttpsError('invalid-argument', 'Valid stock is required.');
+    if (!Number.isFinite(stock) || stock < 0 || stock > 100000000) throw new HttpsError('invalid-argument', 'Valid stock is required.');
+    if (!['piece','kg','g','l','ml','m'].includes(saleUnit) || !Number.isFinite(step) || step <= 0 || !Number.isFinite(minOrder) || minOrder <= 0) throw new HttpsError('invalid-argument', 'Invalid product unit settings.');
     if (!storeId) throw new HttpsError('failed-precondition', 'This WhatsApp number is not linked to a store.');
 
     const storeSnap = await db.collection('stores').doc(storeId).get();
@@ -284,6 +295,12 @@ exports.confirmWhatsAppProductImport = onCall(
       name,
       price,
       stock,
+      stockBase: Math.round(stock * unitScale),
+      saleUnit,
+      unitScale,
+      baseUnit: ['kg','g'].includes(saleUnit) ? 'g' : (['kg','g'].includes(saleUnit) ? 'g' : (['l','ml'].includes(saleUnit) ? 'ml' : saleUnit)),
+      stepBase: Math.round(step * unitScale),
+      minOrderBase: Math.round(minOrder * unitScale),
       storeId,
       ownerId: store.ownerId || data.merchantUid || auth.uid,
       status: publish ? 'active' : 'draft',
