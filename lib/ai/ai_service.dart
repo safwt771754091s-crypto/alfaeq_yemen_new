@@ -11,7 +11,7 @@ import 'ai_tools.dart';
 /// permission gateway. Reversible actions can pause for an explicit UI
 /// confirmation before the tool is executed.
 class AlfaeqAiService {
-  static const String modelName = 'gemini-3.5-flash';
+  static const String modelName = 'gemini-3.8-flash';
   static const int _maxToolRounds = 6;
 
   final AlfaeqAiToolRegistry _tools;
