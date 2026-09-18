@@ -14,6 +14,7 @@ import 'merchant_invites_page.dart';
 import 'merchant_portal_page.dart';
 import 'platform_automation_page.dart';
 import 'platform_control_page.dart';
+import 'whatsapp_automation_page.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -78,6 +79,7 @@ class AdminDashboard extends StatelessWidget {
                 _ActionCard(icon: Icons.manage_accounts_outlined, title: 'المستخدمون والأدوار', subtitle: 'إدارة الأدوار والصلاحيات وتعطيل الحسابات وإلغاء الجلسات', onTap: () => _open(context, AdminUserManagementPage())),
                 _ActionCard(icon: Icons.tune_outlined, title: 'مركز تشغيل المنصة', subtitle: 'الأقسام، الدفع، التجار والإعدادات التشغيلية', onTap: () => _open(context, PlatformControlPage())),
                 _ActionCard(icon: Icons.radar_outlined, title: 'أتمتة وجاهزية المنصة', subtitle: 'قراءة حالة الجاهزية القادمة من الخادم', onTap: () => _open(context, PlatformAutomationPage())),
+                _ActionCard(icon: Icons.message_outlined, title: 'أتمتة واتساب', subtitle: 'استقبال منتجات التجار عبر WhatsApp Business وربطها بالمتجر', onTap: () => _open(context, WhatsAppAutomationPage())),
                 _ActionCard(icon: Icons.fact_check_outlined, title: 'اعتماد المتاجر', subtitle: 'مراجعة واعتماد طلبات التجار', onTap: () => _open(context, MerchantApprovalPage())),
                 _ActionCard(icon: Icons.add_link, title: 'التجار والروابط', subtitle: 'إنشاء وإدارة دعوات التجار', onTap: () => _open(context, MerchantInvitesPage())),
                 _ActionCard(icon: Icons.storefront_outlined, title: 'مركز التاجر', subtitle: 'الكتالوج والمنتجات والطلبات', onTap: () => _open(context, MerchantPortalPage())),
