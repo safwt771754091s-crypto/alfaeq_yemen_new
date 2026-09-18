@@ -3,6 +3,10 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const db = getFirestore();
 const CURRENCY = 'YER';
+const UNIT_DEFS = { piece:{id:'piece',label:'قطعة',scale:1}, kg:{id:'kg',label:'كجم',scale:1000}, g:{id:'g',label:'جرام',scale:1}, l:{id:'l',label:'لتر',scale:1000}, ml:{id:'ml',label:'مل',scale:1}, m:{id:'m',label:'متر',scale:1} };
+const unitFor = (p) => UNIT_DEFS[String(p.saleUnit || p.unit || 'piece')] || UNIT_DEFS.piece;
+const stockBaseFor = (p,u) => Number.isFinite(Number(p.stockBase)) ? Math.round(Number(p.stockBase)) : Math.round(Number(p.stock || 0) * u.scale);
+const stepBaseFor = (p,u) => Number(p.stepBase) > 0 ? Math.round(Number(p.stepBase)) : (u.id === 'kg' || u.id === 'l' ? 250 : (u.id === 'g' || u.id === 'ml' ? 50 : 1));
 
 exports.createOrderFromCart = onCall({ region: 'us-central1', enforceAppCheck: true }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'يجب تسجيل الدخول أولاً.');
@@ -39,8 +43,8 @@ exports.createOrderFromCart = onCall({ region: 'us-central1', enforceAppCheck: t
       const quantities = new Map();
       for (const item of rawItems) {
         const productId = String(item?.productId || '').trim();
-        const quantity = Number(item?.quantity || 0);
-        if (!productId || !Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+        const quantity = Number.isFinite(Number(item?.quantityBase)) ? Math.round(Number(item.quantityBase)) : Math.round(Number(item?.quantity || 0) * Number(item?.unitScale || 1));
+        if (!productId || !Number.isInteger(quantity) || quantity < 1 || quantity > 100000000) {
           throw new HttpsError('invalid-argument', 'بيانات أحد أصناف السلة غير صالحة.');
         }
         quantities.set(productId, (quantities.get(productId) || 0) + quantity);
@@ -63,8 +67,11 @@ exports.createOrderFromCart = onCall({ region: 'us-central1', enforceAppCheck: t
 
         const product = snap.data() || {};
         const status = String(product.status || '').toLowerCase();
-        const price = Number(product.price);
-        const stock = Number(product.stock);
+        const unit = unitFor(product);
+        const price = Number(product.price ?? product.unitPrice);
+        const stock = stockBaseFor(product, unit);
+        const stepBase = stepBaseFor(product, unit);
+        const minBase = Number(product.minOrderBase) > 0 ? Math.round(Number(product.minOrderBase)) : stepBase;
         if (status !== 'active') throw new HttpsError('failed-precondition', 'أحد المنتجات غير متاح حالياً.');
         if (!Number.isFinite(price) || price < 0) throw new HttpsError('failed-precondition', 'سعر أحد المنتجات غير صالح.');
         if (!Number.isInteger(stock) || stock < requested) {
@@ -75,13 +82,20 @@ exports.createOrderFromCart = onCall({ region: 'us-central1', enforceAppCheck: t
         const ownerId = String(product.ownerId || product.merchantId || '');
         if (ownerId) merchantIds.add(ownerId);
 
-        const lineTotal = price * requested;
+        if (requested < minBase || requested % stepBase !== 0) throw new HttpsError('failed-precondition', `كمية ${product.name || productId} لا تطابق خطوة البيع.`);
+        const saleQuantity = requested / unit.scale;
+        const lineTotal = price * saleQuantity;
         total += lineTotal;
         items.push({
           productId,
           name: String(product.name || product.title || 'صنف'),
-          quantity: requested,
+          quantity: saleQuantity,
+          quantityBase: requested,
+          unit: unit.id,
+          unitLabel: unit.label,
+          unitScale: unit.scale,
           price,
+          unitPrice: price,
           lineTotal,
           currency: String(product.currency || CURRENCY),
           storeId,
@@ -90,13 +104,16 @@ exports.createOrderFromCart = onCall({ region: 'us-central1', enforceAppCheck: t
         });
 
         tx.update(productRefs[i], {
-          stock: stock - requested,
-          soldQuantity: Number(product.soldQuantity || 0) + requested,
+          stockBase: stock - requested,
+          stock: (stock - requested) / unit.scale,
+          soldQuantity: Number(product.soldQuantity || 0) + saleQuantity,
+          soldQuantityBase: Number(product.soldQuantityBase || 0) + requested,
           updatedAt: FieldValue.serverTimestamp(),
         });
-        movements.push({ productId, quantity: requested, stockBefore: stock, stockAfter: stock - requested });
+        movements.push({ productId, quantity: saleQuantity, quantityBase: requested, unit: unit.id, stockBeforeBase: stock, stockAfterBase: stock - requested });
       }
 
+      const invoiceRef = db.collection('invoices').doc(orderRef.id);
       const orderData = {
         customerId: uid,
         merchantIds: [...merchantIds],
@@ -118,6 +135,7 @@ exports.createOrderFromCart = onCall({ region: 'us-central1', enforceAppCheck: t
       if (deliveryLocation) orderData.deliveryLocation = deliveryLocation;
 
       tx.create(orderRef, orderData);
+      tx.create(invoiceRef, { invoiceId: orderRef.id, orderId: orderRef.id, customerId: uid, merchantIds: [...merchantIds], items, subtotal: total, total, currency: CURRENCY, paymentMethod, status: 'issued', source: 'order_checkout', createdAt: FieldValue.serverTimestamp() });
       tx.set(cartRef, {
         ownerId: uid,
         customerId: uid,
@@ -126,7 +144,7 @@ exports.createOrderFromCart = onCall({ region: 'us-central1', enforceAppCheck: t
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
 
-      return { orderId: orderRef.id, total, itemCount: items.length, stockMovements: movements };
+      return { orderId: orderRef.id, invoiceId: invoiceRef.id, total, itemCount: items.length, stockMovements: movements };
     });
 
     await db.collection('auditLogs').add({
