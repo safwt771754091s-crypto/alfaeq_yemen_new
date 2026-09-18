@@ -14,6 +14,7 @@ import 'screens/developer_page.dart';
 import 'screens/merchant_invite_page.dart';
 import 'screens/my_orders_page.dart';
 import 'services/auth_service.dart';
+import 'core/product_units.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -287,13 +288,15 @@ class _StoreCatalogCard extends StatelessWidget {
     final productId = product.id;
     final name = (p['name'] ?? 'صنف').toString();
     final price = p['price'];
-    final stock = (p['stock'] as num?)?.toInt() ?? 0;
+    final unit = ProductUnit.fromProduct(p);
+    final stockBase = ProductUnit.stockBase(p);
+    final stock = unit.fromBase(stockBase);
     final currency = (p['currency'] ?? 'YER').toString();
     if (price is! num || price < 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سعر الصنف غير صالح.')));
       return;
     }
-    if (stock <= 0) {
+    if (stockBase <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هذا الصنف غير متوفر حالياً.')));
       return;
     }
@@ -310,12 +313,17 @@ class _StoreCatalogCard extends StatelessWidget {
         final index = items.indexWhere((e) => e['productId'] == productId);
 
         if (index >= 0) {
-          final current = (items[index]['quantity'] as num?)?.toInt() ?? 1;
-          if (current >= stock || current >= 100) {
+          final current = (items[index]['quantityBase'] as num?)?.toInt() ?? (((items[index]['quantity'] as num?) ?? 1) * unit.scale).round();
+          if (current >= stockBase || current >= unit.scale * 100) {
             throw StateError('الكمية المطلوبة غير متوفرة في المخزون.');
           }
-          items[index]['quantity'] = current + 1;
+          items[index]['quantityBase'] = current + unit.scale;
+          items[index]['quantity'] = unit.fromBase(current + unit.scale);
           items[index]['price'] = price;
+          items[index]['unitScale'] = unit.scale;
+          items[index]['saleUnit'] = unit.id;
+          items[index]['unitLabel'] = unit.label;
+          items[index]['baseUnit'] = unit.baseUnit;
           items[index]['name'] = name;
           items[index]['currency'] = currency;
           items[index]['storeId'] = (p['storeId'] ?? store.id).toString();
@@ -327,6 +335,13 @@ class _StoreCatalogCard extends StatelessWidget {
             'price': price,
             'currency': currency,
             'quantity': 1,
+            'quantityBase': unit.scale,
+            'unitScale': unit.scale,
+            'saleUnit': unit.id,
+            'unitLabel': unit.label,
+            'baseUnit': unit.baseUnit,
+            'stepBase': unit.defaultStepBase,
+            'minOrderBase': unit.defaultStepBase,
           });
         }
 
@@ -384,7 +399,8 @@ class _StoreCatalogCard extends StatelessWidget {
               if (products.isEmpty) return const Padding(padding: EdgeInsets.all(8), child: Text('لا توجد أصناف مضافة لهذا المتجر بعد.'));
               return Column(children: products.map((product) {
                 final p = product.data();
-                final stock = (p['stock'] as num?)?.toInt() ?? 0;
+                final stockBase = ProductUnit.stockBase(p);
+                final unit = ProductUnit.fromProduct(p);
                 final price = p['price'] ?? 0;
                 final currency = p['currency'] ?? 'YER';
                 return Card(
@@ -393,20 +409,20 @@ class _StoreCatalogCard extends StatelessWidget {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     leading: CircleAvatar(child: Icon(stock > 0 ? Icons.inventory_2_outlined : Icons.remove_shopping_cart_outlined)),
                     title: Text('${p['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
-                    subtitle: Text('${p['description'] ?? ''}\nالمتوفر: $stock', maxLines: 3, overflow: TextOverflow.ellipsis),
+                    subtitle: Text('${p['description'] ?? ''}\nالمتوفر: ${ProductUnit.formatBase(p, stockBase)}', maxLines: 3, overflow: TextOverflow.ellipsis),
                     isThreeLine: true,
                     trailing: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text('$price $currency', style: const TextStyle(fontWeight: FontWeight.w900)),
+                        Text('$price $currency / ${unit.label}', style: const TextStyle(fontWeight: FontWeight.w900)),
                         const SizedBox(height: 5),
                         SizedBox(
                           height: 34,
                           child: FilledButton.icon(
-                            onPressed: stock > 0 ? () => _addToCart(context, product) : null,
+                            onPressed: stockBase > 0 ? () => _addToCart(context, product) : null,
                             icon: const Icon(Icons.add_shopping_cart, size: 18),
-                            label: Text(stock > 0 ? 'أضف للسلة' : 'نفد'),
+                            label: Text(stockBase > 0 ? 'أضف للسلة' : 'نفد'),
                           ),
                         ),
                       ],
