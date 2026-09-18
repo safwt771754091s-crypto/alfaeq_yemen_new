@@ -7,6 +7,7 @@ import '../core/app_sections.dart';
 import '../services/auth_service.dart';
 import 'bulk_product_import_page.dart';
 import 'location_picker_page.dart';
+import '../core/product_units.dart';
 
 class AdminDataEntry extends StatefulWidget {
   const AdminDataEntry({super.key});
@@ -25,6 +26,7 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
   final _price = TextEditingController();
   final _stock = TextEditingController();
   final _imageUrl = TextEditingController();
+  String _saleUnit = 'piece';
 
   String _sectionId = appSections.first.id;
   String? _selectedStoreId;
@@ -88,7 +90,7 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
     final storeId = _selectedStoreId;
     final name = _productName.text.trim();
     final price = num.tryParse(_price.text.trim());
-    final stock = int.tryParse(_stock.text.trim());
+    final stock = num.tryParse(_stock.text.trim());
     if (user == null || storeId == null || name.isEmpty) { _message('اختر المتجر وأدخل اسم الصنف.'); return; }
     if (price == null || price < 0 || stock == null || stock < 0) { _message('السعر والكمية يجب أن يكونا أرقاماً صحيحة وغير سالبة.'); return; }
     setState(() => _saving = true);
@@ -96,7 +98,7 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
       await FirebaseFirestore.instance.collection('products').add({
         'storeId': storeId, 'sectionId': _selectedStoreSectionId ?? _sectionId, 'ownerId': user.uid, 'createdBy': user.uid,
         'name': name, 'description': _description.text.trim(), 'imageUrl': _imageUrl.text.trim(), 'price': price, 'currency': 'YER',
-        'stock': stock, 'soldQuantity': 0, 'status': 'active', 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp(),
+        'stock': stock, 'stockBase': ProductUnit.fromId(_saleUnit).toBase(stock).round(), 'saleUnit': _saleUnit, 'unitLabel': ProductUnit.fromId(_saleUnit).label, 'baseUnit': ProductUnit.fromId(_saleUnit).baseUnit, 'unitScale': ProductUnit.fromId(_saleUnit).scale, 'stepBase': ProductUnit.fromId(_saleUnit).defaultStepBase, 'minOrderBase': ProductUnit.fromId(_saleUnit).defaultStepBase, 'soldQuantity': 0, 'soldQuantityBase': 0, 'status': 'active', 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp(),
       });
       _productName.clear(); _description.clear(); _price.clear(); _stock.clear(); _imageUrl.clear();
       _message('تم حفظ الصنف الحقيقي في Firestore وسيظهر في كتالوج المتجر.');
@@ -146,7 +148,8 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
                   TextField(controller: _productName, decoration: const InputDecoration(labelText: 'اسم الصنف الحقيقي')),
                   TextField(controller: _description, maxLines: 2, decoration: const InputDecoration(labelText: 'وصف الصنف')),
                   TextField(controller: _price, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر الحقيقي بالريال اليمني')),
-                  TextField(controller: _stock, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المخزون')),
+                  TextField(controller: _stock, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'المخزون بـ ${ProductUnit.fromId(_saleUnit).label}')),
+                  DropdownButtonFormField<String>(initialValue: _saleUnit, decoration: const InputDecoration(labelText: 'وحدة البيع'), items: [for (final u in ProductUnit.all) DropdownMenuItem(value: u.id, child: Text(u.label))], onChanged: (v) => setState(() => _saleUnit = v ?? _saleUnit)),
                   TextField(controller: _imageUrl, decoration: const InputDecoration(labelText: 'رابط صورة الصنف (اختياري)')),
                   const SizedBox(height: 12),
                   SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _saving || _selectedStoreId == null ? null : _createProduct, icon: const Icon(Icons.add_box), label: const Text('حفظ الصنف في قاعدة البيانات'))),
