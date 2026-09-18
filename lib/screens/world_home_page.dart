@@ -617,7 +617,7 @@ Future<void> _addProductToCart(BuildContext context, QueryDocumentSnapshot<Map<S
   } on StateError catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? 'تعذر تحديث السلة.')));
   } on FirebaseException catch (e) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحديث السلة: ${e.message ?? e.code}')));
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحديث السلة: ${e.message}')));
   }
 }
 
@@ -715,33 +715,101 @@ class _StoreCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
-        leading: const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.storefront_outlined, color: _blue)),
-        title: Text('${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900)),
-        subtitle: Text('${data['address'] ?? 'عنوان غير محدد'}'),
+        leading: const CircleAvatar(
+          backgroundColor: Color(0xFFF1F6FF),
+          child: Icon(Icons.storefront_outlined, color: _blue),
+        ),
+        title: Text(
+          data['name']?.toString() ?? 'متجر',
+          style: const TextStyle(fontWeight: FontWeight.w900),
+        ),
+        subtitle: Text(data['address']?.toString() ?? 'عنوان غير محدد'),
         children: [
           Container(height: 1, color: const Color(0xFFE8ECEA)),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('products').where('storeId', isEqualTo: store.id).where('status', isEqualTo: 'active').limit(40).snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('products')
+                .where('storeId', isEqualTo: store.id)
+                .where('status', isEqualTo: 'active')
+                .limit(40)
+                .snapshots(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) return const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator());
-              if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(16), child: Text('تعذر تحميل الأصناف.'));
-              final products = snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-              if (products.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد أصناف نشطة حالياً.'));
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                );
+              }
+              if (snapshot.hasError) {
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('تعذر تحميل الأصناف.'),
+                );
+              }
+              final products = snapshot.data?.docs ??
+                  const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+              if (products.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('لا توجد أصناف نشطة حالياً.'),
+                );
+              }
               return Column(
                 children: products.map((product) {
                   final p = product.data();
-                  final imageUrl = (p['imageUrl'] ?? p['image'] ?? '').toString();
+                  final imageUrl =
+                      (p['imageUrl'] ?? p['image'] ?? '').toString();
                   final price = p['price'];
+                  Widget leading;
+                  if (imageUrl.isEmpty) {
+                    leading = const CircleAvatar(
+                      backgroundColor: Color(0xFFF1F6FF),
+                      child: Icon(Icons.inventory_2_outlined, color: _blue),
+                    );
+                  } else {
+                    leading = ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        imageUrl,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const CircleAvatar(
+                          child: Icon(Icons.broken_image_outlined),
+                        ),
+                      ),
+                    );
+                  }
+
+                  final priceText = price is num
+                      ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}'
+                      : 'عند الطلب';
+
                   return ListTile(
-                    leading: imageUrl.isEmpty
-                        ? const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.inventory_2_outlined, color: _blue))
-                        : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(imageUrl, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(child: Icon(Icons.broken_image_outlined))),
-                    title: Text('${p['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                    leading: leading,
+                    title: Text(
+                      p['name']?.toString() ?? 'صنف',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
                     subtitle: Text('المتوفر: ${p['stock'] ?? '—'}'),
-                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(price is num ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}' : 'عند الطلب', style: const TextStyle(fontWeight: FontWeight.w900)),
-                      IconButton(onPressed: () => _addProductToCart(context, product), tooltip: 'أضف للسلة', icon: const Icon(Icons.add_shopping_cart, color: _blue)),
-                    ]),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          priceText,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        IconButton(
+                          onPressed: () =>
+                              _addProductToCart(context, product),
+                          tooltip: 'أضف للسلة',
+                          icon: const Icon(
+                            Icons.add_shopping_cart,
+                            color: _blue,
+                          ),
+                        ),
+                      ],
+                    ),
                     onTap: () => _addProductToCart(context, product),
                   );
                 }).toList(),
