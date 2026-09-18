@@ -21,12 +21,25 @@ Future<void> main() async {
   if (kIsWeb) {
     const siteKey = String.fromEnvironment('RECAPTCHA_ENTERPRISE_SITE_KEY');
     if (siteKey.isNotEmpty) {
-      await FirebaseAppCheck.instance.activate(
-        providerWeb: ReCaptchaEnterpriseProvider(siteKey),
-      );
+      try {
+        await FirebaseAppCheck.instance.activate(
+          providerWeb: ReCaptchaEnterpriseProvider(siteKey),
+        );
+      } catch (e) {
+        // App Check must not prevent the Flutter shell from rendering.
+        // Firebase services remain protected by their server-side rules.
+        debugPrint('Web App Check activation failed: $e');
+      }
     }
   } else {
-    await FirebaseAppCheck.instance.activate(providerAndroid: const AndroidPlayIntegrityProvider(), providerApple: const AppleAppAttestProvider());
+    try {
+      await FirebaseAppCheck.instance.activate(
+        providerAndroid: const AndroidPlayIntegrityProvider(),
+        providerApple: const AppleAppAttestProvider(),
+      );
+    } catch (e) {
+      debugPrint('Mobile App Check activation failed: $e');
+    }
   }
   runApp(const AlfaeqYemenApp());
 }
