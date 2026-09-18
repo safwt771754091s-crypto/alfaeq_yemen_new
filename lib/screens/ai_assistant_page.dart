@@ -43,8 +43,17 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       setState(() => _messages.add(_AiMessage(text: answer, fromUser: false)));
     } catch (e) {
       if (!mounted) return;
+      final detail = e.toString();
+      final lower = detail.toLowerCase();
+      final hint = lower.contains('app check') || lower.contains('appcheck')
+          ? 'الطلب رُفض بسبب App Check.'
+          : lower.contains('permission') || lower.contains('unauthenticated')
+              ? 'تحقق من تسجيل الدخول والصلاحيات.'
+              : lower.contains('not found') || lower.contains('model')
+                  ? 'تحقق من تفعيل Firebase AI Logic والنموذج في مشروع Firebase.'
+                  : 'تحقق من الاتصال وإعداد Firebase AI Logic.';
       setState(() => _messages.add(_AiMessage(
-        text: 'تعذر الاتصال بخدمة الذكاء الاصطناعي حالياً. تحقق من إعداد Firebase AI Logic وApp Check ثم أعد المحاولة.',
+        text: 'تعذر تشغيل ذكاء الفائق. $hint\\n\\nتفاصيل التشخيص: $detail',
         fromUser: false,
         error: true,
       )));
