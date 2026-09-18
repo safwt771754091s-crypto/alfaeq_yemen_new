@@ -59,35 +59,77 @@ class _MainBottomBar extends StatelessWidget {
       (Icons.receipt_long_outlined, Icons.receipt_long, 'طلباتي'),
       (Icons.person_outline, Icons.person, 'حسابي'),
     ];
-    return Container(
-      decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFE5EAF0)))),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: List.generate(items.length, (i) {
-            final selected = selectedIndex == i;
-            final item = items[i];
-            return Expanded(
-              child: InkWell(
-                onTap: () => onSelected(i),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(selected ? item.$2 : item.$1, color: selected ? _blue : _navy, size: 24),
-                      const SizedBox(height: 3),
-                      Text(item.$3, style: TextStyle(color: selected ? _blue : _navy, fontSize: 11, fontWeight: selected ? FontWeight.w900 : FontWeight.w600)),
-                    ],
+    final user = FirebaseAuth.instance.currentUser;
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: user == null ? null : FirebaseFirestore.instance.collection('carts').doc(user.uid).snapshots(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() ?? <String, dynamic>{};
+        final raw = data['items'];
+        var cartCount = 0;
+        if (raw is List) {
+          for (final item in raw) {
+            if (item is Map && item['quantity'] is num) cartCount += (item['quantity'] as num).toInt();
+          }
+        }
+        return Container(
+          decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFE5EAF0)))),
+          child: SafeArea(
+            top: false,
+            child: Row(
+              children: List.generate(items.length, (i) {
+                final selected = selectedIndex == i;
+                final item = items[i];
+                final icon = i == 2
+                    ? _CartBadgeIcon(icon: selected ? item.$2 : item.$1, count: cartCount, color: selected ? _blue : _navy)
+                    : Icon(selected ? item.$2 : item.$1, color: selected ? _blue : _navy, size: 24);
+                return Expanded(
+                  child: InkWell(
+                    onTap: () => onSelected(i),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          icon,
+                          const SizedBox(height: 3),
+                          Text(item.$3, style: TextStyle(color: selected ? _blue : _navy, fontSize: 11, fontWeight: selected ? FontWeight.w900 : FontWeight.w600)),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ),
+                );
+              }),
+            ),
+          ),
+        );
+      },
     );
   }
+}
+
+class _CartBadgeIcon extends StatelessWidget {
+  final IconData icon;
+  final int count;
+  final Color color;
+  const _CartBadgeIcon({required this.icon, required this.count, required this.color});
+  @override
+  Widget build(BuildContext context) => Stack(
+    clipBehavior: Clip.none,
+    children: [
+      Icon(icon, color: color, size: 24),
+      if (count > 0)
+        Positioned(
+          top: -7,
+          right: -10,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(color: _yellow, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white, width: 1.5)),
+            child: Text('$count', textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: _navy)),
+          ),
+        ),
+    ],
+  );
 }
 
 class _HomeTab extends StatefulWidget {
@@ -216,7 +258,15 @@ class _HomeHeader extends StatelessWidget {
                 ),
               ),
               IconButton(onPressed: onNotifications, icon: const Icon(Icons.notifications_none, color: Colors.white)),
-              IconButton(onPressed: onCart, icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white)),
+              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: FirebaseAuth.instance.currentUser == null ? null : FirebaseFirestore.instance.collection('carts').doc(FirebaseAuth.instance.currentUser!.uid).snapshots(),
+                builder: (context, snapshot) {
+                  final raw = snapshot.data?.data()?['items'];
+                  var count = 0;
+                  if (raw is List) for (final item in raw) if (item is Map && item['quantity'] is num) count += (item['quantity'] as num).toInt();
+                  return IconButton(onPressed: onCart, icon: _CartBadgeIcon(icon: Icons.shopping_cart_outlined, count: count, color: Colors.white));
+                },
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -904,6 +954,7 @@ class _AccountTab extends StatelessWidget {
         )),
         ListTile(leading: const Icon(Icons.shopping_cart_outlined, color: _blue), title: const Text('السلة', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage()))),
         ListTile(leading: const Icon(Icons.receipt_long_outlined, color: _blue), title: const Text('طلباتي وتتبع التوصيل', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersPage()))),
+        ListTile(leading: const Icon(Icons.account_balance_wallet_outlined, color: _blue), title: const Text('محفظتي', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletCenterPage()))),
         ListTile(leading: const Icon(Icons.auto_awesome, color: _blue), title: const Text('ذكاء الفائق يمن', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()))),
         const Divider(height: 24),
         FilledButton.icon(onPressed: () => _logout(context), icon: const Icon(Icons.logout), label: const Text('تسجيل الخروج'), style: FilledButton.styleFrom(backgroundColor: _navy)),
