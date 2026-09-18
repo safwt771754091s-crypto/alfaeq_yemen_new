@@ -615,7 +615,7 @@ Future<void> _addProductToCart(BuildContext context, QueryDocumentSnapshot<Map<S
     });
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تمت إضافة «$name» إلى السلة.')));
   } on StateError catch (e) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? 'تعذر تحديث السلة.')));
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
   } on FirebaseException catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحديث السلة: ${e.message}')));
   }
@@ -878,7 +878,7 @@ class WalletCenterPage extends StatelessWidget {
                 Text('مركز المحافظ', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                 SizedBox(height: 8),
                 Text('تظهر هنا المحافظ والخدمات المالية المرتبطة بالحساب عند تفعيلها من المنصة.'),
-              ])),
+              ]))),
             ],
           ),
         ),
