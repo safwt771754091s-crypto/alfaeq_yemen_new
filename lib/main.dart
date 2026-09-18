@@ -17,31 +17,94 @@ import 'services/auth_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  if (kIsWeb) {
-    const siteKey = String.fromEnvironment('RECAPTCHA_ENTERPRISE_SITE_KEY');
-    if (siteKey.isNotEmpty) {
+  runApp(const AlfaeqBootstrapApp());
+}
+
+class AlfaeqBootstrapApp extends StatefulWidget {
+  const AlfaeqBootstrapApp({super.key});
+
+  @override
+  State<AlfaeqBootstrapApp> createState() => _AlfaeqBootstrapAppState();
+}
+
+class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
+  late final Future<void> _startup;
+
+  @override
+  void initState() {
+    super.initState();
+    _startup = _initializeFirebase();
+  }
+
+  Future<void> _initializeFirebase() async {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    if (kIsWeb) {
+      const siteKey = String.fromEnvironment('RECAPTCHA_ENTERPRISE_SITE_KEY');
+      if (siteKey.isNotEmpty) {
+        try {
+          await FirebaseAppCheck.instance.activate(
+            providerWeb: ReCaptchaEnterpriseProvider(siteKey),
+          );
+        } catch (e) {
+          debugPrint('Web App Check activation failed: $e');
+        }
+      }
+    } else {
       try {
         await FirebaseAppCheck.instance.activate(
-          providerWeb: ReCaptchaEnterpriseProvider(siteKey),
+          providerAndroid: const AndroidPlayIntegrityProvider(),
+          providerApple: const AppleAppAttestProvider(),
         );
       } catch (e) {
-        // App Check must not prevent the Flutter shell from rendering.
-        // Firebase services remain protected by their server-side rules.
-        debugPrint('Web App Check activation failed: $e');
+        debugPrint('Mobile App Check activation failed: $e');
       }
     }
-  } else {
-    try {
-      await FirebaseAppCheck.instance.activate(
-        providerAndroid: const AndroidPlayIntegrityProvider(),
-        providerApple: const AppleAppAttestProvider(),
-      );
-    } catch (e) {
-      debugPrint('Mobile App Check activation failed: $e');
-    }
   }
-  runApp(const AlfaeqYemenApp());
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _startup,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                appBar: AppBar(title: const Text('الفائق يمن')),
+                body: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: SelectableText(
+                      'تعذر تشغيل خدمات الفائق يمن.\\n\\nخطأ التهيئة: ${snapshot.error}\\n\\nأعد تحميل الصفحة. إذا استمر الخطأ، أرسل لنا صورة هذه الشاشة.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return const AlfaeqYemenApp();
+      },
+    );
+  }
 }
 
 class AlfaeqYemenApp extends StatelessWidget {
