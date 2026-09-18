@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/app_sections.dart';
 import '../services/auth_service.dart';
@@ -143,6 +142,43 @@ class _HomeTabState extends State<_HomeTab> {
   }
 }
 
+class _AlfaeqLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final blue = Paint()..color = _blue..style = PaintingStyle.stroke..strokeWidth = size.width * .075..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round;
+    final yellow = Paint()..color = _yellow..style = PaintingStyle.fill;
+    final cart = Path()
+      ..moveTo(size.width * .10, size.height * .30)
+      ..lineTo(size.width * .27, size.height * .30)
+      ..lineTo(size.width * .37, size.height * .76)
+      ..lineTo(size.width * .78, size.height * .76)
+      ..lineTo(size.width * .90, size.height * .42)
+      ..lineTo(size.width * .31, size.height * .42);
+    canvas.drawPath(cart, blue);
+    canvas.drawLine(Offset(size.width * .13, size.height * .30), Offset(size.width * .05, size.height * .30), blue);
+    canvas.drawCircle(Offset(size.width * .45, size.height * .89), size.width * .045, Paint()..color = _blue);
+    canvas.drawCircle(Offset(size.width * .77, size.height * .89), size.width * .045, Paint()..color = _blue);
+    final yemen = Path()
+      ..moveTo(size.width * .30, size.height * .18)
+      ..lineTo(size.width * .43, size.height * .08)
+      ..lineTo(size.width * .70, size.height * .06)
+      ..lineTo(size.width * .86, size.height * .19)
+      ..lineTo(size.width * .78, size.height * .38)
+      ..lineTo(size.width * .48, size.height * .41)
+      ..lineTo(size.width * .32, size.height * .32)
+      ..close();
+    canvas.drawPath(yemen, yellow);
+    final tp = TextPainter(
+      text: const TextSpan(text: 'f', style: TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w900, height: 1)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(size.width * .53 - tp.width / 2, size.height * .45));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class _HomeHeader extends StatelessWidget {
   final String locationLabel;
   final VoidCallback onLocationTap;
@@ -164,7 +200,7 @@ class _HomeHeader extends StatelessWidget {
                 height: 52,
                 padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
-                child: SvgPicture.asset('assets/images/alfaeq_yemen_logo.svg'),
+                child: CustomPaint(painter: _AlfaeqLogoPainter()),
               ),
               const SizedBox(width: 10),
               const Expanded(
