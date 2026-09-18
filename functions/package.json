@@ -1,0 +1,13 @@
+{
+  "name": "alfaeq-yemen-functions",
+  "description": "Alfaeq Yemen Firebase backend",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^13.5.0",
+    "firebase-functions": "^6.5.0"
+  }
+}
