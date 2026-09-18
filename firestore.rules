@@ -183,7 +183,13 @@ service cloud.firestore {
 
     match /wallets/{uid} {
       allow read: if self(uid) || staff() || developer();
-      allow create: if staff() || self(uid);
+      allow create: if staff()
+        || (self(uid)
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.currency == 'YER'
+          && request.resource.data.status == 'active'
+          && request.resource.data.availableBalance == 0
+          && request.resource.data.version == 1);
       allow update: if staff();
       allow delete: if false;
     }
