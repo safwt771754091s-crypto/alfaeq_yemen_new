@@ -50,7 +50,17 @@ jobs:
           test -s lib/firebase_options.dart
           echo "Firebase configuration generated: $(wc -c < lib/firebase_options.dart) bytes"
       - name: Analyze
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log
+          exit ${PIPESTATUS[0]}
+      - name: Capture analyze diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analyze-diagnostics-${{ github.run_id }}
+          path: analyze.log
+          retention-days: 3
       - name: Build Web
         run: |
           rm -rf build/web
