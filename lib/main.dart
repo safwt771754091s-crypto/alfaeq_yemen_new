@@ -19,8 +19,12 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   if (kIsWeb) {
-    const siteKey = String.fromEnvironment('RECAPTCHA_V3_SITE_KEY');
-    if (siteKey.isNotEmpty) await FirebaseAppCheck.instance.activate(providerWeb: ReCaptchaV3Provider(siteKey));
+    const siteKey = String.fromEnvironment('RECAPTCHA_ENTERPRISE_SITE_KEY');
+    if (siteKey.isNotEmpty) {
+      await FirebaseAppCheck.instance.activate(
+        providerWeb: ReCaptchaEnterpriseProvider(siteKey),
+      );
+    }
   } else {
     await FirebaseAppCheck.instance.activate(providerAndroid: const AndroidPlayIntegrityProvider(), providerApple: const AppleAppAttestProvider());
   }
