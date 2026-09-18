@@ -912,27 +912,163 @@ class _ServiceTile extends StatelessWidget {
       );
 }
 
-class WalletCenterPage extends StatelessWidget {
+class WalletCenterPage extends StatefulWidget {
   const WalletCenterPage({super.key});
   @override
-  Widget build(BuildContext context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Scaffold(
-          appBar: AppBar(title: const Text('المحافظ', style: TextStyle(fontWeight: FontWeight.w900))),
-          body: ListView(
-            padding: const EdgeInsets.all(16),
-            children: const [
-              Card(child: Padding(padding: EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Icon(Icons.account_balance_wallet_outlined, size: 42, color: _blue),
-                SizedBox(height: 12),
-                Text('مركز المحافظ', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-                SizedBox(height: 8),
-                Text('تظهر هنا المحافظ والخدمات المالية المرتبطة بالحساب عند تفعيلها من المنصة.'),
-              ]))),
-            ],
-          ),
+  State<WalletCenterPage> createState() => _WalletCenterPageState();
+}
+
+class _WalletCenterPageState extends State<WalletCenterPage> {
+  final _amount = TextEditingController();
+  final _recipient = TextEditingController();
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    _recipient.dispose();
+    super.dispose();
+  }
+
+  Future<void> _ensureWallet(String uid) async {
+    final ref = FirebaseFirestore.instance.collection('wallets').doc(uid);
+    if ((await ref.get()).exists) return;
+    await ref.set({
+      'uid': uid, 'currency': 'YER', 'status': 'active',
+      'availableBalance': 0, 'version': 1,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> _operation(String type) async {
+    final user = FirebaseAuth.instance.currentUser;
+    final amount = num.tryParse(_amount.text.trim());
+    if (user == null || amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل مبلغاً صحيحاً.')));
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await FirebaseFirestore.instance.collection('walletOperations').add({
+        'uid': user.uid, 'type': type, 'amount': amount,
+        'currency': 'YER', 'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      _amount.clear();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(type == 'deposit' ? 'تم إرسال طلب الإيداع للمراجعة.' : 'تم إرسال طلب السحب للمراجعة.')));
+    } on FirebaseException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء العملية: ' + (e.message ?? e.code))));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _transfer() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final recipient = _recipient.text.trim();
+    final amount = num.tryParse(_amount.text.trim());
+    if (user == null || recipient.isEmpty || amount == null || amount <= 0 || recipient == user.uid) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تحقق من UID المستلم والمبلغ.')));
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await FirebaseFirestore.instance.collection('walletOperations').add({
+        'uid': user.uid, 'recipientUid': recipient, 'type': 'transfer',
+        'amount': amount, 'currency': 'YER', 'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      _amount.clear(); _recipient.clear();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال التحويل للمعالجة الآمنة.')));
+    } on FirebaseException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال التحويل: ' + (e.message ?? e.code))));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const Scaffold(body: Center(child: Text('يجب تسجيل الدخول أولاً.')));
+    final walletRef = FirebaseFirestore.instance.collection('wallets').doc(user.uid);
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('المحفظة المالية', style: TextStyle(fontWeight: FontWeight.w900))),
+        body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: walletRef.snapshots(),
+          builder: (context, snapshot) {
+            final data = snapshot.data?.data();
+            if (data == null) {
+              return Center(child: FilledButton.icon(
+                onPressed: _busy ? null : () async { setState(() => _busy = true); try { await _ensureWallet(user.uid); } finally { if (mounted) setState(() => _busy = false); } },
+                icon: const Icon(Icons.account_balance_wallet_outlined),
+                label: const Text('تفعيل محفظتي'),
+              ));
+            }
+            final balance = num.tryParse('${data['availableBalance'] ?? 0}') ?? 0;
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Card(color: _navy, child: Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('الرصيد المتاح', style: TextStyle(color: Colors.white70)),
+                    const SizedBox(height: 6),
+                    Text('$balance YER', style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 8),
+                    Text(data['status'] == 'active' ? 'المحفظة نشطة' : 'حالة المحفظة: ' + (data['status']?.toString() ?? 'غير معروفة'), style: const TextStyle(color: Colors.white70)),
+                  ]),
+                )),
+                const SizedBox(height: 14),
+                Card(child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    const Text('عملية مالية', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 10),
+                    TextField(controller: _amount, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المبلغ', suffixText: 'YER')),
+                    const SizedBox(height: 10),
+                    TextField(controller: _recipient, decoration: const InputDecoration(labelText: 'UID المستلم للتحويل')),
+                    const SizedBox(height: 12),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      OutlinedButton.icon(onPressed: _busy ? null : () => _operation('deposit'), icon: const Icon(Icons.add_circle_outline), label: const Text('إيداع')),
+                      OutlinedButton.icon(onPressed: _busy ? null : () => _operation('withdraw'), icon: const Icon(Icons.remove_circle_outline), label: const Text('سحب')),
+                      FilledButton.icon(onPressed: _busy ? null : _transfer, icon: const Icon(Icons.swap_horiz), label: const Text('تحويل')),
+                    ]),
+                    const SizedBox(height: 8),
+                    const Text('الإيداع والسحب للمراجعة، والتحويل يعالج آلياً بعد تحقق الخادم من الرصيد.', style: TextStyle(color: Colors.black54)),
+                  ]),
+                )),
+                const SizedBox(height: 14),
+                const Text('آخر العمليات', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance.collection('walletOperations').where('uid', isEqualTo: user.uid).limit(30).snapshots(),
+                  builder: (context, ops) {
+                    if (ops.hasError) return Text('تعذر تحميل العمليات: ' + ops.error.toString());
+                    final docs = ops.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                    if (docs.isEmpty) return const Card(child: ListTile(title: Text('لا توجد عمليات مالية بعد.')));
+                    return Column(children: docs.map((doc) {
+                      final op = doc.data();
+                      final type = op['type']?.toString() ?? '';
+                      final label = type == 'transfer' ? 'تحويل' : type == 'deposit' ? 'إيداع' : 'سحب';
+                      return Card(elevation: 0, child: ListTile(
+                        leading: Icon(type == 'deposit' ? Icons.add_circle : type == 'withdraw' ? Icons.remove_circle : Icons.swap_horiz),
+                        title: Text(label + ' • ' + (op['amount'] ?? 0).toString() + ' YER', style: const TextStyle(fontWeight: FontWeight.w800)),
+                        subtitle: Text('الحالة: ' + (op['status'] ?? 'pending').toString()),
+                      ));
+                    }).toList());
+                  },
+                ),
+              ],
+            );
+          },
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _AccountTab extends StatelessWidget {
