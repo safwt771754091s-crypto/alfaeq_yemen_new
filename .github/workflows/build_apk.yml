@@ -60,8 +60,13 @@ jobs:
       - name: Generate Firebase configuration
         run: |
           flutterfire configure --project=alfaeq-yemen-fed37 --platforms=android --android-package-name=com.alfaeq.alfaeq_yemen --yes --out=lib/firebase_options.dart
-          test -s lib/firebase_options.dart
+          if [ ! -s lib/firebase_options.dart ]; then
+            echo "ERROR: FlutterFire did not generate lib/firebase_options.dart"
+            find lib -maxdepth 1 -type f -print | sort
+            exit 1
+          fi
           echo "Firebase configuration generated: $(wc -c < lib/firebase_options.dart) bytes"
+          grep -q "class DefaultFirebaseOptions" lib/firebase_options.dart
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Build APK
