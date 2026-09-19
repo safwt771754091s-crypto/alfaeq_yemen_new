@@ -407,7 +407,7 @@ class _StoreCatalogCard extends StatelessWidget {
                   elevation: 0,
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    leading: CircleAvatar(child: Icon(stockBase > 0 ? Icons.inventory_2_outlined : Icons.remove_shopping_cart_outlined)),
+                    leading: Builder(builder: (context) { final imageUrl = (p['imageUrl'] ?? '').toString(); if (imageUrl.isEmpty) return CircleAvatar(child: Icon(stockBase > 0 ? Icons.inventory_2_outlined : Icons.remove_shopping_cart_outlined)); return ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(imageUrl, width: 54, height: 54, fit: BoxFit.cover, errorBuilder: (_, __, ___) => CircleAvatar(child: Icon(stockBase > 0 ? Icons.inventory_2_outlined : Icons.remove_shopping_cart_outlined)))); }),
                     title: Text('${p['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
                     subtitle: Text('${p['description'] ?? ''}\nالمتوفر: ${ProductUnit.formatBase(p, stockBase)}', maxLines: 3, overflow: TextOverflow.ellipsis),
                     isThreeLine: true,
