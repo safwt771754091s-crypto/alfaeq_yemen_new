@@ -331,7 +331,6 @@ class _StoreCatalogCard extends StatelessWidget {
     final price = p['price'];
     final unit = ProductUnit.fromProduct(p);
     final stockBase = ProductUnit.stockBase(p);
-    final stock = unit.fromBase(stockBase);
     final currency = (p['currency'] ?? 'YER').toString();
     if (price is! num || price < 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سعر الصنف غير صالح.')));
