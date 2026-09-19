@@ -156,7 +156,48 @@ class HomePage extends StatelessWidget {
             title: const Text('الفائق يمن', style: TextStyle(fontWeight: FontWeight.w900)),
             actions: [
               IconButton(tooltip: 'ذكاء الفائق', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage())), icon: const Icon(Icons.auto_awesome)),
-              IconButton(tooltip: 'السلة', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage())), icon: const Icon(Icons.shopping_cart_outlined)),
+              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: FirebaseAuth.instance.currentUser == null
+                    ? null
+                    : FirebaseFirestore.instance.collection('carts').doc(FirebaseAuth.instance.currentUser!.uid).snapshots(),
+                builder: (context, snapshot) {
+                  var count = 0;
+                  final raw = snapshot.data?.data()?['items'];
+                  if (raw is List) {
+                    for (final item in raw) {
+                      if (item is Map) {
+                        count += ((item['quantity'] as num?)?.toDouble() ?? 0).round();
+                      }
+                    }
+                  }
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      IconButton(
+                        tooltip: 'السلة',
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage())),
+                        icon: const Icon(Icons.shopping_cart_outlined),
+                      ),
+                      if (count > 0)
+                        Positioned(
+                          right: 2,
+                          top: 2,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              count > 99 ? '99+' : '$count',
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
               IconButton(tooltip: 'طلباتي', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersPage())), icon: const Icon(Icons.receipt_long_outlined)),
               IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none)),
               PopupMenuButton<String>(
