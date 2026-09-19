@@ -92,10 +92,15 @@ class CartPage extends StatelessWidget {
       addressController.dispose();
       return;
     }
-    final address = addressController.text.trim();
+    final typedAddress = addressController.text.trim();
+    final address = typedAddress.isNotEmpty
+        ? typedAddress
+        : (deliveryPoint == null
+            ? ''
+            : 'موقع الخريطة: ' + deliveryPoint!.latitude.toStringAsFixed(6) + ', ' + deliveryPoint!.longitude.toStringAsFixed(6));
     addressController.dispose();
     if (address.isEmpty) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل عنوان التوصيل أولاً.')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حدد موقع التوصيل على الخريطة أو اكتب العنوان أولاً.')));
       return;
     }
     try {
@@ -121,7 +126,7 @@ class CartPage extends StatelessWidget {
         );
       }
     } on FirebaseFunctionsException catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء الطلب: ${e.message ?? e.code}')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء الطلب: ${e.message ?? e.code} (code: ${e.code})')));
     } on FirebaseException catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء الطلب: ${e.message ?? e.code}')));
     }
