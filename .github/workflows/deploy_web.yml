@@ -79,4 +79,4 @@ jobs:
           test ! -e build/web/flutter_service_worker.js
           echo "Fresh web build verified: $(du -sh build/web | cut -f1)"
       - name: Deploy Hosting and Firestore rules
-        run: firebase deploy --only hosting,firestore,functions --project alfaeq-yemen-fed37
+        run: firebase deploy --only hosting,firestore --project alfaeq-yemen-fed37
