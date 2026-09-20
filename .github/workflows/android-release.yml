@@ -22,8 +22,31 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Authenticate Google/Firebase
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
       - name: Flutter pub get
         run: flutter pub get
+
+      - name: Install FlutterFire CLI
+        run: |
+          dart pub global activate flutterfire_cli
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: Generate Firebase configuration
+        run: |
+          flutterfire configure --project=alfaeq-yemen-fed37 --platforms=android --android-package-name=com.alfaeq.alfaeq_yemen --yes --out=lib/firebase_options.dart
+          if [ ! -s lib/firebase_options.dart ]; then
+            echo "ERROR: FlutterFire did not generate lib/firebase_options.dart"
+            find lib -maxdepth 1 -type f -print | sort
+            exit 1
+          fi
+          echo "Firebase configuration generated: $(wc -c < lib/firebase_options.dart) bytes"
+          grep -q "class DefaultFirebaseOptions" lib/firebase_options.dart
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
