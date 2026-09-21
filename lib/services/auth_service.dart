@@ -22,8 +22,15 @@ class AuthService {
 
   Stream<User?> get authStateChanges => auth.authStateChanges();
 
-  Future<UserCredential> signIn({required String email, required String password}) {
-    return auth.signInWithEmailAndPassword(email: email.trim(), password: password);
+  Future<UserCredential> signIn({required String email, required String password}) async {
+    final credential = await auth.signInWithEmailAndPassword(email: email.trim(), password: password);
+    final user = credential.user;
+    if (user != null) {
+      await _ensureUserProfile(user);
+      await startPresence();
+      await _recordLoginEvent(user, provider: 'password');
+    }
+    return credential;
   }
 
   Future<UserCredential?> signInWithGoogle() async {
@@ -48,6 +55,7 @@ class AuthService {
     if (user == null) return credential;
     await _ensureUserProfile(user);
     await startPresence();
+    await _recordLoginEvent(user, provider: 'google');
     if ((user.email ?? '').trim().toLowerCase() == 'albyysks@gmail.com') {
       await bootstrapPrimaryAdminIfEligible();
     }
@@ -129,7 +137,16 @@ class AuthService {
     }
     await user.reload();
     await startPresence();
+    await _recordLoginEvent(user, provider: 'password', action: 'register');
     return credential;
+  }
+
+  Future<void> _recordLoginEvent(User user, {required String provider, String action = 'login'}) async {
+    try {
+      await functions.httpsCallable('recordLoginEvent').call({'provider': provider, 'action': action});
+    } catch (_) {
+      // Authentication must never fail because telemetry is unavailable.
+    }
   }
 
   Future<void> saveUserLocation({required GeoPoint location, String source = 'device'}) async {
