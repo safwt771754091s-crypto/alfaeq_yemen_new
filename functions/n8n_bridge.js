@@ -1,23 +1,32 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
-const { defineSecret } = require('firebase-functions/params');
+const { getFirestore } = require('firebase-admin/firestore');
 const { logger } = require('firebase-functions');
 
-const N8N_WEBHOOK_URL = defineSecret('N8N_AUTOMATION_WEBHOOK_URL');
-const N8N_SHARED_SECRET = defineSecret('N8N_AUTOMATION_SHARED_SECRET');
+const db = getFirestore();
+const CONFIG_DOC = 'platformIntegrations/n8n';
+
+async function loadConfig() {
+  const snap = await db.doc(CONFIG_DOC).get();
+  if (!snap.exists) return null;
+  const data = snap.data() || {};
+  const url = typeof data.webhookUrl === 'string' ? data.webhookUrl.trim() : '';
+  const sharedSecret = typeof data.sharedSecret === 'string' ? data.sharedSecret : '';
+  if (!url || !sharedSecret || data.enabled !== true) return null;
+  return { url, sharedSecret };
+}
 
 async function forward(eventType, id, data) {
-  const url = N8N_WEBHOOK_URL.value();
-  const sharedSecret = N8N_SHARED_SECRET.value();
-  if (!url || !sharedSecret) {
-    logger.warn('n8n bridge is not configured; event retained in Firestore only', { eventType, id });
+  const config = await loadConfig();
+  if (!config) {
+    logger.warn('n8n bridge is not configured; event remains in Firebase', { eventType, id });
     return;
   }
 
-  const response = await fetch(url, {
+  const response = await fetch(config.url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-alfaeq-automation-secret': sharedSecret,
+      'x-alfaeq-automation-secret': config.sharedSecret,
     },
     body: JSON.stringify({
       source: 'alfaeq_yemen',
@@ -37,7 +46,7 @@ async function forward(eventType, id, data) {
 
 function trigger(document, eventType) {
   return onDocumentCreated(
-    { document, region: 'us-central1', retry: true, secrets: [N8N_WEBHOOK_URL, N8N_SHARED_SECRET] },
+    { document, region: 'us-central1', retry: true },
     async (event) => {
       const id = event.params[Object.keys(event.params)[0]];
       const data = event.data?.data() || {};
