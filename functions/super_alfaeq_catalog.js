@@ -2,6 +2,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const fs = require('fs');
 const path = require('path');
+const { getSarToYerRate, sarToYer } = require('./currency');
 
 const db = getFirestore();
 const CHUNKS = ['catalog_01.json','catalog_02.json','catalog_03.json','catalog_04.json','catalog_05.json','catalog_06.json','catalog_07.json','catalog_08.json'];
@@ -36,6 +37,7 @@ exports.ensureSuperAlfaeqCatalog = onCall({ region:'us-central1', enforceAppChec
   if (!allowed) throw new HttpsError('permission-denied','Owner/admin permission required.');
 
   const markerRef = db.collection('settings').doc('super_alfaeq_catalog');
+  const sarToYerRate = await getSarToYerRate(db);
   const markerSnap = await markerRef.get();
   if (request.data?.checkOnly === true) {
     const data = markerSnap.exists ? (markerSnap.data() || {}) : {};
@@ -61,13 +63,17 @@ exports.ensureSuperAlfaeqCatalog = onCall({ region:'us-central1', enforceAppChec
       rowIndex++;
       const productId=`super_${String(row.id).replace(/[^A-Za-z0-9_-]/g,'_')}_${rowIndex}`.slice(0,120);
       const saleUnit=normalizeUnit(row.unit), scale=unitScale(saleUnit);
-      const price=Number(row.price || 0), stock=Number(row.stock || 0);
+      const priceSar=Number(row.price || 0), costSar=Number(row.cost || 0);
+      const stockRaw=Number(row.stock ?? 0), expectedStock=Number(row.expectedStock ?? 0);
+      const stock=stockRaw > 0 ? stockRaw : expectedStock;
+      const price=sarToYer(priceSar, sarToYerRate), cost=sarToYer(costSar, sarToYerRate);
       const status=validPrice(price)?'active':'draft';
       if(status==='active') active++;
       batch.set(db.collection('products').doc(productId),{
         name:String(row.name || 'منتج'), barcode:row.barcode || null, internalRef:row.internalRef || null,
-        category:String(row.category || 'عام'), price:validPrice(price)?price:0, cost:Number(row.cost || 0), currency:'YER',
-        stock, stockBase:Math.max(0,Math.round(stock*scale)), expectedStock:Number(row.expectedStock || 0),
+        category:String(row.category || 'عام'), price:validPrice(price)?price:0, priceSar:validPrice(priceSar)?priceSar:0,
+        cost:validPrice(cost)?cost:0, costSar:validPrice(costSar)?costSar:0, currency:'YER', sourceCurrency:'SAR', exchangeRateSarToYer:sarToYerRate,
+        stock, stockSource:stockRaw > 0 ? 'stock' : (expectedStock > 0 ? 'expectedStock' : 'unverified'), stockBase:Math.max(0,Math.round(stock*scale)), expectedStock,
         saleUnit, unitScale:scale, baseUnit:['kg','g'].includes(saleUnit)?'g':(['l','ml'].includes(saleUnit)?'ml':saleUnit),
         stepBase:(saleUnit==='kg'||saleUnit==='l')?250:1, minOrderBase:(saleUnit==='kg'||saleUnit==='l')?250:1,
         storeId:'super-alfaeq', ownerId:auth.uid, merchantName:'سوبر الفائق', status,
@@ -81,6 +87,6 @@ exports.ensureSuperAlfaeqCatalog = onCall({ region:'us-central1', enforceAppChec
     }
     if(writes) await batch.commit();
   }
-  await markerRef.set({status:'ready',imported,active,storeId:'super-alfaeq',completedBy:auth.uid,completedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  await markerRef.set({status:'ready',imported,active,storeId:'super-alfaeq',completedBy:auth.uid,completedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp(),sarToYerRate,baseCurrency:'YER',sourceCurrency:'SAR'},{merge:true});
   return {ok:true,alreadyReady:false,imported,active,storeId:'super-alfaeq'};
 });
