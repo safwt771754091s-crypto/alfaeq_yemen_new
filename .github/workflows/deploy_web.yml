@@ -82,5 +82,9 @@ jobs:
           test -s build/web/flutter_bootstrap.js
           test ! -e build/web/flutter_service_worker.js
           echo "Fresh web build verified: $(du -sh build/web | cut -f1)"
+      - name: Seed Super Alfaeq catalog into Firestore
+        run: |
+          npm --prefix functions install --omit=dev
+          node scripts/seed_super_alfaeq.js
       - name: Deploy Hosting and Firestore rules
         run: firebase deploy --only hosting,firestore --project alfaeq-yemen-fed37
