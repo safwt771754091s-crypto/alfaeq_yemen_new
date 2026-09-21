@@ -781,7 +781,7 @@ class _StoreCard extends StatelessWidget {
                 .collection('products')
                 .where('storeId', isEqualTo: store.id)
                 .where('status', isEqualTo: 'active')
-                .limit(40)
+                .limit(5000)
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
@@ -834,6 +834,11 @@ class _StoreCard extends StatelessWidget {
                   final priceText = price is num
                       ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}'
                       : 'عند الطلب';
+                  final stock = p['stock'];
+                  final stockSource = (p['stockSource'] ?? '').toString();
+                  final stockText = stockSource == 'unverified' && (stock is num && stock <= 0)
+                      ? 'المخزون يحتاج إدخالاً'
+                      : 'المتوفر: ${stock ?? '—'}';
 
                   return ListTile(
                     leading: leading,
@@ -841,7 +846,7 @@ class _StoreCard extends StatelessWidget {
                       p['name']?.toString() ?? 'صنف',
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
-                    subtitle: Text('المتوفر: ${p['stock'] ?? '—'}'),
+                    subtitle: Text(stockText),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
