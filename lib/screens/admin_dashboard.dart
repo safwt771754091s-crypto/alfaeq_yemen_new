@@ -128,11 +128,11 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 6),
             const Text('المتواجدون الآن = حسابات أرسلت نبضة حضور خلال آخر دقيقتين.', style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 10),
-            Row(children: [Expanded(child: _Metric(label: 'الحسابات المسجلة', value: stats.users, icon: Icons.people_outline)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'المتواجدون الآن', value: stats.onlineUsers, icon: Icons.wifi_tethering)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'المتاجر', value: stats.stores, icon: Icons.storefront_outlined))]),
+            Row(children: [Expanded(child: _Metric(label: 'الحسابات المسجلة', value: stats.users, icon: Icons.people_outline)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'سجلوا الدخول', value: stats.loggedInUsers, icon: Icons.login)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'المتواجدون الآن', value: stats.onlineUsers, icon: Icons.wifi_tethering))]),
             const SizedBox(height: 8),
             Row(children: [Expanded(child: _Metric(label: 'المنتجات', value: stats.products, icon: Icons.inventory_2_outlined)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'الطلبات', value: stats.orders, icon: Icons.receipt_long_outlined)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'عمليات المحفظة', value: stats.walletOperations, icon: Icons.account_balance_wallet_outlined))]),
             const SizedBox(height: 8),
-            _Metric(label: 'سجل التدقيق', value: stats.auditLogs, icon: Icons.fact_check_outlined),
+            Row(children: [Expanded(child: _Metric(label: 'سجل الدخول', value: stats.loginEvents, icon: Icons.login_outlined)), const SizedBox(width: 8), Expanded(child: _Metric(label: 'سجل التدقيق', value: stats.auditLogs, icon: Icons.fact_check_outlined))]),
           ])));
         },
       );
@@ -204,8 +204,11 @@ class AdminDashboard extends StatelessWidget {
       db.collection('orders').get(),
       db.collection('walletOperations').get(),
       db.collection('auditLogs').get(),
+      db.collection('loginEvents').get(),
     ]);
-    return _AdminStats(users: results[0].size, onlineUsers: results[1].size, stores: results[2].size, products: results[3].size, orders: results[4].size, walletOperations: results[5].size, auditLogs: results[6].size);
+    final loginDocs = results[7].docs;
+    final loggedInUsers = loginDocs.map((d) => (d.data() as Map<String, dynamic>)['uid']?.toString()).whereType<String>().toSet().length;
+    return _AdminStats(users: results[0].size, onlineUsers: results[1].size, loggedInUsers: loggedInUsers, loginEvents: results[7].size, stores: results[2].size, products: results[3].size, orders: results[4].size, walletOperations: results[5].size, auditLogs: results[6].size);
   }
 
   static void _open(BuildContext context, Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
@@ -214,12 +217,14 @@ class AdminDashboard extends StatelessWidget {
 class _AdminStats {
   final int users;
   final int onlineUsers;
+  final int loggedInUsers;
+  final int loginEvents;
   final int stores;
   final int products;
   final int orders;
   final int walletOperations;
   final int auditLogs;
-  const _AdminStats({required this.users, required this.onlineUsers, required this.stores, required this.products, required this.orders, required this.walletOperations, required this.auditLogs});
+  const _AdminStats({required this.users, required this.onlineUsers, required this.loggedInUsers, required this.loginEvents, required this.stores, required this.products, required this.orders, required this.walletOperations, required this.auditLogs});
 }
 
 class _Metric extends StatelessWidget {
