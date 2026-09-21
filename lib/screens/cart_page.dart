@@ -144,6 +144,7 @@ class CartPage extends StatelessWidget {
 
   Future<Map<String, dynamic>> _createLocalOrderDraft({
     required String uid,
+    required List<Map<String, dynamic>> items,
     required String address,
     required String paymentMethod,
     required LatLng? deliveryPoint,
