@@ -120,7 +120,7 @@ class CartPage extends StatelessWidget {
         resultData = Map<String, dynamic>.from(response.data as Map);
       } on FirebaseFunctionsException catch (e) {
         if (!['not-found', 'unavailable'].contains(e.code)) rethrow;
-        resultData = await _createLocalOrderDraft(uid: uid, address: address, paymentMethod: paymentMethod, deliveryPoint: deliveryPoint);
+        resultData = await _createLocalOrderDraft(uid: uid, items: items, address: address, paymentMethod: paymentMethod, deliveryPoint: deliveryPoint);
         usedFallback = true;
       }
       if (context.mounted) {
