@@ -15,14 +15,24 @@ Flutter/Firebase → Cloud Functions → n8n Webhook → Google Sheets / WhatsAp
 - مسار WhatsApp Automation.
 - سر مشترك بين Firebase وn8n.
 
-## الأسرار المطلوبة في Firebase Functions
+## إعداد اتصال n8n داخل Firebase
+
+لا أضفت أسرارًا جديدة إلى نشر Functions حتى لا نعطّل خط النشر الحالي. إعداد الاتصال محفوظ server-side في:
+
+`platformIntegrations/n8n`
+
+بالحقول:
 
 ```
-N8N_AUTOMATION_WEBHOOK_URL
-N8N_AUTOMATION_SHARED_SECRET
+enabled: true
+webhookUrl: "https://YOUR-N8N-HOST/webhook/alfaeq-events"
+sharedSecret: "LONG_RANDOM_SECRET"
 ```
+
+يجب أن يكتب هذا المستند فقط من مسار مالك/إدارة موثوق؛ لا يقرأه تطبيق Flutter مباشرة.
 
 ## متغيرات n8n
+
 
 ```
 ALFAEQ_N8N_SHARED_SECRET
