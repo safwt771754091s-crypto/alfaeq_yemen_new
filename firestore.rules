@@ -167,7 +167,14 @@ service cloud.firestore {
 
     match /loginEvents/{id} {
       allow read: if staff() || developer();
-      allow create, update, delete: if false;
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.action in ['login', 'register']
+        && request.resource.data.provider is string
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.loginAt == request.time;
+      allow update, delete: if false;
     }
 
     match /auditLogs/{id} {
