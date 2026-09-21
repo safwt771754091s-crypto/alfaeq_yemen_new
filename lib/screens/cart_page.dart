@@ -182,7 +182,8 @@ class CartPage extends StatelessWidget {
       final quantity = unit.fromBase(requested);
       verifiedTotal += price * quantity;
       final storeId = (p['storeId'] ?? item['storeId'] ?? '').toString();
-      if (storeId.isNotEmpty) merchantIds.add(storeId);
+      final merchantOwnerId = (p['ownerId'] ?? '').toString();
+      if (merchantOwnerId.isNotEmpty) merchantIds.add(merchantOwnerId);
       verifiedItems.add({
         'productId': productId,
         'storeId': storeId,
@@ -201,6 +202,7 @@ class CartPage extends StatelessWidget {
       'customerId': uid,
       'items': verifiedItems,
       'merchantIds': merchantIds.toList(),
+      if (merchantIds.length == 1) 'merchantId': merchantIds.first,
       'total': verifiedTotal,
       'currency': 'YER',
       'address': address,
