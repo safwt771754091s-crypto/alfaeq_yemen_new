@@ -1,4 +1,5 @@
 const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { logger } = require('firebase-functions');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -250,3 +251,24 @@ Object.assign(exports, require('./admin_users'));
 Object.assign(exports, require('./order_checkout'));
 Object.assign(exports, require('./whatsapp'));
 Object.assign(exports, require('./super_alfaeq_catalog'));
+
+
+// Records authenticated sessions server-side. This is append-only telemetry for the owner/admin dashboard.
+exports.recordLoginEvent = onCall({ region: 'us-central1' }, async (request) => {
+  if (!request.auth?.uid) throw new HttpsError('unauthenticated', 'Authentication required.');
+  const uid = request.auth.uid;
+  const email = request.auth.token.email || null;
+  const provider = typeof request.data?.provider === 'string' ? request.data.provider : 'unknown';
+  const action = typeof request.data?.action === 'string' ? request.data.action : 'login';
+  await db.collection('loginEvents').add({
+    uid, email, provider, action,
+    loginAt: FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  await db.collection('users').doc(uid).set({
+    lastLoginAt: FieldValue.serverTimestamp(),
+    lastSeen: FieldValue.serverTimestamp(),
+    isOnline: true,
+  }, { merge: true });
+  return { ok: true };
+});
