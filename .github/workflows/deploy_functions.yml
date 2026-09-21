@@ -2,6 +2,12 @@ name: Deploy Alfaeq Yemen Functions (Blaze required)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+      - 'firebase.json'
+      - '.github/workflows/deploy_functions.yml'
 
 permissions:
   contents: read
