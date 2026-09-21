@@ -40,36 +40,44 @@ class ProductUnit {
   }
 
   static int stockBase(Map<String, dynamic> product) {
-    final explicit = (product['stockBase'] is num) ? (product['stockBase'] as num).round() : null;
-    if (explicit != null) return explicit;
-    final scale = Number.fromString(product['unitScale']?.toString() ?? '1');
-    final stock = (product['stock'] is num) ? (product['stock'] as num).toDouble() : 0.0;
-    if (stock <= 0) return 0;
-    final normalizedScale = scale > 0 ? scale : 1;
-    return (stock * normalizedScale).round();
+    final explicit = product['stockBase'];
+    if (explicit is num && explicit.isFinite) {
+      return explicit.round();
+    }
+
+    final unit = fromProduct(product);
+    final rawStock = product['stock'];
+    final unitScale = product['unitScale'] is num
+        ? (product['unitScale'] as num).toInt()
+        : unit.scale;
+
+    if (rawStock is num && rawStock.isFinite) {
+      return (rawStock * unitScale).round();
+    }
+    return 0;
   }
 
-  static num fromBase(int baseValue) {
-    final unit = this;
-    return baseValue / unit.scale;
+  int toBase(dynamic value) {
+    if (value is num && value.isFinite) {
+      return (value * scale).round();
+    }
+    if (value is String) {
+      final parsed = num.tryParse(value);
+      if (parsed != null && parsed.isFinite) {
+        return (parsed * scale).round();
+      }
+    }
+    return 0;
   }
 
-  int fromBase(int value) => value ~/ scale;
+  num toDisplay(int baseValue) => baseValue / scale;
 
   static String formatBase(Map<String, dynamic> product, int baseValue) {
     final unit = fromProduct(product);
-    final base = baseValue;
+    final value = unit.toDisplay(baseValue);
     if (unit.id == 'kg' || unit.id == 'l') {
-      final floatValue = (base / unit.scale);
-      return '${floatValue.toStringAsFixed(floatValue >= 100 ? 0 : 2)} ${unit.label}';
+      return '${value.toStringAsFixed(value >= 100 ? 0 : 2)} ${unit.label}';
     }
-    return '$base ${unit.label}';
-  }
-}
-
-extension NumberFromString on num {
-  static int fromString(String value) {
-    final parsed = num.tryParse(value);
-    return parsed != null && parsed.isFinite ? parsed.round() : 1;
+    return '$baseValue ${unit.label}';
   }
 }
