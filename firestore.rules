@@ -165,6 +165,11 @@ service cloud.firestore {
       allow update, delete: if staff();
     }
 
+    match /loginEvents/{id} {
+      allow read: if staff() || developer();
+      allow create, update, delete: if false;
+    }
+
     match /auditLogs/{id} {
       allow read: if staff() || developer();
       allow create: if signedIn()
