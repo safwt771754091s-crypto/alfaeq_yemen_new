@@ -69,8 +69,27 @@ jobs:
           grep -q "class DefaultFirebaseOptions" lib/firebase_options.dart
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - name: Build APK
-        run: flutter build apk --debug --no-tree-shake-icons
+      - name: Configure Gradle dependency cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+      - name: Build APK (with dependency retry)
+        shell: bash
+        run: |
+          set -e
+          for attempt in 1 2 3; do
+            echo "Gradle/Flutter APK build attempt $attempt/3"
+            if flutter build apk --debug --no-tree-shake-icons; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              wait_seconds=$((attempt * 20))
+              echo "Dependency/network failure detected; waiting ${wait_seconds}s before retry"
+              sleep "$wait_seconds"
+            fi
+          done
+          echo "APK build failed after 3 attempts"
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: alfaeq-yemen-fresh-apk
