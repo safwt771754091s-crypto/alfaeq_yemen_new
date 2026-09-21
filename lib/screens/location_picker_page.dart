@@ -23,15 +23,32 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   LatLng get _center => _selected ?? LatLng(widget.initialLatitude ?? _fallback.latitude, widget.initialLongitude ?? _fallback.longitude);
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialLatitude != null && widget.initialLongitude != null) {
+      _selected = LatLng(widget.initialLatitude!, widget.initialLongitude!);
+    } else {
+      // Initiate the browser/device permission prompt as soon as the picker opens.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _useDeviceLocation();
+      });
+    }
+  }
+
   Future<void> _useDeviceLocation() async {
+    if (!mounted || _busy) return;
     setState(() { _busy = true; _error = null; });
     try {
       final position = await LocationService.requireCurrentPosition();
+      if (!mounted) return;
       final point = LatLng(position.latitude, position.longitude);
       setState(() => _selected = point);
       _mapController.move(point, 16);
     } catch (_) {
-      setState(() => _error = 'تعذر تحديد موقعك. فعّل GPS واسمح بالوصول إلى الموقع ثم حاول مرة أخرى.');
+      if (mounted) {
+        setState(() => _error = 'تعذر تحديد موقعك تلقائيًا. تحقق من إذن الموقع وفعّل GPS، أو اختر موقعك بالنقر على الخريطة.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -52,14 +69,16 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             child: Card(elevation: 0, child: Padding(
               padding: const EdgeInsets.all(14),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                const Text('حدد موقعك على الخريطة أو استخدم موقع الهاتف الحالي.', style: TextStyle(fontWeight: FontWeight.w800)),
+                const Text('يجري تحديد موقعك تلقائيًا. يمكنك أيضًا تحريك الخريطة والنقر لاختيار موقع آخر.', style: TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 10),
                 Row(children: [
-                  Expanded(child: OutlinedButton.icon(onPressed: _busy ? null : _useDeviceLocation, icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.my_location), label: const Text('موقع الهاتف'))),
+                  Expanded(child: OutlinedButton.icon(onPressed: _busy ? null : _useDeviceLocation, icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.my_location), label: const Text('إعادة تحديد موقعي'))),
                   const SizedBox(width: 8),
                   Expanded(child: FilledButton.icon(onPressed: point == null ? null : () => Navigator.pop(context, point), icon: const Icon(Icons.check_circle_outline), label: const Text('تأكيد الموقع'))),
                 ]),
+                if (_busy) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator()),
                 if (_error != null) ...[const SizedBox(height: 8), Text(_error!, style: const TextStyle(fontWeight: FontWeight.w700))],
+                if (point != null) ...[const SizedBox(height: 6), Text('الإحداثيات: ${point.latitude.toStringAsFixed(6)}, ${point.longitude.toStringAsFixed(6)}', textDirection: TextDirection.ltr, textAlign: TextAlign.center)],
               ]),
             )),
           ),
