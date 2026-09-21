@@ -221,7 +221,17 @@ exports.createOrderFromCart = onCall({ region: 'us-central1', enforceAppCheck: t
       return { orderId: orderRef.id, invoiceId: invoiceRef.id, total, itemCount: items.length, stockMovements: movements, deliveryLocation };
     });
 
-    if (result.orderId && deliveryLocationForDispatch(result)) await autoAssignDriver(result.orderId, deliveryLocationForDispatch(result));
+    let dispatchStatus = 'awaiting_assignment';
+    const dispatchLocation = deliveryLocationForDispatch(result);
+    if (result.orderId && dispatchLocation) {
+      try {
+        const assigned = await autoAssignDriver(result.orderId, dispatchLocation);
+        dispatchStatus = assigned ? 'assigned' : 'awaiting_assignment';
+      } catch (dispatchError) {
+        logger.warn('Automatic dispatch deferred; order remains queued', { orderId: result.orderId, error: dispatchError?.message || String(dispatchError) });
+        dispatchStatus = 'awaiting_assignment';
+      }
+    }
 
     await db.collection('auditLogs').add({
       actorUid: uid,
@@ -233,7 +243,7 @@ exports.createOrderFromCart = onCall({ region: 'us-central1', enforceAppCheck: t
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    return { ok: true, ...result, currency: CURRENCY, inventoryStatus: 'reserved', deliveryStatus: deliveryLocationForDispatch(result) ? 'auto_assigned_or_queued' : 'awaiting_location' };
+    return { ok: true, ...result, currency: CURRENCY, inventoryStatus: 'reserved', deliveryStatus: dispatchStatus };
   } catch (error) {
     if (error instanceof HttpsError) throw error;
     throw new HttpsError('internal', 'تعذر إتمام الطلب بشكل آمن. لم يتم خصم أي مخزون.');
