@@ -141,7 +141,7 @@ exports.syncProductAutomation = onDocumentWritten(
     const hasStore = typeof product.storeId === 'string' && product.storeId.trim() !== '';
     const hasOwner = typeof product.ownerId === 'string' && product.ownerId.trim() !== '' && product.ownerId !== 'admin-created';
     const validPrice = typeof product.price === 'number' && Number.isFinite(product.price) && product.price >= 0;
-    const validStock = typeof product.stock === 'number' && Number.isInteger(product.stock) && product.stock >= 0;
+    const validStock = typeof product.stock === 'number' && Number.isFinite(product.stock) && product.stock >= 0;
     const active = product.status === 'active';
     const ready = hasName && hasStore && hasOwner && validPrice && validStock && active;
     const checklist = [];
