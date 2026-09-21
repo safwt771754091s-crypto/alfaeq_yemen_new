@@ -1,4 +1,4 @@
-const DEFAULT_SAR_TO_YER = 650;
+const DEFAULT_SAR_TO_YER = 413;
 
 async function getSarToYerRate(db) {
   const refs = [
