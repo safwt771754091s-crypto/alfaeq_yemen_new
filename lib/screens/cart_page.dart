@@ -24,7 +24,7 @@ class CartPage extends StatelessWidget {
       final next = current + delta * step;
       if (next <= 0) {
         items.removeAt(index);
-      } else if (next <= 100) {
+      } else if (next <= unit.scale * 100) {
         items[index]['quantityBase'] = next;
         items[index]['quantity'] = unit.fromBase(next);
       }
