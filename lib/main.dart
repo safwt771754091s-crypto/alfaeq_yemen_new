@@ -357,8 +357,11 @@ class _StoreCatalogCard extends StatelessWidget {
           if (current >= stockBase || current >= unit.scale * 100) {
             throw StateError('الكمية المطلوبة غير متوفرة في المخزون.');
           }
-          items[index]['quantityBase'] = current + unit.scale;
-          items[index]['quantity'] = unit.fromBase(current + unit.scale);
+          final step = (items[index]['stepBase'] as num?)?.round() ?? unit.defaultStepBase;
+          final next = current + step;
+          if (next > stockBase) throw StateError('الكمية المطلوبة غير متوفرة في المخزون.');
+          items[index]['quantityBase'] = next;
+          items[index]['quantity'] = unit.fromBase(next);
           items[index]['price'] = price;
           items[index]['unitScale'] = unit.scale;
           items[index]['saleUnit'] = unit.id;
