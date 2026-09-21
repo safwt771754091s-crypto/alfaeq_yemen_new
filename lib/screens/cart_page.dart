@@ -104,23 +104,31 @@ class CartPage extends StatelessWidget {
       return;
     }
     try {
-      final callable = FirebaseFunctions.instanceFor(region: 'us-central1').httpsCallable('createOrderFromCart');
-      final response = await callable.call({
-        'address': address,
-        'paymentMethod': paymentMethod,
-        if (deliveryPoint != null)
-          'deliveryLocation': {
-            'latitude': deliveryPoint!.latitude,
-            'longitude': deliveryPoint!.longitude,
-          },
-      });
-      final resultData = Map<String, dynamic>.from(response.data as Map);
+      Map<String, dynamic> resultData;
+      var usedFallback = false;
+      try {
+        final callable = FirebaseFunctions.instanceFor(region: 'us-central1').httpsCallable('createOrderFromCart');
+        final response = await callable.call({
+          'address': address,
+          'paymentMethod': paymentMethod,
+          if (deliveryPoint != null)
+            'deliveryLocation': {
+              'latitude': deliveryPoint!.latitude,
+              'longitude': deliveryPoint!.longitude,
+            },
+        });
+        resultData = Map<String, dynamic>.from(response.data as Map);
+      } on FirebaseFunctionsException catch (e) {
+        if (!['not-found', 'unavailable'].contains(e.code)) rethrow;
+        resultData = await _createLocalOrderDraft(uid: uid, address: address, paymentMethod: paymentMethod, deliveryPoint: deliveryPoint);
+        usedFallback = true;
+      }
       if (context.mounted) {
         await showDialog<void>(
           context: context,
           builder: (_) => AlertDialog(
             title: const Text('تم إنشاء الطلب'),
-            content: Text('رقم الطلب: ${resultData['orderId']}\\nالإجمالي: ${resultData['total'] ?? total} ${resultData['currency'] ?? currency}\\nتم تثبيت المخزون بشكل آمن.'),
+            content: Text('رقم الطلب: ' + (resultData['orderId'] ?? '').toString() + '\\nالإجمالي: ' + (resultData['total'] ?? total).toString() + ' ' + (resultData['currency'] ?? currency).toString() + '\\n' + (usedFallback ? 'تم إنشاء مسودة طلب معلّقة بعد التحقق من المنتج والمخزون. ستحتاج المعالجة النهائية إلى مسار الخادم.' : 'تم تثبيت المخزون بشكل آمن.')),
             actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
           ),
         );
@@ -130,6 +138,86 @@ class CartPage extends StatelessWidget {
     } on FirebaseException catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء الطلب: ${e.message ?? e.code}')));
     }
+  }
+
+  Future<Map<String, dynamic>> _createLocalOrderDraft({
+    required String uid,
+    required String address,
+    required String paymentMethod,
+    required LatLng? deliveryPoint,
+  }) async {
+    final productRefs = <String, DocumentReference<Map<String, dynamic>>>{};
+    for (final item in items) {
+      final productId = (item['productId'] ?? '').toString();
+      if (productId.isEmpty) throw StateError('أحد عناصر السلة لا يملك معرف منتج صالحاً.');
+      productRefs[productId] = FirebaseFirestore.instance.collection('products').doc(productId);
+    }
+
+    final snaps = await Future.wait(productRefs.values.map((ref) => ref.get()));
+    final byId = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+    var snapIndex = 0;
+    for (final entry in productRefs.entries) {
+      byId[entry.key] = snaps[snapIndex++];
+    }
+
+    num verifiedTotal = 0;
+    final verifiedItems = <Map<String, dynamic>>[];
+    final merchantIds = <String>{};
+
+    for (final item in items) {
+      final productId = (item['productId'] ?? '').toString();
+      final snap = byId[productId];
+      if (snap == null || !snap.exists) throw StateError('المنتج غير موجود حالياً.');
+      final p = snap.data() ?? <String, dynamic>{};
+      if ((p['status'] ?? 'active') != 'active') throw StateError('المنتج غير متاح حالياً.');
+      final unit = ProductUnit.fromProduct(p);
+      final price = p['price'];
+      if (price is! num || price < 0) throw StateError('سعر المنتج غير صالح.');
+      final base = (item['quantityBase'] as num?)?.toDouble() ?? (((item['quantity'] as num?) ?? 1) * unit.scale);
+      final requested = base.round();
+      final stockBase = ProductUnit.stockBase(p);
+      if (requested <= 0 || requested > stockBase) throw StateError('المخزون غير كافٍ للمنتج: ' + (p['name'] ?? productId).toString() + '.');
+      final quantity = unit.fromBase(requested);
+      verifiedTotal += price * quantity;
+      final storeId = (p['storeId'] ?? item['storeId'] ?? '').toString();
+      if (storeId.isNotEmpty) merchantIds.add(storeId);
+      verifiedItems.add({
+        'productId': productId,
+        'storeId': storeId,
+        'name': (p['name'] ?? item['name'] ?? 'منتج').toString(),
+        'quantity': quantity,
+        'quantityBase': requested,
+        'saleUnit': unit.id,
+        'unitLabel': unit.label,
+        'price': price,
+        'currency': (p['currency'] ?? 'YER').toString(),
+      });
+    }
+
+    final orderRef = FirebaseFirestore.instance.collection('orders').doc();
+    await orderRef.set({
+      'customerId': uid,
+      'items': verifiedItems,
+      'merchantIds': merchantIds.toList(),
+      'total': verifiedTotal,
+      'currency': 'YER',
+      'address': address,
+      'deliveryLocation': deliveryPoint == null ? null : GeoPoint(deliveryPoint.latitude, deliveryPoint.longitude),
+      'paymentMethod': paymentMethod,
+      'status': 'pending',
+      'deliveryStatus': 'awaiting_assignment',
+      'requiresServerValidation': true,
+      'creationMode': 'client_draft_fallback',
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    await FirebaseFirestore.instance.collection('carts').doc(uid).set({
+      'ownerId': uid,
+      'items': <Map<String, dynamic>>[],
+      'currency': 'YER',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    return {'orderId': orderRef.id, 'total': verifiedTotal, 'currency': 'YER', 'fallback': true};
   }
 
   @override
