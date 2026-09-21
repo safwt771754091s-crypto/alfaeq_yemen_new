@@ -251,6 +251,7 @@ Object.assign(exports, require('./admin_users'));
 Object.assign(exports, require('./order_checkout'));
 Object.assign(exports, require('./whatsapp'));
 Object.assign(exports, require('./super_alfaeq_catalog'));
+Object.assign(exports, require('./n8n_bridge'));
 
 
 // Records authenticated sessions server-side. This is append-only telemetry for the owner/admin dashboard.
