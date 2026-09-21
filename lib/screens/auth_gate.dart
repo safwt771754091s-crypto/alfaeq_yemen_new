@@ -77,6 +77,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
             switch (role) {
               case 'owner':
               case 'admin':
+                SuperAlfaeqCatalogImporter().importIfNeeded().catchError((_) => 0);
                 return const AdminDashboard();
               case 'developer':
                 return const DeveloperPage();
