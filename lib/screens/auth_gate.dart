@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/super_alfaeq_catalog_importer.dart';
 import 'admin_dashboard.dart';
 import 'customer_session_shell.dart';
 import 'developer_page.dart';
@@ -29,6 +30,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     _authSubscription = _auth.authStateChanges.listen((user) {
       if (user != null) {
         _auth.startPresence();
+        SuperAlfaeqCatalogImporter().importIfNeeded().catchError((_) => 0);
       } else {
         _auth.stopPresence();
       }
