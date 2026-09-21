@@ -6,6 +6,8 @@ import '../services/auth_service.dart';
 import 'admin_data_entry.dart';
 import 'admin_user_management_page.dart';
 import 'cart_page.dart';
+import 'ai_assistant_page.dart';
+import 'bulk_product_import_page.dart';
 import 'developer_page.dart';
 import 'dispatch_center_page.dart';
 import 'location_picker_page.dart';
@@ -86,6 +88,8 @@ class AdminDashboard extends StatelessWidget {
                 _ActionCard(icon: Icons.add_link, title: 'التجار والروابط', subtitle: 'إنشاء وإدارة دعوات التجار', onTap: () => _open(context, MerchantInvitesPage())),
                 _ActionCard(icon: Icons.storefront_outlined, title: 'مركز التاجر', subtitle: 'الكتالوج والمنتجات والطلبات', onTap: () => _open(context, MerchantPortalPage())),
                 _ActionCard(icon: Icons.add_business_outlined, title: 'إدخال البيانات', subtitle: 'إضافة المتاجر والمنتجات مع تحديد موقع المتجر على الخريطة', onTap: () => _open(context, AdminDataEntry())),
+                _ActionCard(icon: Icons.table_view_outlined, title: 'استيراد Excel بالجملة', subtitle: 'رفع Excel/CSV ومعاينة الأصناف ثم اعتمادها دفعة واحدة', onTap: () => _open(context, const BulkProductImportPage())),
+                _ActionCard(icon: Icons.auto_awesome, title: 'ذكاء الفائق', subtitle: 'المساعد الذكي للمالك والإدارة مع بوابة الصلاحيات', onTap: () => _open(context, const AiAssistantPage())),
                 _ActionCard(icon: Icons.local_shipping_outlined, title: 'التوزيع والمندوبون', subtitle: 'تشغيل التوزيع ومتابعة الطلبات', onTap: () => _open(context, DispatchCenterPage())),
                 _ActionCard(icon: Icons.code_outlined, title: 'مركز المطور والأمن', subtitle: 'الفحص، سجل التدقيق، وتقارير الحماية', onTap: () => _open(context, DeveloperPage())),
                 const SizedBox(height: 18),
@@ -186,6 +190,8 @@ class AdminDashboard extends StatelessWidget {
       _QuickAction(Icons.manage_accounts, 'المستخدمون', () => _open(context, AdminUserManagementPage())),
       _QuickAction(Icons.store, 'اعتماد المتاجر', () => _open(context, MerchantApprovalPage())),
       _QuickAction(Icons.add_business, 'إضافة بيانات', () => _open(context, AdminDataEntry())),
+      _QuickAction(Icons.table_view_outlined, 'استيراد Excel', () => _open(context, const BulkProductImportPage())),
+      _QuickAction(Icons.auto_awesome, 'ذكاء الفائق', () => _open(context, const AiAssistantPage())),
       _QuickAction(Icons.map_outlined, 'خريطة المتاجر', () => _open(context, LocationPickerPage(title: 'خريطة المنصة'))),
       _QuickAction(Icons.account_balance_wallet_outlined, 'الدفع والمحافظ', () => _open(context, PlatformControlPage())),
       _QuickAction(Icons.delivery_dining_outlined, 'التوزيع', () => _open(context, DispatchCenterPage())),
