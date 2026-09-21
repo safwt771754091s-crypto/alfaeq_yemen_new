@@ -27,12 +27,6 @@ function productStockBase(product) {
     : 0;
 }
 
-/**
- * Reserve inventory atomically for legacy client-created orders.
- * Server-created checkout orders already have inventoryStatus=reserved and
- * stockDeducted=true, so this trigger deliberately skips them. Quantities are
- * normalized to base units so kg/l products cannot be deducted as whole units.
- */
 exports.reserveOrderStock = onDocumentCreated(
   { document: 'orders/{orderId}', region: 'us-central1', retry: true },
   async (event) => {
@@ -43,18 +37,13 @@ exports.reserveOrderStock = onDocumentCreated(
       await db.runTransaction(async (tx) => {
         const orderSnap = await tx.get(orderRef);
         if (!orderSnap.exists) return;
-
         const order = orderSnap.data() || {};
         if (order.inventoryStatus === 'reserved' || order.stockDeducted === true) return;
         if (order.inventoryStatus === 'insufficient_stock') return;
 
         const rawItems = Array.isArray(order.items) ? order.items : [];
         if (rawItems.length === 0) {
-          tx.update(orderRef, {
-            inventoryStatus: 'insufficient_stock', stockDeducted: false,
-            rejectionCode: 'EMPTY_ORDER', status: 'rejected',
-            updatedAt: FieldValue.serverTimestamp(),
-          });
+          tx.update(orderRef, { inventoryStatus: 'insufficient_stock', stockDeducted: false, rejectionCode: 'EMPTY_ORDER', status: 'rejected', updatedAt: FieldValue.serverTimestamp() });
           return;
         }
 
@@ -63,11 +52,7 @@ exports.reserveOrderStock = onDocumentCreated(
           const productId = String(item?.productId || '').trim();
           const requested = baseQuantity(item, item);
           if (!productId || !Number.isInteger(requested) || requested <= 0) {
-            tx.update(orderRef, {
-              inventoryStatus: 'insufficient_stock', stockDeducted: false,
-              rejectionCode: 'INVALID_ORDER_ITEM', status: 'rejected',
-              updatedAt: FieldValue.serverTimestamp(),
-            });
+            tx.update(orderRef, { inventoryStatus: 'insufficient_stock', stockDeducted: false, rejectionCode: 'INVALID_ORDER_ITEM', status: 'rejected', updatedAt: FieldValue.serverTimestamp() });
             return;
           }
           quantities.set(productId, (quantities.get(productId) || 0) + requested);
@@ -82,23 +67,12 @@ exports.reserveOrderStock = onDocumentCreated(
           const productId = productRefs[i].id;
           const requested = quantities.get(productId);
           if (!snap.exists) {
-            tx.update(orderRef, {
-              inventoryStatus: 'insufficient_stock', stockDeducted: false,
-              rejectionCode: 'PRODUCT_NOT_FOUND', rejectionProductId: productId,
-              status: 'rejected', updatedAt: FieldValue.serverTimestamp(),
-            });
+            tx.update(orderRef, { inventoryStatus: 'insufficient_stock', stockDeducted: false, rejectionCode: 'PRODUCT_NOT_FOUND', rejectionProductId: productId, status: 'rejected', updatedAt: FieldValue.serverTimestamp() });
             return;
           }
-          const product = snap.data() || {};
-          const available = productStockBase(product);
+          const available = productStockBase(snap.data() || {});
           if (!Number.isInteger(available) || available < requested) {
-            tx.update(orderRef, {
-              inventoryStatus: 'insufficient_stock', stockDeducted: false,
-              rejectionCode: 'INSUFFICIENT_STOCK', rejectionProductId: productId,
-              requestedQuantityBase: requested,
-              availableStockBase: Number.isFinite(available) ? available : 0,
-              status: 'rejected', updatedAt: FieldValue.serverTimestamp(),
-            });
+            tx.update(orderRef, { inventoryStatus: 'insufficient_stock', stockDeducted: false, rejectionCode: 'INSUFFICIENT_STOCK', rejectionProductId: productId, requestedQuantityBase: requested, availableStockBase: Number.isFinite(available) ? available : 0, status: 'rejected', updatedAt: FieldValue.serverTimestamp() });
             return;
           }
         }
@@ -119,30 +93,47 @@ exports.reserveOrderStock = onDocumentCreated(
             soldQuantity: Number(product.soldQuantity || 0) + requestedBase / scale,
             updatedAt: now,
           });
-          deductedItems.push({
-            productId: productRef.id,
-            quantityBase: requestedBase,
-            stockBeforeBase: oldStockBase,
-            stockAfterBase: newStockBase,
-          });
+          deductedItems.push({ productId: productRef.id, quantityBase: requestedBase, stockBeforeBase: oldStockBase, stockAfterBase: newStockBase });
         }
-
-        tx.update(orderRef, {
-          inventoryStatus: 'reserved', stockDeducted: true,
-          stockDeductedAt: now, stockMovements: deductedItems,
-          updatedAt: now,
-        });
+        tx.update(orderRef, { inventoryStatus: 'reserved', stockDeducted: true, stockDeductedAt: now, stockMovements: deductedItems, updatedAt: now });
       });
 
-      await db.collection('auditLogs').add({
-        actorUid: event.data?.data()?.customerId || 'unknown',
-        action: 'order.inventory.deducted', result: 'success',
-        source: 'inventory_backend', orderId,
-        createdAt: FieldValue.serverTimestamp(),
-      });
+      await db.collection('auditLogs').add({ actorUid: event.data?.data()?.customerId || 'unknown', action: 'order.inventory.deducted', result: 'success', source: 'inventory_backend', orderId, createdAt: FieldValue.serverTimestamp() });
     } catch (error) {
       logger.error('Inventory reservation failed', { orderId, error: error?.message || String(error) });
       throw error;
     }
+  },
+);
+
+/** Creates an auditable payment intent without falsely confirming external payment. */
+exports.createOrderPaymentRecord = onDocumentCreated(
+  { document: 'orders/{orderId}', region: 'us-central1', retry: true },
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) return;
+    const orderId = event.params.orderId;
+    const order = snapshot.data() || {};
+    const method = String(order.paymentMethod || '');
+    if (!['cash_on_delivery', 'al_kuraimi', 'cash_wallet', 'jeeb_wallet'].includes(method)) return;
+
+    const paymentRef = db.collection('payments').doc(orderId);
+    if ((await paymentRef.get()).exists) return;
+    const status = method === 'cash_on_delivery' ? 'payable_on_delivery' : 'awaiting_confirmation';
+    await paymentRef.create({
+      paymentId: orderId,
+      orderId,
+      customerId: String(order.customerId || ''),
+      merchantIds: Array.isArray(order.merchantIds) ? order.merchantIds : [],
+      provider: method,
+      method,
+      amount: Number(order.total || 0),
+      currency: String(order.currency || 'YER'),
+      status,
+      verified: false,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    await db.collection('auditLogs').add({ actorUid: String(order.customerId || 'system'), action: 'payment.intent.created', result: status, source: 'payment_backend', orderId, paymentMethod: method, amount: Number(order.total || 0), createdAt: FieldValue.serverTimestamp() });
   },
 );
