@@ -7,9 +7,11 @@ const { getSarToYerRate, sarToYer } = require('../functions/currency');
 initializeApp();
 const db = getFirestore();
 const CHUNKS = ['catalog_01.json','catalog_02.json','catalog_03.json','catalog_04.json','catalog_05.json','catalog_06.json','catalog_07.json','catalog_08.json'];
+const BATCH_SIZE = 100; // Small commits reduce pressure on Firestore during imports.
+const MAX_RETRIES = 6;
 
 function imageUrlForBarcode(barcode) {
-  const digits = String(barcode || '').replace(/\D/g, '');
+  const digits = String(barcode || '').replace(/\\D/g, '');
   if (digits.length < 8) return null;
   return `https://images.openfoodfacts.org/images/products/${digits.slice(0,3)}/${digits.slice(3,6)}/${digits.slice(6,9)}/${digits.slice(9)}/front_en.400.jpg`;
 }
@@ -24,6 +26,26 @@ function normalizeUnit(raw) {
 }
 function unitScale(unit) { return { piece:1, kg:1000, g:1, l:1000, ml:1, m:1 }[unit] || 1; }
 function validPrice(v) { return typeof v === 'number' && Number.isFinite(v) && v >= 0; }
+
+async function commitWithRetry(batch, label) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await batch.commit();
+      return;
+    } catch (error) {
+      const code = error?.code;
+      const retryable = code === 4 || code === 8 || code === 10 || code === 13 || code === 14 ||
+        ['RESOURCE_EXHAUSTED','ABORTED','UNAVAILABLE','DEADLINE_EXCEEDED','INTERNAL'].includes(error?.status);
+      if (!retryable || attempt >= MAX_RETRIES) {
+        error.message = `${label} failed after ${attempt + 1} attempt(s): ${error.message}`;
+        throw error;
+      }
+      const delayMs = Math.min(60000, 1500 * (2 ** attempt)) + Math.floor(Math.random() * 1000);
+      console.warn(`${label}: transient Firestore error (${code || error.status || 'unknown'}); retry ${attempt + 1}/${MAX_RETRIES} in ${delayMs}ms`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+}
 
 async function findOwnerId() {
   const ownerSnap = await db.collection('users').where('role', '==', 'owner').limit(1).get();
@@ -42,10 +64,10 @@ async function main() {
     updatedAt:FieldValue.serverTimestamp(), createdAt:FieldValue.serverTimestamp()
   }, {merge:true});
 
-  let imported=0, active=0, rowIndex=0;
+  let imported=0, active=0, rowIndex=0, totalBatches=0;
+  let batch=db.batch(), writes=0;
   for (const file of CHUNKS) {
     const rows=JSON.parse(fs.readFileSync(path.join(__dirname,'..','functions','data','super_alfaeq',file),'utf8'));
-    let batch=db.batch(), writes=0;
     for (const row of rows) {
       rowIndex++;
       const productId=`super_${String(row.id).replace(/[^A-Za-z0-9_-]/g,'_')}_${rowIndex}`.slice(0,120);
@@ -75,17 +97,23 @@ async function main() {
         updatedAt:FieldValue.serverTimestamp(), createdAt:FieldValue.serverTimestamp()
       }, {merge:true});
       imported++; writes++;
-      if(writes===450){ await batch.commit(); batch=db.batch(); writes=0; }
+      if(writes >= BATCH_SIZE){
+        await commitWithRetry(batch, `Firestore batch ${++totalBatches}`);
+        console.log(`committed batch ${totalBatches}; processed ${imported} products`);
+        batch=db.batch(); writes=0;
+        // Brief pause smooths sustained write pressure. Re-running is safe because IDs are deterministic.
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
     }
-    if(writes) await batch.commit();
-    console.log(`seeded ${file}: ${rows.length} rows`);
+    console.log(`read ${file}: ${rows.length} rows`);
   }
+  if(writes){ await commitWithRetry(batch, `Firestore batch ${++totalBatches}`); }
   await db.collection('settings').doc('super_alfaeq_catalog').set({
     status:'ready', source:'الفائق_يمن_منتجات_سوبر_الفائق_جاهز_للمراجعة.xlsx',
     imported, active, storeId:'super-alfaeq', ownerId, seededBy:'github_actions',
     sarToYerRate, baseCurrency:'YER', sourceCurrency:'SAR',
     completedAt:FieldValue.serverTimestamp(), updatedAt:FieldValue.serverTimestamp()
   }, {merge:true});
-  console.log(JSON.stringify({ok:true, imported, active, ownerId}));
+  console.log(JSON.stringify({ok:true, imported, active, totalBatches, ownerId}));
 }
 main().catch(error=>{console.error(error);process.exit(1);});
