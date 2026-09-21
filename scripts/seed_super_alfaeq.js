@@ -2,6 +2,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const fs = require('fs');
 const path = require('path');
+const { getSarToYerRate, sarToYer } = require('../functions/currency');
 
 initializeApp();
 const db = getFirestore();
@@ -34,6 +35,7 @@ async function findOwnerId() {
 
 async function main() {
   const ownerId = await findOwnerId();
+  const sarToYerRate = await getSarToYerRate(db);
   await db.collection('stores').doc('super-alfaeq').set({
     name:'سوبر الفائق', sectionId:'markets', ownerId, status:'approved', enabled:true,
     address:'سوبر الفائق — متجر المنصة', phone:'', catalogSource:'excel_2026_09_19',
@@ -48,15 +50,20 @@ async function main() {
       rowIndex++;
       const productId=`super_${String(row.id).replace(/[^A-Za-z0-9_-]/g,'_')}_${rowIndex}`.slice(0,120);
       const saleUnit=normalizeUnit(row.unit), scale=unitScale(saleUnit);
-      const price=Number(row.price || 0), stock=Number(row.stock || 0);
+      const priceSar=Number(row.price || 0), costSar=Number(row.cost || 0);
+      const stockRaw=Number(row.stock ?? 0), expectedStock=Number(row.expectedStock ?? 0);
+      const stock=stockRaw > 0 ? stockRaw : expectedStock;
+      const price=sarToYer(priceSar, sarToYerRate), cost=sarToYer(costSar, sarToYerRate);
       const status=validPrice(price)?'active':'draft';
       if(status==='active') active++;
       batch.set(db.collection('products').doc(productId), {
         name:String(row.name || 'منتج'), barcode:row.barcode || null,
         internalRef:row.internalRef || null, reference:row.internalRef || row.barcode || productId,
         category:String(row.category || 'عام'), price:validPrice(price)?price:0,
-        cost:Number(row.cost || 0), currency:'YER', stock,
-        stockBase:Math.max(0,Math.round(stock*scale)), expectedStock:Number(row.expectedStock || 0),
+        priceSar:validPrice(priceSar)?priceSar:0, cost:validPrice(cost)?cost:0, costSar:validPrice(costSar)?costSar:0,
+        currency:'YER', sourceCurrency:'SAR', exchangeRateSarToYer:sarToYerRate, stock,
+        stockSource:stockRaw > 0 ? 'stock' : (expectedStock > 0 ? 'expectedStock' : 'unverified'),
+        stockBase:Math.max(0,Math.round(stock*scale)), expectedStock,
         saleUnit, unitScale:scale,
         baseUnit:['kg','g'].includes(saleUnit)?'g':(['l','ml'].includes(saleUnit)?'ml':saleUnit),
         stepBase:(saleUnit==='kg'||saleUnit==='l')?250:1,
@@ -76,6 +83,7 @@ async function main() {
   await db.collection('settings').doc('super_alfaeq_catalog').set({
     status:'ready', source:'الفائق_يمن_منتجات_سوبر_الفائق_جاهز_للمراجعة.xlsx',
     imported, active, storeId:'super-alfaeq', ownerId, seededBy:'github_actions',
+    sarToYerRate, baseCurrency:'YER', sourceCurrency:'SAR',
     completedAt:FieldValue.serverTimestamp(), updatedAt:FieldValue.serverTimestamp()
   }, {merge:true});
   console.log(JSON.stringify({ok:true, imported, active, ownerId}));
