@@ -32,7 +32,11 @@ exports.ensureSuperAlfaeqCatalog = onCall({ region:'us-central1', enforceAppChec
 
   const markerRef = db.collection('settings').doc('super_alfaeq_catalog');
   const markerSnap = await markerRef.get();
-  if (markerSnap.exists && markerSnap.data()?.status === 'ready') return { ok:true, alreadyReady:true, imported:markerSnap.data()?.imported || 0 };
+  if (request.data?.checkOnly === true) {
+    const data = markerSnap.exists ? (markerSnap.data() || {}) : {};
+    return { ok:true, ready:data.status === 'ready', imported:data.imported || 0, active:data.active || 0 };
+  }
+  if (markerSnap.exists && markerSnap.data()?.status === 'ready') return { ok:true, alreadyReady:true, imported:markerSnap.data()?.imported || 0, active:markerSnap.data()?.active || 0 };
 
   const storeRef = db.collection('stores').doc('super-alfaeq');
   if (!(await storeRef.get()).exists) {
