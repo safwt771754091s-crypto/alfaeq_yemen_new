@@ -27,7 +27,12 @@ exports.ensureSuperAlfaeqCatalog = onCall({ region:'us-central1', enforceAppChec
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated','Authentication required.');
   const claims = auth.token || {};
-  const allowed = claims.owner === true || claims.admin === true || claims.role === 'owner' || claims.role === 'admin';
+  let allowed = claims.owner === true || claims.admin === true || claims.role === 'owner' || claims.role === 'admin';
+  if (!allowed) {
+    const userSnap = await db.collection('users').doc(auth.uid).get();
+    const role = userSnap.data()?.role?.toString().toLowerCase();
+    allowed = role === 'owner' || role === 'admin';
+  }
   if (!allowed) throw new HttpsError('permission-denied','Owner/admin permission required.');
 
   const markerRef = db.collection('settings').doc('super_alfaeq_catalog');
