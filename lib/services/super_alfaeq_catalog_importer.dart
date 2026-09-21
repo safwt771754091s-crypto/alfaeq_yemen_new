@@ -60,7 +60,11 @@ class SuperAlfaeqCatalogImporter {
     final user = auth.currentUser!;
     final marker = db.collection('settings').doc('super_alfaeq_catalog');
     final markerSnap = await marker.get();
-    if (markerSnap.data()?['status'] == 'importing') return 0;
+    final markerData = markerSnap.data();
+    if (markerData?['status'] == 'importing') {
+      final started = markerData?['startedAt'];
+      if (started is Timestamp && DateTime.now().difference(started.toDate()).inMinutes < 30) return 0;
+    }
 
     await marker.set({
       'status': 'importing',
@@ -85,13 +89,14 @@ class SuperAlfaeqCatalogImporter {
 
     var total = 0;
     var done = 0;
-    for (final file in _files) {
+    try {
+      for (final file in _files) {
       final raw = await rootBundle.loadString(file);
       final rows = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
-      total += rows.length;
-    }
+        total += rows.length;
+      }
 
-    var rowIndex = 0;
+      var rowIndex = 0;
     var active = 0;
     for (final file in _files) {
       final raw = await rootBundle.loadString(file);
@@ -144,8 +149,8 @@ class SuperAlfaeqCatalogImporter {
       }
     }
 
-    await marker.set({
-      'status': 'ready',
+      await marker.set({
+        'status': 'ready',
       'imported': done,
       'active': active,
       'storeId': 'super-alfaeq',
@@ -153,6 +158,15 @@ class SuperAlfaeqCatalogImporter {
       'completedAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-    return done;
+      return done;
+    } catch (e) {
+      await marker.set({
+        'status': 'failed',
+        'error': e.toString(),
+        'failedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      rethrow;
+    }
   }
 }
