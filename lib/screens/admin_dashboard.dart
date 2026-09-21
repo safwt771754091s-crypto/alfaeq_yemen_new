@@ -60,6 +60,8 @@ class AdminDashboard extends StatelessWidget {
                 const SizedBox(height: 14),
                 _liveOverview(),
                 const SizedBox(height: 12),
+                _loginActivity(),
+                const SizedBox(height: 12),
                 Card(
                   child: ListTile(
                     leading: const CircleAvatar(child: Icon(Icons.logout_outlined)),
@@ -132,6 +134,50 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 8),
             _Metric(label: 'سجل التدقيق', value: stats.auditLogs, icon: Icons.fact_check_outlined),
           ])));
+        },
+      );
+
+  Widget _loginActivity() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance.collection('loginEvents').limit(50).snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Card(child: Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())));
+          }
+          if (snapshot.hasError) {
+            return const Card(child: ListTile(title: Text('سجل الدخول'), subtitle: Text('تعذر قراءة سجل الدخول. تحقق من صلاحيات المالك.')));
+          }
+          final docs = snapshot.data?.docs ?? const [];
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Expanded(child: Text('سجل دخول المستخدمين', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
+                  Text('\${docs.length} حدث حديث', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ]),
+                const SizedBox(height: 6),
+                const Text('يُسجّل الدخول الحقيقي من الخادم مع البريد الإلكتروني للحساب.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 8),
+                if (docs.isEmpty)
+                  const Padding(padding: EdgeInsets.all(12), child: Text('لا توجد أحداث دخول مسجلة بعد.'))
+                else
+                  ...docs.map((doc) {
+                    final d = doc.data();
+                    final email = (d['email'] ?? 'بدون بريد').toString();
+                    final provider = (d['provider'] ?? 'unknown').toString();
+                    final ts = d['loginAt'];
+                    final when = ts is Timestamp ? ts.toDate().toLocal().toString() : 'جارٍ تسجيل الوقت';
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: const CircleAvatar(child: Icon(Icons.login, size: 18)),
+                      title: Text(email, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: Text('الدخول: $when\nالمزوّد: $provider'),
+                    );
+                  }),
+              ]),
+            ),
+          );
         },
       );
 
