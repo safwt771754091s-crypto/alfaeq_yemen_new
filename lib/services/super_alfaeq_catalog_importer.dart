@@ -35,7 +35,7 @@ class SuperAlfaeqCatalogImporter {
   int _scale(String unit) => const {'piece': 1, 'kg': 1000, 'g': 1, 'l': 1000, 'ml': 1, 'm': 1}[unit] ?? 1;
 
   String? _image(String? barcode) {
-    final digits = (barcode ?? '').replaceAll(RegExp(r'\\D'), '');
+    final digits = (barcode ?? '').replaceAll(RegExp(r'\D'), '');
     if (digits.length < 8) return null;
     return 'https://images.openfoodfacts.org/images/products/${digits.substring(0, 3)}/${digits.substring(3, 6)}/${digits.substring(6, 9)}/${digits.substring(9)}/front_en.400.jpg';
   }
