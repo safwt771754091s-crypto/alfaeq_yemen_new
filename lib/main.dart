@@ -434,7 +434,7 @@ class _StoreCatalogCard extends StatelessWidget {
           ),
           const Divider(),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('products').where('storeId', isEqualTo: store.id).where('status', isEqualTo: 'active').limit(50).snapshots(),
+            stream: FirebaseFirestore.instance.collection('products').where('storeId', isEqualTo: store.id).where('status', isEqualTo: 'active').limit(5000).snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
               if (snapshot.hasError) return Text('تعذر تحميل الأصناف: ${snapshot.error}');
