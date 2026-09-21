@@ -143,7 +143,19 @@ class AuthService {
 
   Future<void> _recordLoginEvent(User user, {required String provider, String action = 'login'}) async {
     try {
-      await functions.httpsCallable('recordLoginEvent').call({'provider': provider, 'action': action});
+      await db.collection('loginEvents').add({
+        'uid': user.uid,
+        'email': user.email,
+        'provider': provider,
+        'action': action,
+        'loginAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      await db.collection('users').doc(user.uid).set({
+        'lastLoginAt': FieldValue.serverTimestamp(),
+        'lastSeen': FieldValue.serverTimestamp(),
+        'isOnline': true,
+      }, SetOptions(merge: true));
     } catch (_) {
       // Authentication must never fail because telemetry is unavailable.
     }
