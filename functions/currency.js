@@ -1,24 +1,16 @@
 const DEFAULT_SAR_TO_YER = 413;
 
 async function getSarToYerRate(db) {
-  const refs = [
-    db.collection('settings').doc('currency_rates'),
-    db.collection('settings').doc('exchange_rates'),
-  ];
-  for (const ref of refs) {
-    const snap = await ref.get();
-    if (!snap.exists) continue;
-    const data = snap.data() || {};
-    const rate = Number(data.sarToYer ?? data.SAR_YER ?? data.sar_yer);
-    if (Number.isFinite(rate) && rate > 0) return rate;
-  }
+  // The platform's approved catalog conversion is fixed at 413 YER per 1 SAR.
+  // Always synchronize Firestore so an older stored rate cannot silently override it.
+  const rate = DEFAULT_SAR_TO_YER;
   await db.collection('settings').doc('currency_rates').set({
-    sarToYer: DEFAULT_SAR_TO_YER,
+    sarToYer: rate,
     baseCurrency: 'YER',
     sourceCurrency: 'SAR',
     updatedAt: new Date(),
   }, { merge: true });
-  return DEFAULT_SAR_TO_YER;
+  return rate;
 }
 
 function sarToYer(amountSar, rate) {
