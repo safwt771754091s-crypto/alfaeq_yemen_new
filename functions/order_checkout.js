@@ -8,6 +8,80 @@ const unitFor = (p) => UNIT_DEFS[String(p.saleUnit || p.unit || 'piece')] || UNI
 const stockBaseFor = (p,u) => Number.isFinite(Number(p.stockBase)) ? Math.round(Number(p.stockBase)) : Math.round(Number(p.stock || 0) * u.scale);
 const stepBaseFor = (p,u) => Number(p.stepBase) > 0 ? Math.round(Number(p.stepBase)) : (u.id === 'kg' || u.id === 'l' ? 250 : (u.id === 'g' || u.id === 'ml' ? 50 : 1));
 
+async function autoAssignDriver(orderId, destination) {
+  if (!destination) return null;
+  const driversSnap = await db.collection('drivers')
+    .where('approved', '==', true)
+    .where('isOnline', '==', true)
+    .limit(50)
+    .get();
+
+  const distanceKm = (a, b) => {
+    const rad = (v) => v * Math.PI / 180;
+    const dLat = rad(b.latitude - a.latitude);
+    const dLon = rad(b.longitude - a.longitude);
+    const lat1 = rad(a.latitude);
+    const lat2 = rad(b.latitude);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    return 6371.0088 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  };
+
+  let best = null;
+  for (const doc of driversSnap.docs) {
+    const data = doc.data() || {};
+    const location = data.currentLocation;
+    if (!location || typeof location.latitude !== 'number' || typeof location.longitude !== 'number') continue;
+    const active = Number(data.activeOrderCount || 0);
+    if (active >= 3) continue;
+    const distance = distanceKm(location, destination);
+    const rating = Number(data.rating || 5);
+    const score = distance + active * 2.5 + Math.max(0, Math.min(5, 5 - rating)) * 0.8;
+    if (!best || score < best.score) best = { driverId: doc.id, distanceKm: distance, score, active };
+  }
+  if (!best) return null;
+
+  const orderRef = db.collection('orders').doc(orderId);
+  const driverRef = db.collection('drivers').doc(best.driverId);
+  await db.runTransaction(async (tx) => {
+    const orderSnap = await tx.get(orderRef);
+    const driverSnap = await tx.get(driverRef);
+    if (!orderSnap.exists || !driverSnap.exists) return;
+    const order = orderSnap.data() || {};
+    const driver = driverSnap.data() || {};
+    if (order.deliveryStatus !== 'awaiting_assignment' || order.driverId) return;
+    if (driver.approved !== true || driver.isOnline !== true) return;
+    const active = Number(driver.activeOrderCount || 0);
+    if (active >= 3) return;
+    const now = FieldValue.serverTimestamp();
+    tx.update(orderRef, {
+      driverId: best.driverId,
+      deliveryStatus: 'assigned',
+      assignedAt: now,
+      dispatchScore: best.score,
+      dispatchDistanceKm: best.distanceKm,
+      updatedAt: now,
+    });
+    tx.update(driverRef, { activeOrderCount: active + 1, lastAssignedAt: now, updatedAt: now });
+    tx.set(db.collection('deliveryEvents').doc(), {
+      orderId, driverId: best.driverId, type: 'assigned',
+      source: 'automatic_dispatch', distanceKm: best.distanceKm,
+      createdAt: now,
+    });
+    tx.set(db.collection('auditLogs').doc(), {
+      actorUid: 'platform_automation', action: 'smart_dispatch_auto_assign', result: 'success',
+      source: 'automatic_dispatch', orderId, driverId: best.driverId,
+      distanceKm: best.distanceKm, createdAt: now,
+    });
+  });
+  return best;
+}
+
+function deliveryLocationForDispatch(result) {
+  return result && result.deliveryLocation && Number.isFinite(Number(result.deliveryLocation.latitude)) && Number.isFinite(Number(result.deliveryLocation.longitude))
+    ? { latitude: Number(result.deliveryLocation.latitude), longitude: Number(result.deliveryLocation.longitude) }
+    : null;
+}
+
 exports.createOrderFromCart = onCall({ region: 'us-central1', enforceAppCheck: true }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'يجب تسجيل الدخول أولاً.');
   const uid = request.auth.uid;
@@ -144,8 +218,10 @@ exports.createOrderFromCart = onCall({ region: 'us-central1', enforceAppCheck: t
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
 
-      return { orderId: orderRef.id, invoiceId: invoiceRef.id, total, itemCount: items.length, stockMovements: movements };
+      return { orderId: orderRef.id, invoiceId: invoiceRef.id, total, itemCount: items.length, stockMovements: movements, deliveryLocation };
     });
+
+    if (result.orderId && deliveryLocationForDispatch(result)) await autoAssignDriver(result.orderId, deliveryLocationForDispatch(result));
 
     await db.collection('auditLogs').add({
       actorUid: uid,
@@ -157,7 +233,7 @@ exports.createOrderFromCart = onCall({ region: 'us-central1', enforceAppCheck: t
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    return { ok: true, ...result, currency: CURRENCY, inventoryStatus: 'reserved' };
+    return { ok: true, ...result, currency: CURRENCY, inventoryStatus: 'reserved', deliveryStatus: deliveryLocationForDispatch(result) ? 'auto_assigned_or_queued' : 'awaiting_location' };
   } catch (error) {
     if (error instanceof HttpsError) throw error;
     throw new HttpsError('internal', 'تعذر إتمام الطلب بشكل آمن. لم يتم خصم أي مخزون.');
