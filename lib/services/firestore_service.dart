@@ -13,7 +13,7 @@ class FirestoreService {
   FirestoreService({
     FirebaseFirestore? firestore,
     SupabaseClient? client,
-    this.preferSupabase = true,
+    this.preferSupabase = false,
   })  : db = firestore ?? FirebaseFirestore.instance,
         supabase = client ?? Supabase.instance.client;
 
