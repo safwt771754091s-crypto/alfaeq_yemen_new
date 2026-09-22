@@ -5,6 +5,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'supabase_service.dart';
 
 class AuthService {
   final FirebaseAuth? _auth;
@@ -30,6 +31,7 @@ class AuthService {
     final user = credential.user;
     if (user != null) {
       await _ensureUserProfile(user);
+      await _syncSupabaseProfile(user);
       await startPresence();
       await _recordLoginEvent(user, provider: 'password');
     }
@@ -62,6 +64,7 @@ class AuthService {
     if ((user.email ?? '').trim().toLowerCase() == 'albyysks@gmail.com') {
       await bootstrapPrimaryAdminIfEligible();
     }
+    await _syncSupabaseProfile(user);
     return credential;
   }
 
@@ -139,9 +142,30 @@ class AuthService {
       rethrow;
     }
     await user.reload();
+    await _syncSupabaseProfile(user);
     await startPresence();
     await _recordLoginEvent(user, provider: 'password', action: 'register');
     return credential;
+  }
+
+  Future<void> _syncSupabaseProfile(User user) async {
+    if (!SupabaseService.isInitialized) return;
+    try {
+      final token = await user.getIdTokenResult(true);
+      final claims = token.claims ?? const <String, dynamic>{};
+      final role = (claims['app_role'] ?? claims['role'] ?? 'customer').toString();
+      await SupabaseService.client.from('users').upsert({
+        'uid': user.uid,
+        'email': user.email,
+        'name': (user.displayName ?? '').trim(),
+        'role': role,
+        'admin': claims['admin'] == true,
+        'owner': claims['owner'] == true,
+        'developer': claims['developer'] == true,
+        'access_level': (claims['accessLevel'] as num?)?.toInt() ?? 0,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'uid');
+    } catch (_) {}
   }
 
   Future<void> _recordLoginEvent(User user, {required String provider, String action = 'login'}) async {
@@ -154,6 +178,9 @@ class AuthService {
         'loginAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       });
+      if (SupabaseService.isInitialized) {
+        await SupabaseService.client.from('login_events').insert({'uid': user.uid, 'email': user.email, 'provider': provider, 'action': action, 'login_at': DateTime.now().toUtc().toIso8601String()});
+      }
       await db.collection('users').doc(user.uid).set({
         'lastLoginAt': FieldValue.serverTimestamp(),
         'lastSeen': FieldValue.serverTimestamp(),
