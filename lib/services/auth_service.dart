@@ -262,11 +262,37 @@ class AuthService {
   }
 
   Future<void> signOut() async {
-    await stopPresence();
-    await auth.signOut();
+    // Logout must never be blocked by presence/telemetry/network failures.
+    final user = auth.currentUser;
+    _presenceTimer?.cancel();
+    _presenceTimer = null;
+
+    // Mark the captured Firebase user offline on a best-effort basis, but do
+    // not wait indefinitely for Firestore before clearing the auth session.
+    if (user != null) {
+      try {
+        await db.collection('users').doc(user.uid).set({
+          'isOnline': false,
+          'lastSeen': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true)).timeout(const Duration(seconds: 2));
+      } catch (_) {}
+    }
+
+    // Clear both authentication layers. Firebase is the AuthGate source of
+    // truth, while Supabase must also lose its session after migration.
+    try {
+      await auth.signOut().timeout(const Duration(seconds: 5));
+    } catch (_) {}
+
+    if (SupabaseService.isInitialized) {
+      try {
+        await SupabaseService.client.auth.signOut().timeout(const Duration(seconds: 5));
+      } catch (_) {}
+    }
+
     if (!kIsWeb) {
       try {
-        await GoogleSignIn().signOut();
+        await GoogleSignIn().signOut().timeout(const Duration(seconds: 3));
       } catch (_) {}
     }
   }
