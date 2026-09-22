@@ -175,7 +175,6 @@ class CartPage extends StatelessWidget {
           ),
         );
       }
-    }
     } on FirebaseFunctionsException catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء الطلب: ${e.message ?? e.code} (code: ${e.code})')));
     } on StateError catch (e) {
