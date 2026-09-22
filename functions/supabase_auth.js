@@ -9,10 +9,14 @@ const { beforeUserCreated, beforeUserSignedIn } = require('firebase-functions/v2
  */
 function supabaseAuthClaims(event) {
   const existing = event?.data?.customClaims || {};
+  const appRole = existing.app_role || existing.role || 'customer';
   return {
-    customClaims: {
-      ...existing,
+    sessionClaims: {
       role: 'authenticated',
+      app_role: appRole,
+      admin: existing.admin === true,
+      owner: existing.owner === true,
+      developer: existing.developer === true,
     },
   };
 }
