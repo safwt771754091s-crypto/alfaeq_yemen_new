@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
 import '../services/auth_service.dart';
+import '../services/catalog_service.dart';
 import 'ai_assistant_page.dart';
 import 'cart_page.dart';
 import 'location_picker_page.dart';
@@ -427,247 +428,96 @@ class _CategoriesSection extends StatelessWidget {
 }
 
 class _OffersSection extends StatelessWidget {
-  final Future<void> Function(QueryDocumentSnapshot<Map<String, dynamic>>) onAddToCart;
+  final Future<void> Function(CatalogDocument) onAddToCart;
   const _OffersSection({required this.onAddToCart});
-
   int _discount(Map<String, dynamic> data) {
-    final percent = data['discountPercent'];
-    final price = data['price'];
-    final original = data['originalPrice'];
-    if (percent is num && percent > 0 && percent <= 100) return percent.round();
-    if (price is num && original is num && original > price) return ((1 - (price / original)) * 100).round();
+    final p = data['discountPercent'] ?? data['discount_percent']; final price = data['price']; final original = data['originalPrice'] ?? data['original_price'];
+    if (p is num && p > 0 && p <= 100) return p.round();
+    if (price is num && original is num && original > price) return ((1 - price / original) * 100).round();
     return 0;
   }
-
   @override
-  Widget build(BuildContext context) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance.collection('products').where('status', isEqualTo: 'active').limit(40).snapshots(),
-        builder: (context, snapshot) {
-          final products = (snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
-              .where((doc) => _discount(doc.data()) > 0)
-              .take(8)
-              .toList();
-          return Column(
-            children: [
-              Row(
-                children: [
-                  const Expanded(child: Text('عروض مميزة 🔥', style: TextStyle(color: _navy, fontSize: 21, fontWeight: FontWeight.w900))),
-                  TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _OffersPage())), child: const Text('عرض الكل')),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (snapshot.connectionState == ConnectionState.waiting)
-                const LinearProgressIndicator()
-              else if (products.isEmpty)
-                const _Info(title: 'العروض جاهزة للظهور', text: 'عند إضافة خصم حقيقي للصنف سيظهر تلقائياً هنا.')
-              else
-                SizedBox(
-                  height: 238,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: products.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 10),
-                    itemBuilder: (context, i) {
-                      final product = products[i];
-                      return _OfferCard(product: product, discount: _discount(product.data()), onAdd: () => onAddToCart(product));
-                    },
-                  ),
-                ),
-            ],
-          );
-        },
-      );
+  Widget build(BuildContext context) => FutureBuilder<List<CatalogDocument>>(
+    future: const CatalogService().activeProducts(limit: 40),
+    builder: (context, snapshot) {
+      final products = (snapshot.data ?? const <CatalogDocument>[]).where((d) => _discount(d.data) > 0).take(8).toList();
+      return Column(children: [
+        Row(children: [
+          const Expanded(child: Text('عروض مميزة 🔥', style: TextStyle(color: _navy, fontSize: 21, fontWeight: FontWeight.w900))),
+          TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _OffersPage())), child: const Text('عرض الكل')),
+        ]),
+        const SizedBox(height: 8),
+        if (snapshot.connectionState == ConnectionState.waiting) const LinearProgressIndicator()
+        else if (snapshot.hasError) const _Info(title: 'تعذر تحميل العروض', text: 'تحقق من الاتصال والصلاحيات.')
+        else if (products.isEmpty) const _Info(title: 'العروض جاهزة للظهور', text: 'عند إضافة خصم حقيقي للصنف سيظهر تلقائياً هنا.')
+        else SizedBox(height: 238, child: ListView.separated(
+          scrollDirection: Axis.horizontal, itemCount: products.length, separatorBuilder: (_, __) => const SizedBox(width: 10),
+          itemBuilder: (context, i) { final p = products[i]; return _OfferCard(product: p, discount: _discount(p.data), onAdd: () => onAddToCart(p)); },
+        )),
+      ]);
+    },
+  );
 }
 
 class _OfferCard extends StatelessWidget {
-  final QueryDocumentSnapshot<Map<String, dynamic>> product;
-  final int discount;
-  final VoidCallback onAdd;
+  final CatalogDocument product; final int discount; final VoidCallback onAdd;
   const _OfferCard({required this.product, required this.discount, required this.onAdd});
-
   @override
   Widget build(BuildContext context) {
-    final data = product.data();
-    final price = data['price'];
-    final original = data['originalPrice'];
-    final imageUrl = (data['imageUrl'] ?? data['image'] ?? '').toString();
-    return Container(
-      width: 178,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE3E8EF))),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(11),
-                child: imageUrl.isEmpty
-                    ? Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.image_outlined, size: 42, color: Colors.black26))
-                    : Image.network(imageUrl, height: 108, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.broken_image_outlined))),
-              ),
-              Positioned(
-                top: 5,
-                right: 5,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                  decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(8)),
-                  child: Text('خصم $discount%', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 7),
-          Text('${data['name'] ?? 'صنف'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 3),
-          Row(
-            children: [
-              Expanded(child: Text(price is num ? '${price.toStringAsFixed(0)} ر.ي' : 'عند الطلب', style: const TextStyle(color: _navy, fontWeight: FontWeight.w900))),
-              if (original is num) Text('${original.toStringAsFixed(0)}', style: const TextStyle(color: Colors.grey, decoration: TextDecoration.lineThrough, fontSize: 10)),
-            ],
-          ),
-          const Spacer(),
-          SizedBox(height: 34, child: FilledButton.icon(onPressed: onAdd, icon: const Icon(Icons.add_shopping_cart, size: 16), label: const Text('أضف'), style: FilledButton.styleFrom(backgroundColor: _blue, padding: EdgeInsets.zero))),
-        ],
-      ),
-    );
+    final data = product.data; final price = data['price']; final original = data['originalPrice'] ?? data['original_price'];
+    final imageUrl = (data['imageUrl'] ?? data['image_url'] ?? data['image'] ?? '').toString();
+    return Container(width: 178, padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE3E8EF))), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Stack(children: [
+        ClipRRect(borderRadius: BorderRadius.circular(11), child: imageUrl.isEmpty ? Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.image_outlined, size: 42, color: Colors.black26)) : Image.network(imageUrl, height: 108, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.broken_image_outlined)))),
+        Positioned(top: 5, right: 5, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(8)), child: Text('خصم ' + discount.toString() + '%', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)))),
+      ]),
+      const SizedBox(height: 7), Text(data['name']?.toString() ?? 'صنف', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 4), Text((price ?? 0).toString() + ' ' + (data['currency'] ?? 'YER').toString(), style: const TextStyle(fontWeight: FontWeight.w900)),
+      if (original is num && price is num && original > price) Text(original.toString() + ' ' + (data['currency'] ?? 'YER').toString(), style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.grey, fontSize: 11)),
+      const Spacer(), FilledButton.icon(onPressed: onAdd, icon: const Icon(Icons.add_shopping_cart, size: 17), label: const Text('أضف للسلة')),
+    ]));
   }
-}
-
-class _BenefitsBar extends StatelessWidget {
-  const _BenefitsBar();
-  @override
-  Widget build(BuildContext context) {
-    final benefits = const [
-      (Icons.credit_card_outlined, 'طرق دفع متعددة'),
-      (Icons.percent_rounded, 'عروض وخصومات'),
-      (Icons.local_shipping_outlined, 'توصيل سريع'),
-      (Icons.headset_mic_outlined, 'دعم 24/7'),
-      (Icons.verified_user_outlined, 'آمن وموثوق'),
-    ];
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(color: _navy, borderRadius: BorderRadius.circular(18)),
-      child: Row(children: benefits.map((item) => Expanded(child: Column(children: [
-        Icon(item.$1, color: Colors.white, size: 25),
-        const SizedBox(height: 6),
-        Text(item.$2, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
-      ]))).toList()),
-    );
-  }
-}
-
-class _StoresTab extends StatelessWidget {
-  const _StoresTab();
-  @override
-  Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
-        children: [
-          const Text('المتاجر', style: TextStyle(color: _navy, fontSize: 28, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
-          const Text('متاجر الفائق المعتمدة ومنتجاتها الحقيقية.', style: TextStyle(color: Colors.black54)),
-          const SizedBox(height: 16),
-          ...appSections.map((section) => Card(
-                elevation: 0,
-                child: ListTile(
-                  leading: Container(width: 45, height: 45, decoration: BoxDecoration(color: const Color(0xFFF1F6FF), borderRadius: BorderRadius.circular(13)), child: Icon(_SectionCard.iconFor(section.icon), color: _blue)),
-                  title: Text(section.title, style: const TextStyle(fontWeight: FontWeight.w900)),
-                  subtitle: Text(section.subtitle),
-                  trailing: const Icon(Icons.chevron_left),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WorldSectionPage(section: section))),
-                ),
-              )),
-        ],
-      );
 }
 
 class _OffersPage extends StatelessWidget {
   const _OffersPage();
   int _discount(Map<String, dynamic> data) {
-    final p = data['discountPercent'];
-    final price = data['price'];
-    final original = data['originalPrice'];
+    final p = data['discountPercent'] ?? data['discount_percent']; final price = data['price']; final original = data['originalPrice'] ?? data['original_price'];
     if (p is num && p > 0 && p <= 100) return p.round();
     if (price is num && original is num && original > price) return ((1 - price / original) * 100).round();
     return 0;
   }
-
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('العروض المميزة', style: TextStyle(fontWeight: FontWeight.w900))),
-        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection('products').where('status', isEqualTo: 'active').limit(100).snapshots(),
-          builder: (context, snapshot) {
-            final docs = (snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[]).where((d) => _discount(d.data()) > 0).toList();
-            if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-            if (docs.isEmpty) return const Center(child: _Info(title: 'لا توجد عروض حالياً', text: 'أضف خصماً حقيقياً إلى منتجاتك ليظهر هنا.'));
-            return GridView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: docs.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: .68),
-              itemBuilder: (_, i) {
-                final d = docs[i];
-                return _OfferCard(product: d, discount: _discount(d.data()), onAdd: () => _addProductToCart(context, d));
-              },
-            );
-          },
-        ),
-      );
+    appBar: AppBar(title: const Text('العروض المميزة', style: TextStyle(fontWeight: FontWeight.w900))),
+    body: FutureBuilder<List<CatalogDocument>>(
+      future: const CatalogService().activeProducts(limit: 100),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) return const Center(child: _Info(title: 'تعذر تحميل العروض', text: 'تحقق من الاتصال والصلاحيات.'));
+        final docs = (snapshot.data ?? const <CatalogDocument>[]).where((d) => _discount(d.data) > 0).toList();
+        if (docs.isEmpty) return const Center(child: _Info(title: 'لا توجد عروض حالياً', text: 'أضف خصماً حقيقياً إلى منتجاتك ليظهر هنا.'));
+        return GridView.builder(
+          padding: const EdgeInsets.all(16), itemCount: docs.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: .68),
+          itemBuilder: (_, i) { final d = docs[i]; return _OfferCard(product: d, discount: _discount(d.data), onAdd: () => _addProductToCart(context, d)); },
+        );
+      },
+    ),
+  );
 }
 
-Future<void> _addProductToCart(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> product) async {
+Future<void> _addProductToCart(BuildContext context, CatalogDocument product) async {
   final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول أولاً.')));
-    return;
-  }
-  final data = product.data();
-  final price = data['price'];
-  final stock = data['stock'];
-  if (price is! num || price < 0) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سعر الصنف غير صالح.')));
-    return;
-  }
-  if (stock is num && stock <= 0) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هذا الصنف غير متوفر حالياً.')));
-    return;
-  }
-  final name = (data['name'] ?? data['title'] ?? 'صنف').toString();
-  final cartRef = FirebaseFirestore.instance.collection('carts').doc(user.uid);
+  if (user == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول أولاً.'))); return; }
+  final name = (product.data['name'] ?? product.data['title'] ?? 'صنف').toString();
   try {
-    await FirebaseFirestore.instance.runTransaction((tx) async {
-      final snap = await tx.get(cartRef);
-      final cart = snap.data() ?? <String, dynamic>{};
-      final rawItems = cart['items'];
-      final items = rawItems is List ? rawItems.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList() : <Map<String, dynamic>>[];
-      final itemIndex = items.indexWhere((item) => item['productId'] == product.id);
-      if (itemIndex >= 0) {
-        final current = (items[itemIndex]['quantity'] as num?)?.toInt() ?? 1;
-        final next = current + 1;
-        if (stock is num && next > stock.toInt()) throw StateError('لا يمكن تجاوز الكمية المتوفرة.');
-        if (next > 100) throw StateError('الحد الأقصى 100 قطعة للصنف.');
-        items[itemIndex]['quantity'] = next;
-      } else {
-        items.add({
-          'productId': product.id,
-          'name': name,
-          'price': price,
-          'currency': data['currency'] ?? 'YER',
-          'quantity': 1,
-          'storeId': data['storeId'] ?? '',
-          'merchantId': data['merchantId'] ?? data['ownerId'] ?? '',
-          'ownerId': data['ownerId'] ?? '',
-          'imageUrl': data['imageUrl'] ?? data['image'] ?? '',
-          'addedAt': Timestamp.now(),
-        });
-      }
-      tx.set(cartRef, {'ownerId': user.uid, 'customerId': user.uid, 'items': items, 'currency': data['currency'] ?? cart['currency'] ?? 'YER', 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-    });
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تمت إضافة «$name» إلى السلة.')));
+    await const CatalogService().addToCart(user.uid, product);
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تمت إضافة «' + name + '» إلى السلة.')));
   } on StateError catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-  } on FirebaseException catch (e) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحديث السلة: ${e.message}')));
+  } catch (e) {
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحديث السلة: ' + e.toString())));
   }
 }
 
