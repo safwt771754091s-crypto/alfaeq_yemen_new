@@ -213,7 +213,7 @@ class AdminDashboard extends StatelessWidget {
       db.collection('loginEvents').get(),
     ]);
     final loginDocs = results[7].docs;
-    final loggedInUsers = loginDocs.map((d) => (d.data() as Map<String, dynamic>)['uid']?.toString()).whereType<String>().toSet().length;
+    final loggedInUsers = loginDocs.map((d) => d.data()['uid']?.toString()).whereType<String>().toSet().length;
     return _AdminStats(users: results[0].size, onlineUsers: results[1].size, loggedInUsers: loggedInUsers, loginEvents: results[7].size, stores: results[2].size, products: results[3].size, orders: results[4].size, walletOperations: results[5].size, auditLogs: results[6].size);
   }
 
