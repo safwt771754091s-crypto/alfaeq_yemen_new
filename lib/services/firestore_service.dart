@@ -107,6 +107,12 @@ class FirestoreService {
         'metadata': <String, dynamic>{},
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }, onConflict: 'uid');
+      await db.collection('carts').doc(uid).set({
+        'ownerId': uid,
+        'items': <Map<String, dynamic>>[],
+        'currency': 'YER',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
       return;
     }
     await db.collection('carts').doc(uid).set({
