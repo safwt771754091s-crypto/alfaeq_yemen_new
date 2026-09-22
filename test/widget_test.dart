@@ -1,15 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:alfaeq_yemen/main.dart';
+import 'package:alfaeq_yemen/screens/login_page.dart';
 
 void main() {
-  testWidgets('الفائق يمن renders the fresh home screen', (WidgetTester tester) async {
-    await tester.pumpWidget(const AlfaeqYemenApp());
+  testWidgets('الفائق يمن renders the login screen', (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(home: LoginPage()));
 
     expect(find.text('الفائق يمن'), findsOneWidget);
-    expect(find.text('مرحباً بك في الفائق يمن'), findsOneWidget);
-    expect(find.text('الأقسام'), findsOneWidget);
-    expect(find.text('المتاجر'), findsOneWidget);
-    expect(find.text('المطاعم'), findsOneWidget);
+    expect(find.text('تسجيل الدخول إلى حسابك'), findsOneWidget);
+    expect(find.text('البريد الإلكتروني'), findsOneWidget);
+    expect(find.text('كلمة المرور'), findsOneWidget);
+    expect(find.text('تسجيل الدخول'), findsOneWidget);
   });
 }
