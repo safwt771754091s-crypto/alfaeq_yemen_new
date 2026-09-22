@@ -1,0 +1,52 @@
+name: Firebase Hosting
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: firebase-hosting-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Authenticate Google/Firebase
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Install Firebase CLI
+        run: |
+          curl -sL https://firebase.tools | bash
+          firebase --version
+          firebase projects:list --project="alfaeq-yemen-fed37" --json >/dev/null
+      - run: flutter pub get
+      - name: Generate Firebase web configuration
+        timeout-minutes: 5
+        env:
+          FIREBASE_PROJECT_ID: alfaeq-yemen-fed37
+        run: |
+          dart pub global activate flutterfire_cli
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+          timeout 180s flutterfire configure --project="$FIREBASE_PROJECT_ID" --platforms=web --yes --out=lib/firebase_options.dart
+          test -s lib/firebase_options.dart
+          grep -q "class DefaultFirebaseOptions" lib/firebase_options.dart
+      - name: Build web
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: flutter build web --release --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+      - name: Deploy Firebase Hosting
+        run: firebase deploy --project="alfaeq-yemen-fed37" --only hosting --non-interactive
