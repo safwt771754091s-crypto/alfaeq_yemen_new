@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - supabase-migration-foundation
+      - fix-web-platform-core
 
 concurrency:
   group: flutter-build-${{ github.workflow }}-${{ github.ref }}
@@ -48,7 +49,8 @@ jobs:
       - name: Build web
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-        run: flutter build web --release --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+          RECAPTCHA_ENTERPRISE_SITE_KEY: ${{ secrets.RECAPTCHA_ENTERPRISE_SITE_KEY }}
+        run: flutter build web --release --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" --dart-define=RECAPTCHA_ENTERPRISE_SITE_KEY="$RECAPTCHA_ENTERPRISE_SITE_KEY"
       - uses: actions/upload-artifact@v4
         with:
           name: alfaeq-yemen-web
