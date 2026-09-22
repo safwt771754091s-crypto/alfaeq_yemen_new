@@ -81,7 +81,7 @@ jobs:
         run: |
           dart pub global activate flutterfire_cli
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
-          timeout 180s flutterfire configure --project="$FIREBASE_PROJECT_ID" --platforms=android --yes --out=lib/firebase_options.dart
+          timeout 180s flutterfire configure --project="$FIREBASE_PROJECT_ID" --platforms=android --android-package-name=com.alfaeq.alfaeq_yemen --yes --out=lib/firebase_options.dart
           test -s lib/firebase_options.dart
           grep -q "class DefaultFirebaseOptions" lib/firebase_options.dart
       - name: Build Android debug APK
