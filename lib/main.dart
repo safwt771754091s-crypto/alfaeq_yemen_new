@@ -51,7 +51,7 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
     // login screen. New logins are not affected on subsequent launches.
     final prefs = await SharedPreferences.getInstance();
     const migrationKey = 'alfaeq_auth_migration_2026_09_22';
-    if (!prefs.getBool(migrationKey)!) {
+    if (prefs.getBool(migrationKey) != true) {
       await FirebaseAuth.instance.signOut();
       try {
         if (SupabaseService.isInitialized) {
