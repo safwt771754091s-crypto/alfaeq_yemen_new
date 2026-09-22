@@ -237,6 +237,11 @@ class AuthService {
   Future<void> signOut() async {
     await stopPresence();
     await auth.signOut();
+    if (!kIsWeb) {
+      try {
+        await GoogleSignIn().signOut();
+      } catch (_) {}
+    }
   }
 
   Future<Map<String, dynamic>> claims({bool forceRefresh = true}) async {

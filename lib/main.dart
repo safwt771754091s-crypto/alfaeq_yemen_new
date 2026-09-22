@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'core/app_sections.dart';
 import 'firebase_options.dart';
 import 'screens/admin_dashboard.dart';
@@ -44,6 +45,21 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // One-time migration reset: the current release changed the auth/data
+    // path. Clear any persisted legacy session so testing starts from a clean
+    // login screen. New logins are not affected on subsequent launches.
+    final prefs = await SharedPreferences.getInstance();
+    const migrationKey = 'alfaeq_auth_migration_2026_09_22';
+    if (prefs.getBool(migrationKey) != true) {
+      await FirebaseAuth.instance.signOut();
+      try {
+        if (SupabaseService.isInitialized) {
+          await SupabaseService.client.auth.signOut();
+        }
+      } catch (_) {}
+      await prefs.setBool(migrationKey, true);
+    }
 
     if (kIsWeb) {
       const siteKey = String.fromEnvironment('RECAPTCHA_ENTERPRISE_SITE_KEY');
