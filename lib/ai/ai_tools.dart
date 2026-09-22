@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_ai/firebase_ai.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/supabase_service.dart';
+import '../services/firestore_service.dart';
 
 /// Allow-listed tools for Alfaeq AI.
 /// Sensitive mutations remain behind the permission gateway and trusted
@@ -177,8 +179,19 @@ class AlfaeqAiToolRegistry {
     final user = _auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
     final requestedStatus = (args['status'] ?? 'all').toString();
-    final snap = await _db.collection('orders').where('customerId', isEqualTo: user.uid).limit(20).get();
     final orders = <Map<String, Object?>>[];
+    if (SupabaseService.isInitialized) {
+      final rows = await SupabaseService.client.from('orders').select().eq('customer_id', user.uid).order('created_at', ascending: false).limit(20);
+      for (final raw in rows) {
+        final data = Map<String, dynamic>.from(raw);
+        final status = (data['status'] ?? '').toString();
+        if (requestedStatus != 'all' && status != requestedStatus) continue;
+        orders.add({'id': data['id'], 'status': status, 'total': data['total'], 'currency': data['currency'] ?? 'YER', 'createdAt': _safeDate(data['created_at']), 'itemCount': data['items'] is List ? (data['items'] as List).length : null});
+        if (orders.length >= _maxResults) break;
+      }
+      return {'ok': true, 'orders': orders, 'resultCount': orders.length};
+    }
+    final snap = await _db.collection('orders').where('customerId', isEqualTo: user.uid).limit(20).get();
     for (final doc in snap.docs) {
       final data = doc.data();
       final status = (data['status'] ?? '').toString();
@@ -194,6 +207,12 @@ class AlfaeqAiToolRegistry {
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
     final orderId = (args['orderId'] ?? '').toString().trim();
     if (orderId.isEmpty || orderId.length > 128) return {'ok': false, 'error': 'رقم الطلب غير صالح.'};
+    if (SupabaseService.isInitialized) {
+      final rows = await SupabaseService.client.from('orders').select().eq('id', orderId).eq('customer_id', user.uid).limit(1);
+      if (rows.isEmpty) return {'ok': false, 'error': 'الطلب غير موجود.'};
+      final data = Map<String, dynamic>.from(rows.first);
+      return {'ok': true, 'order': {'id': data['id'], 'status': data['status'], 'deliveryStatus': data['delivery_status'], 'itemCount': data['items'] is List ? (data['items'] as List).length : null, 'total': data['total'], 'currency': data['currency'] ?? 'YER', 'paymentMethod': data['payment_method'], 'createdAt': _safeDate(data['created_at']), 'updatedAt': _safeDate(data['updated_at'])}};
+    }
     final doc = await _db.collection('orders').doc(orderId).get();
     if (!doc.exists) return {'ok': false, 'error': 'الطلب غير موجود.'};
     final data = doc.data()!;
@@ -229,6 +248,20 @@ class AlfaeqAiToolRegistry {
   Future<Map<String, Object?>> _getMyCart() async {
     final user = _auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
+    if (SupabaseService.isInitialized) {
+      final rows = await SupabaseService.client.from('carts').select().eq('uid', user.uid).limit(1);
+      if (rows.isNotEmpty) {
+        final data = Map<String, dynamic>.from(rows.first);
+        final items = _normalizeCartItems(data['items']);
+        if (items.isNotEmpty) return {'ok': true, 'items': items, 'itemCount': items.length, 'total': _cartTotal(items), 'currency': data['metadata'] is Map ? ((data['metadata'] as Map)['currency'] ?? 'YER') : 'YER', 'updatedAt': _safeDate(data['updated_at'])};
+      }
+      // During the catalog migration, older cart writes may still live in Firebase.
+      final legacy = await _db.collection('carts').doc(user.uid).get();
+      if (!legacy.exists) return {'ok': true, 'items': <Map<String, Object?>>[], 'itemCount': 0, 'total': 0, 'currency': 'YER'};
+      final legacyData = legacy.data() ?? <String, dynamic>{};
+      final legacyItems = _normalizeCartItems(legacyData['items']);
+      return {'ok': true, 'items': legacyItems, 'itemCount': legacyItems.length, 'total': _cartTotal(legacyItems), 'currency': legacyData['currency'] ?? 'YER', 'updatedAt': _safeDate(legacyData['updatedAt'])};
+    }
     final snap = await _db.collection('carts').doc(user.uid).get();
     if (!snap.exists) return {'ok': true, 'items': <Map<String, Object?>>[], 'itemCount': 0, 'total': 0, 'currency': 'YER'};
     final data = snap.data() ?? <String, dynamic>{};
@@ -364,6 +397,12 @@ class AlfaeqAiToolRegistry {
       items.add({'productId': productId, 'name': name, 'quantity': quantity, 'price': price, 'lineTotal': itemTotal, 'currency': product['currency'] ?? 'YER', 'storeId': product['storeId'] ?? product['storeID'] ?? product['ownerId']});
     }
 
+    if (SupabaseService.isInitialized) {
+      final rpcItems = items.map((item) => {'product_id': item['productId'], 'quantity': item['quantity']}).toList();
+      final orderId = await SupabaseService.client.rpc('create_order', params: {'p_items': rpcItems, 'p_address': address, 'p_payment_method': paymentMethod});
+      await FirestoreService(preferSupabase: true).clearCart(user.uid);
+      return {'ok': true, 'orderId': orderId.toString(), 'status': 'pending', 'total': total, 'currency': 'YER', 'paymentProcessed': false, 'message': 'تم إنشاء الطلب المعلّق بعد التحقق من المخزون والسعر من الخادم. لم تتم أي عملية دفع.'};
+    }
     final ref = await _db.collection('orders').add({'customerId': user.uid, 'items': items, 'total': total, 'currency': 'YER', 'address': address, 'paymentMethod': paymentMethod, 'status': 'pending', 'deliveryStatus': 'awaiting_assignment', 'source': 'ai_confirmed', 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp()});
     return {'ok': true, 'orderId': ref.id, 'status': 'pending', 'total': total, 'currency': 'YER', 'paymentProcessed': false, 'message': 'تم إنشاء الطلب المعلّق بعد تأكيدك. لم تتم أي عملية دفع.'};
   }
