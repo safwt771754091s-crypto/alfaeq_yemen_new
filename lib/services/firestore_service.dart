@@ -54,17 +54,17 @@ class FirestoreService {
     }
 
     if (preferSupabase) {
-      final response = await supabase.from('orders').insert({
-        'id': _id(),
-        'customer_id': customerId,
-        'merchant_ids': merchantIds.toList(),
-        'status': 'pending',
-        'delivery_status': 'awaiting_assignment',
-        'address': address,
-        'payment_method': paymentMethod,
-        'items': items,
-      }).select('id').single();
-      return response['id'] as String;
+      final normalizedItems = items.map((item) => {
+            'product_id': item['productId'] ?? item['product_id'],
+            'quantity': item['quantity'],
+          }).toList();
+
+      final orderId = await supabase.rpc('create_order', params: {
+        'p_items': normalizedItems,
+        'p_address': address,
+        'p_payment_method': paymentMethod,
+      });
+      return orderId as String;
     }
 
     final ref = await db.collection('orders').add({
@@ -104,5 +104,4 @@ class FirestoreService {
     await db.collection('orders').doc(orderId).update(data);
   }
 
-  String _id() => DateTime.now().microsecondsSinceEpoch.toString();
 }
