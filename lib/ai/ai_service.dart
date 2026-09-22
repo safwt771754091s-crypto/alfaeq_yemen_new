@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_ai/firebase_ai.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
-
 import 'ai_permission_gateway.dart';
 import 'ai_tools.dart';
 
@@ -78,7 +76,7 @@ class AlfaeqAiService {
 
   GenerativeModel _model() {
     final ai = FirebaseAI.googleAI(
-      useLimitedUseAppCheckTokens: !kIsWeb,
+      useLimitedUseAppCheckTokens: true,
     );
     return ai.generativeModel(
       model: modelName,
