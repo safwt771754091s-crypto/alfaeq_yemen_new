@@ -18,20 +18,48 @@ class FirestoreService {
   })  : db = firestore ?? FirebaseFirestore.instance,
         supabase = client ?? (SupabaseService.isInitialized ? Supabase.instance.client : null);
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> activeStores(String sectionId) {
-    if (!preferSupabase) {
-      return db.collection('stores').where('sectionId', isEqualTo: sectionId).where('status', isEqualTo: 'approved').snapshots();
+  Future<List<Map<String, dynamic>>> activeStores(String sectionId) async {
+    if (preferSupabase && supabase != null) {
+      try {
+        final rows = await supabase!
+            .from('stores')
+            .select()
+            .eq('section_id', sectionId)
+            .eq('status', 'approved')
+            .order('name');
+        return List<Map<String, dynamic>>.from(rows);
+      } catch (_) {
+        // Firebase remains the read fallback during migration.
+      }
     }
-    // Supabase realtime will be introduced after authentication/RLS policies
-    // are mapped. Until then, Firebase remains the live stream fallback.
-    return db.collection('stores').where('sectionId', isEqualTo: sectionId).where('status', isEqualTo: 'approved').snapshots();
+    final snap = await db
+        .collection('stores')
+        .where('sectionId', isEqualTo: sectionId)
+        .where('status', isEqualTo: 'approved')
+        .get();
+    return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> activeProducts(String storeId) {
-    if (!preferSupabase) {
-      return db.collection('products').where('storeId', isEqualTo: storeId).where('status', isEqualTo: 'active').snapshots();
+  Future<List<Map<String, dynamic>>> activeProducts(String storeId) async {
+    if (preferSupabase && supabase != null) {
+      try {
+        final rows = await supabase!
+            .from('products')
+            .select()
+            .eq('store_id', storeId)
+            .eq('status', 'active')
+            .order('name');
+        return List<Map<String, dynamic>>.from(rows);
+      } catch (_) {
+        // Firebase remains the read fallback during migration.
+      }
     }
-    return db.collection('products').where('storeId', isEqualTo: storeId).where('status', isEqualTo: 'active').snapshots();
+    final snap = await db
+        .collection('products')
+        .where('storeId', isEqualTo: storeId)
+        .where('status', isEqualTo: 'active')
+        .get();
+    return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
   }
 
   Future<String> createOrder({
@@ -104,5 +132,4 @@ class FirestoreService {
     if (location != null) data['deliveryLocation'] = location;
     await db.collection('orders').doc(orderId).update(data);
   }
-
 }
