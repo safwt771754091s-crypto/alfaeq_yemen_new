@@ -30,6 +30,11 @@ jobs:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
       - uses: google-github-actions/setup-gcloud@v2
       - run: flutter pub get
+      - name: Install Firebase CLI
+        run: |
+          curl -sL https://firebase.tools | bash
+          firebase --version
+          firebase projects:list --project="$FIREBASE_PROJECT_ID" --json >/dev/null
       - name: Generate Firebase configuration
         timeout-minutes: 5
         env:
