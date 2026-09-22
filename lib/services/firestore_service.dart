@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'supabase_service.dart';
 
 /// Compatibility data layer.
 ///
@@ -7,7 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// read path for catalog and platform data. Authentication is migrated later.
 class FirestoreService {
   final FirebaseFirestore db;
-  final SupabaseClient supabase;
+  final SupabaseClient? supabase;
   final bool preferSupabase;
 
   FirestoreService({
@@ -15,7 +16,7 @@ class FirestoreService {
     SupabaseClient? client,
     this.preferSupabase = false,
   })  : db = firestore ?? FirebaseFirestore.instance,
-        supabase = client ?? Supabase.instance.client;
+        supabase = client ?? (SupabaseService.isInitialized ? Supabase.instance.client : null);
 
   Stream<QuerySnapshot<Map<String, dynamic>>> activeStores(String sectionId) {
     if (!preferSupabase) {
@@ -53,13 +54,13 @@ class FirestoreService {
       if (store.exists && ownerId.isNotEmpty) merchantIds.add(ownerId);
     }
 
-    if (preferSupabase) {
+    if (preferSupabase && supabase != null) {
       final normalizedItems = items.map((item) => {
             'product_id': item['productId'] ?? item['product_id'],
             'quantity': item['quantity'],
           }).toList();
 
-      final orderId = await supabase.rpc('create_order', params: {
+      final orderId = await supabase!.rpc('create_order', params: {
         'p_items': normalizedItems,
         'p_address': address,
         'p_payment_method': paymentMethod,
@@ -85,8 +86,8 @@ class FirestoreService {
       db.collection('orders').doc(orderId).snapshots();
 
   Future<void> updateDelivery(String orderId, String status, {GeoPoint? location}) async {
-    if (preferSupabase) {
-      await supabase.from('orders').update({
+    if (preferSupabase && supabase != null) {
+      await supabase!.from('orders').update({
         'delivery_status': status,
         if (location != null) 'delivery_location': {
           'latitude': location.latitude,
