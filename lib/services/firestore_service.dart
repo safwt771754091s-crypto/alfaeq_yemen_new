@@ -67,7 +67,25 @@ class FirestoreService {
     required List<Map<String, dynamic>> items,
     required String address,
     required String paymentMethod,
+    double? latitude,
+    double? longitude,
   }) async {
+    if (preferSupabase && supabase != null) {
+      final normalizedItems = items.map((item) => {
+            'product_id': item['productId'] ?? item['product_id'],
+            'quantity': item['quantity'],
+          }).toList();
+
+      final orderId = await supabase!.rpc('create_order', params: {
+        'p_items': normalizedItems,
+        'p_address': address,
+        'p_payment_method': paymentMethod,
+        'p_latitude': latitude,
+        'p_longitude': longitude,
+      });
+      return orderId as String;
+    }
+
     final merchantIds = <String>{};
     for (final item in items) {
       final merchantId = item['merchantId']?.toString();
@@ -80,20 +98,6 @@ class FirestoreService {
       final store = await db.collection('stores').doc(storeId).get();
       final ownerId = store.data()?['ownerId']?.toString() ?? '';
       if (store.exists && ownerId.isNotEmpty) merchantIds.add(ownerId);
-    }
-
-    if (preferSupabase && supabase != null) {
-      final normalizedItems = items.map((item) => {
-            'product_id': item['productId'] ?? item['product_id'],
-            'quantity': item['quantity'],
-          }).toList();
-
-      final orderId = await supabase!.rpc('create_order', params: {
-        'p_items': normalizedItems,
-        'p_address': address,
-        'p_payment_method': paymentMethod,
-      });
-      return orderId as String;
     }
 
     final ref = await db.collection('orders').add({
