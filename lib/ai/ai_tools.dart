@@ -250,10 +250,17 @@ class AlfaeqAiToolRegistry {
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
     if (SupabaseService.isInitialized) {
       final rows = await SupabaseService.client.from('carts').select().eq('uid', user.uid).limit(1);
-      if (rows.isEmpty) return {'ok': true, 'items': <Map<String, Object?>>[], 'itemCount': 0, 'total': 0, 'currency': 'YER'};
-      final data = Map<String, dynamic>.from(rows.first);
-      final items = _normalizeCartItems(data['items']);
-      return {'ok': true, 'items': items, 'itemCount': items.length, 'total': _cartTotal(items), 'currency': data['metadata'] is Map ? ((data['metadata'] as Map)['currency'] ?? 'YER') : 'YER', 'updatedAt': _safeDate(data['updated_at'])};
+      if (rows.isNotEmpty) {
+        final data = Map<String, dynamic>.from(rows.first);
+        final items = _normalizeCartItems(data['items']);
+        if (items.isNotEmpty) return {'ok': true, 'items': items, 'itemCount': items.length, 'total': _cartTotal(items), 'currency': data['metadata'] is Map ? ((data['metadata'] as Map)['currency'] ?? 'YER') : 'YER', 'updatedAt': _safeDate(data['updated_at'])};
+      }
+      // During the catalog migration, older cart writes may still live in Firebase.
+      final legacy = await _db.collection('carts').doc(user.uid).get();
+      if (!legacy.exists) return {'ok': true, 'items': <Map<String, Object?>>[], 'itemCount': 0, 'total': 0, 'currency': 'YER'};
+      final legacyData = legacy.data() ?? <String, dynamic>{};
+      final legacyItems = _normalizeCartItems(legacyData['items']);
+      return {'ok': true, 'items': legacyItems, 'itemCount': legacyItems.length, 'total': _cartTotal(legacyItems), 'currency': legacyData['currency'] ?? 'YER', 'updatedAt': _safeDate(legacyData['updatedAt'])};
     }
     final snap = await _db.collection('carts').doc(user.uid).get();
     if (!snap.exists) return {'ok': true, 'items': <Map<String, Object?>>[], 'itemCount': 0, 'total': 0, 'currency': 'YER'};
