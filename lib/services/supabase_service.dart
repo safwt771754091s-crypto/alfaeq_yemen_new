@@ -6,6 +6,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 /// The publishable key is supplied at build time; no service-role key is ever
 /// embedded in the Flutter application.
 class SupabaseService {
+  static bool _initialized = false;
+
+  static bool get isInitialized => _initialized;
+
   static const projectUrl = String.fromEnvironment(
     'SUPABASE_URL',
     defaultValue: 'https://esvljorjykzgrpnrxnma.supabase.co',
@@ -20,6 +24,7 @@ class SupabaseService {
       debug: false,
       accessToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
     );
+    _initialized = true;
   }
 
   static SupabaseClient get client => Supabase.instance.client;
