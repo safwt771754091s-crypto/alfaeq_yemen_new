@@ -165,7 +165,7 @@ class HomePage extends StatelessWidget {
     else ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا تملك صلاحية صفحة المطور.')));
   }
 
-  Future<void> _signOut(BuildContext context) async => FirebaseAuth.instance.signOut();
+  Future<void> _signOut(BuildContext context) async => AuthService().signOut();
 
   @override
   Widget build(BuildContext context) => Directionality(
