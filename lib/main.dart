@@ -175,17 +175,22 @@ class HomePage extends StatelessWidget {
             title: const Text('الفائق يمن', style: TextStyle(fontWeight: FontWeight.w900)),
             actions: [
               IconButton(tooltip: 'ذكاء الفائق', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage())), icon: const Icon(Icons.auto_awesome)),
-              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: FirebaseAuth.instance.currentUser == null
+              StreamBuilder<List<Map<String, dynamic>>>(
+                stream: FirebaseAuth.instance.currentUser == null || !SupabaseService.isInitialized
                     ? null
-                    : FirebaseFirestore.instance.collection('carts').doc(FirebaseAuth.instance.currentUser!.uid).snapshots(),
+                    : SupabaseService.client
+                        .from('carts')
+                        .stream(primaryKey: ['uid'])
+                        .eq('uid', FirebaseAuth.instance.currentUser!.uid),
                 builder: (context, snapshot) {
                   var count = 0;
-                  final raw = snapshot.data?.data()?['items'];
+                  final rows = snapshot.data ?? const <Map<String, dynamic>>[];
+                  final raw = rows.isNotEmpty ? rows.first['items'] : null;
                   if (raw is List) {
                     for (final item in raw) {
                       if (item is Map) {
-                        count += ((item['quantity'] as num?)?.toDouble() ?? 0).round();
+                        final quantity = item['quantity'];
+                        count += quantity is num ? quantity.round() : 0;
                       }
                     }
                   }
