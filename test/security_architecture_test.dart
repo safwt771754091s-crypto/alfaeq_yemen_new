@@ -79,7 +79,7 @@ void main() {
       expect(driver, contains("rpc('driver_update_location'"));
       expect(driver, contains("eq('driver_id',user.uid)"));
       expect(driver, contains("status=='assigned'"));
-      expect(driver, contains("status=='delivered'"));
+      expect(driver, contains("_setStatus(id,'delivered')"));
       expect(gate, contains('final role = roleSnapshot.data ?? \'customer\';'));
       expect(gate, contains("case 'driver':"));
       expect(gate, contains('DriverCenterPage()'));
