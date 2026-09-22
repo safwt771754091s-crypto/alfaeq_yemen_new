@@ -84,7 +84,7 @@ class _DispatchCenterPageState extends State<DispatchCenterPage> {
                   IconButton(tooltip:'تحديد موقع الاستلام',onPressed:_busy?null:()=>_setLocation(o),icon:const Icon(Icons.edit_location_alt_outlined)),
                   FilledButton.icon(onPressed:_busy||p==null?null:()=>_assign(o),icon:const Icon(Icons.local_shipping_outlined),label:const Text('تعيين')),
                 ]),
-              );
+               ));
             });
           },
         ),
