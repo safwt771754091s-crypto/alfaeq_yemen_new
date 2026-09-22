@@ -20,7 +20,7 @@ class SupabaseService {
     if (publishableKey.isEmpty) return;
     await Supabase.initialize(
       url: projectUrl,
-      anonKey: publishableKey,
+      publishableKey: publishableKey,
       debug: false,
       accessToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
     );
