@@ -14,6 +14,8 @@ import 'screens/developer_page.dart';
 import 'screens/merchant_invite_page.dart';
 import 'screens/my_orders_page.dart';
 import 'services/auth_service.dart';
+import 'services/supabase_service.dart';
+
 import 'core/product_units.dart';
 
 Future<void> main() async {
@@ -34,10 +36,11 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
   @override
   void initState() {
     super.initState();
-    _startup = _initializeFirebase();
+    _startup = _initializeServices();
   }
 
-  Future<void> _initializeFirebase() async {
+  Future<void> _initializeServices() async {
+    await SupabaseService.initialize();
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );

@@ -7,18 +7,21 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
-  final FirebaseAuth auth;
-  final FirebaseFirestore db;
-  final FirebaseFunctions functions;
+  final FirebaseAuth? _auth;
+  final FirebaseFirestore? _db;
+  final FirebaseFunctions? _functions;
+  late final FirebaseAuth auth = _auth ?? FirebaseAuth.instance;
+  late final FirebaseFirestore db = _db ?? FirebaseFirestore.instance;
+  late final FirebaseFunctions functions = _functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
   Timer? _presenceTimer;
 
   AuthService({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
-  })  : auth = auth ?? FirebaseAuth.instance,
-        db = firestore ?? FirebaseFirestore.instance,
-        functions = functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
+  })  : _auth = auth,
+        _db = firestore,
+        _functions = functions;
 
   Stream<User?> get authStateChanges => auth.authStateChanges();
 
@@ -247,7 +250,7 @@ class AuthService {
     final user = auth.currentUser;
     if (user == null) return 'guest';
     final tokenClaims = await claims();
-    final claimRole = tokenClaims['role'];
+    final claimRole = tokenClaims['app_role'] ?? tokenClaims['role'];
     if (claimRole is String && claimRole.isNotEmpty) return claimRole;
     if (tokenClaims['admin'] == true) return 'admin';
     final snap = await db.collection('users').doc(user.uid).get();
@@ -256,17 +259,17 @@ class AuthService {
 
   Future<bool> hasAdminClaim() async {
     final tokenClaims = await claims();
-    return tokenClaims['admin'] == true || tokenClaims['role'] == 'admin' || tokenClaims['role'] == 'owner';
+    return tokenClaims['admin'] == true || tokenClaims['app_role'] == 'admin' || tokenClaims['app_role'] == 'owner' || tokenClaims['role'] == 'admin' || tokenClaims['role'] == 'owner';
   }
 
   Future<bool> hasOwnerClaim() async {
     final tokenClaims = await claims();
-    return tokenClaims['owner'] == true || tokenClaims['role'] == 'owner';
+    return tokenClaims['owner'] == true || tokenClaims['app_role'] == 'owner' || tokenClaims['role'] == 'owner';
   }
 
   Future<bool> isDeveloper() async {
     final tokenClaims = await claims();
-    if (tokenClaims['developer'] == true || tokenClaims['role'] == 'developer') return true;
+    if (tokenClaims['developer'] == true || tokenClaims['app_role'] == 'developer' || tokenClaims['role'] == 'developer') return true;
     final user = auth.currentUser;
     if (user == null) return false;
     final snap = await db.collection('users').doc(user.uid).get();
@@ -278,6 +281,9 @@ class AuthService {
     return tokenClaims['owner'] == true ||
         tokenClaims['admin'] == true ||
         tokenClaims['developer'] == true ||
+        tokenClaims['app_role'] == 'owner' ||
+        tokenClaims['app_role'] == 'admin' ||
+        tokenClaims['app_role'] == 'developer' ||
         tokenClaims['role'] == 'owner' ||
         tokenClaims['role'] == 'admin' ||
         tokenClaims['role'] == 'developer';
