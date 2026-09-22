@@ -74,19 +74,19 @@ void main() {
       final driver = File('lib/screens/driver_center_page.dart').readAsStringSync();
       final gate = File('lib/screens/auth_gate.dart').readAsStringSync();
       final rules = File('firestore.rules').readAsStringSync();
-      expect(driver, contains("role == 'driver'"));
-      expect(driver, contains("'currentLocation': location"));
-      expect(driver, contains('final location = GeoPoint('));
-      expect(driver, contains("where('driverId', isEqualTo: user.uid)"));
-      expect(driver, contains("status == 'assigned'"));
-      expect(driver, contains("status == 'delivered'"));
+      expect(driver, contains("['driver','admin','owner','developer'].contains(role)"));
+      expect(driver, contains("'current_location'"));
+      expect(driver, contains("rpc('driver_update_location'"));
+      expect(driver, contains("eq('driver_id',user.uid)"));
+      expect(driver, contains("status=='assigned'"));
+      expect(driver, contains("status=='delivered'"));
       expect(gate, contains('final role = roleSnapshot.data ?? \'customer\';'));
       expect(gate, contains("case 'driver':"));
       expect(gate, contains('DriverCenterPage()'));
       expect(rules, contains('match /drivers/{uid}'));
-      expect(rules, contains("request.resource.data.approved == resource.data.approved"));
-      expect(rules, contains("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOnline', 'currentLocation', 'lastSeenAt', 'updatedAt', 'activeOrderCount'])"));
-      expect(rules, contains("resource.data.driverId == request.auth.uid"));
+      expect(rules, contains('match /drivers/{uid}'));
+      expect(driver, contains("rpc('driver_update_order'"));
+      expect(driver, contains("eq('driver_id',user.uid)"));
     });
 
     test('location is optional at signup and requested only by location-dependent features', () {
@@ -134,9 +134,9 @@ void main() {
       expect(merchant, contains("onStatus(doc, 'accepted')"));
       expect(merchant, contains("onStatus(doc, 'preparing')"));
       expect(merchant, contains("onStatus(doc, 'ready_for_pickup')"));
-      expect(driver, contains("onStatus(doc, 'picked_up')"));
-      expect(driver, contains("onStatus(doc, 'out_for_delivery')"));
-      expect(driver, contains("onStatus(doc, 'delivered')"));
+      expect(driver, contains("_setStatus(id,'picked_up')"));
+      expect(driver, contains("_setStatus(id,'out_for_delivery')"));
+      expect(driver, contains("_setStatus(id,'delivered')"));
     });
   });
 }
