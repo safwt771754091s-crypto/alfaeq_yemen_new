@@ -7,7 +7,7 @@ const { beforeUserCreated, beforeUserSignedIn } = require('firebase-functions/v2
  * `authenticated` role. Application authorization remains in the
  * dedicated admin/owner/developer claims and the users profile.
  */
-function supabaseAuthClaims(event) {
+function supabaseSessionClaims(event) {
   const existing = event?.data?.customClaims || {};
   const appRole = existing.app_role || existing.role || 'customer';
   return {
@@ -21,12 +21,14 @@ function supabaseAuthClaims(event) {
   };
 }
 
+// Do not rewrite persistent Firebase custom claims at account creation.
+// The bridge only adds the Supabase-compatible session claims at sign-in.
 exports.setSupabaseAuthenticatedRoleOnCreate = beforeUserCreated(
   { region: 'us-central1' },
-  (event) => supabaseAuthClaims(event),
+  () => undefined,
 );
 
 exports.setSupabaseAuthenticatedRoleOnSignIn = beforeUserSignedIn(
   { region: 'us-central1' },
-  (event) => supabaseAuthClaims(event),
+  (event) => supabaseSessionClaims(event),
 );
