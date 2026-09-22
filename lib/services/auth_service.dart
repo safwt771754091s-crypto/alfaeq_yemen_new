@@ -247,7 +247,7 @@ class AuthService {
     final user = auth.currentUser;
     if (user == null) return 'guest';
     final tokenClaims = await claims();
-    final claimRole = tokenClaims['role'];
+    final claimRole = tokenClaims['app_role'] ?? tokenClaims['role'];
     if (claimRole is String && claimRole.isNotEmpty) return claimRole;
     if (tokenClaims['admin'] == true) return 'admin';
     final snap = await db.collection('users').doc(user.uid).get();
@@ -256,17 +256,17 @@ class AuthService {
 
   Future<bool> hasAdminClaim() async {
     final tokenClaims = await claims();
-    return tokenClaims['admin'] == true || tokenClaims['role'] == 'admin' || tokenClaims['role'] == 'owner';
+    return tokenClaims['admin'] == true || tokenClaims['app_role'] == 'admin' || tokenClaims['app_role'] == 'owner' || tokenClaims['role'] == 'admin' || tokenClaims['role'] == 'owner';
   }
 
   Future<bool> hasOwnerClaim() async {
     final tokenClaims = await claims();
-    return tokenClaims['owner'] == true || tokenClaims['role'] == 'owner';
+    return tokenClaims['owner'] == true || tokenClaims['app_role'] == 'owner' || tokenClaims['role'] == 'owner';
   }
 
   Future<bool> isDeveloper() async {
     final tokenClaims = await claims();
-    if (tokenClaims['developer'] == true || tokenClaims['role'] == 'developer') return true;
+    if (tokenClaims['developer'] == true || tokenClaims['app_role'] == 'developer' || tokenClaims['role'] == 'developer') return true;
     final user = auth.currentUser;
     if (user == null) return false;
     final snap = await db.collection('users').doc(user.uid).get();
@@ -278,6 +278,9 @@ class AuthService {
     return tokenClaims['owner'] == true ||
         tokenClaims['admin'] == true ||
         tokenClaims['developer'] == true ||
+        tokenClaims['app_role'] == 'owner' ||
+        tokenClaims['app_role'] == 'admin' ||
+        tokenClaims['app_role'] == 'developer' ||
         tokenClaims['role'] == 'owner' ||
         tokenClaims['role'] == 'admin' ||
         tokenClaims['role'] == 'developer';
