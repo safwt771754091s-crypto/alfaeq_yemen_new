@@ -7,6 +7,9 @@ on:
       - main
       - supabase-migration-foundation
       - fix-web-platform-core
+  pull_request:
+    branches:
+      - main
 
 concurrency:
   group: flutter-build-${{ github.workflow }}-${{ github.ref }}
