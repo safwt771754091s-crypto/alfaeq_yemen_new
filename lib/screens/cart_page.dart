@@ -175,21 +175,7 @@ class CartPage extends StatelessWidget {
           ),
         );
       }
-    }    } on FirebaseFunctionsException catch (e) {
-        if (!['not-found', 'unavailable'].contains(e.code)) rethrow;
-        resultData = await _createLocalOrderDraft(uid: uid, items: items, address: address, paymentMethod: paymentMethod, deliveryPoint: deliveryPoint);
-        usedFallback = true;
-      }
-      if (context.mounted) {
-        await showDialog<void>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('تم إنشاء الطلب'),
-            content: Text('رقم الطلب: ' + (resultData['orderId'] ?? '').toString() + '\\nالإجمالي: ' + (resultData['total'] ?? total).toString() + ' ' + (resultData['currency'] ?? currency).toString() + '\\n' + (usedFallback ? 'تم إنشاء مسودة طلب معلّقة بعد التحقق من المنتج والمخزون. ستحتاج المعالجة النهائية إلى مسار الخادم.' : 'تم تثبيت المخزون بشكل آمن.')),
-            actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
-          ),
-        );
-      }
+    }
     } on FirebaseFunctionsException catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء الطلب: ${e.message ?? e.code} (code: ${e.code})')));
     } on StateError catch (e) {
