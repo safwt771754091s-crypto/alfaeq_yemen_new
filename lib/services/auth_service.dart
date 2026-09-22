@@ -7,18 +7,21 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
-  final FirebaseAuth auth;
-  final FirebaseFirestore db;
-  final FirebaseFunctions functions;
+  final FirebaseAuth? _auth;
+  final FirebaseFirestore? _db;
+  final FirebaseFunctions? _functions;
+  late final FirebaseAuth auth = _auth ?? FirebaseAuth.instance;
+  late final FirebaseFirestore db = _db ?? FirebaseFirestore.instance;
+  late final FirebaseFunctions functions = _functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
   Timer? _presenceTimer;
 
   AuthService({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
-  })  : auth = auth ?? FirebaseAuth.instance,
-        db = firestore ?? FirebaseFirestore.instance,
-        functions = functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
+  })  : _auth = auth,
+        _db = firestore,
+        _functions = functions;
 
   Stream<User?> get authStateChanges => auth.authStateChanges();
 
