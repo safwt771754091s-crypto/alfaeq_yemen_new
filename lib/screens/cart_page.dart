@@ -138,9 +138,9 @@ class _CartPageState extends State<CartPage> {
               icon: Icon(deliveryPoint == null ? Icons.location_on_outlined : Icons.location_on),
               label: Text(deliveryPoint == null ? 'حدد موقع التوصيل على الخريطة' : 'تم تحديد الموقع'),
             ),
-            if (deliveryPoint != null) Text('\${deliveryPoint!.latitude.toStringAsFixed(6)}, \${deliveryPoint!.longitude.toStringAsFixed(6)}', textDirection: TextDirection.ltr),
+            if (deliveryPoint != null) Text('${deliveryPoint!.latitude.toStringAsFixed(6)}, ${deliveryPoint!.longitude.toStringAsFixed(6)}', textDirection: TextDirection.ltr),
             const SizedBox(height: 8),
-            Text('الإجمالي: \$_total \$_currency', style: const TextStyle(fontWeight: FontWeight.w900)),
+            Text('الإجمالي: $_total $_currency', style: const TextStyle(fontWeight: FontWeight.w900)),
           ])),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
@@ -151,7 +151,7 @@ class _CartPageState extends State<CartPage> {
     );
     if (confirmed != true) { addressController.dispose(); return; }
     final typed = addressController.text.trim();
-    final address = typed.isNotEmpty ? typed : (deliveryPoint == null ? '' : 'موقع الخريطة: \${deliveryPoint!.latitude.toStringAsFixed(6)}, \${deliveryPoint!.longitude.toStringAsFixed(6)}');
+    final address = typed.isNotEmpty ? typed : (deliveryPoint == null ? '' : 'موقع الخريطة: ${deliveryPoint!.latitude.toStringAsFixed(6)}, ${deliveryPoint!.longitude.toStringAsFixed(6)}');
     addressController.dispose();
     if (address.isEmpty) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اكتب العنوان أو حدد الموقع على الخريطة.')));
@@ -206,17 +206,17 @@ class _CartPageState extends State<CartPage> {
                             return Card(child: ListTile(
                               leading: const CircleAvatar(child: Icon(Icons.shopping_bag_outlined)),
                               title: Text(name, style: const TextStyle(fontWeight: FontWeight.w900)),
-                              subtitle: Text('\$quantity \${unit.label} × \$price \$_currency/\${unit.label} = \${price * quantity} \$_currency'),
+                              subtitle: Text('$quantity ${unit.label} × $price $_currency/${unit.label} = ${price * quantity} $_currency'),
                               trailing: SizedBox(width: 150, child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
                                 IconButton(onPressed: _busy ? null : () => _changeQuantity(index, -1), icon: const Icon(Icons.remove_circle_outline)),
-                                Text('\$quantity', style: const TextStyle(fontWeight: FontWeight.w900)),
+                                Text('$quantity', style: const TextStyle(fontWeight: FontWeight.w900)),
                                 IconButton(onPressed: _busy ? null : () => _changeQuantity(index, 1), icon: const Icon(Icons.add_circle_outline)),
                                 IconButton(onPressed: _busy ? null : () => _remove(index), icon: const Icon(Icons.delete_outline)),
                               ])),
                             ));
                           }),
                           const SizedBox(height: 10),
-                          Card(child: ListTile(title: const Text('الإجمالي', style: TextStyle(fontWeight: FontWeight.w900)), trailing: Text('\$_total \$_currency', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)))),
+                          Card(child: ListTile(title: const Text('الإجمالي', style: TextStyle(fontWeight: FontWeight.w900)), trailing: Text('$_total $_currency', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)))),
                           const SizedBox(height: 14),
                           SizedBox(height: 52, child: FilledButton.icon(onPressed: _busy ? null : _checkout, icon: const Icon(Icons.shopping_cart_checkout), label: const Text('إتمام الطلب والشراء', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)))),
                         ],
