@@ -273,3 +273,7 @@ exports.recordLoginEvent = onCall({ region: 'us-central1' }, async (request) => 
   }, { merge: true });
   return { ok: true };
 });
+
+
+// Supabase Auth bridge: Firebase remains the identity provider during migration.
+Object.assign(module.exports, require('./supabase_auth'));
