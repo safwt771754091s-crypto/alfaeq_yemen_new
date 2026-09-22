@@ -50,7 +50,7 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
     // path. Clear any persisted legacy session so testing starts from a clean
     // login screen. New logins are not affected on subsequent launches.
     final prefs = await SharedPreferences.getInstance();
-    const migrationKey = 'alfaeq_auth_migration_2026_09_22';
+    const migrationKey = 'alfaeq_auth_migration_2026_09_22_2';
     if (prefs.getBool(migrationKey) != true) {
       await FirebaseAuth.instance.signOut();
       try {
