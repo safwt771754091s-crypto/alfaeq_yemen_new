@@ -1,145 +1,94 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
+import 'package:latlong2/latlong.dart';
 import '../services/auth_service.dart';
 import '../services/dispatch_service.dart';
 import 'driver_fleet_map_page.dart';
+import 'location_picker_page.dart';
 
 class DispatchCenterPage extends StatefulWidget {
   const DispatchCenterPage({super.key});
-
-  @override
-  State<DispatchCenterPage> createState() => _DispatchCenterPageState();
+  @override State<DispatchCenterPage> createState()=>_DispatchCenterPageState();
 }
-
 class _DispatchCenterPageState extends State<DispatchCenterPage> {
-  final _auth = AuthService();
-  final _dispatch = DispatchService();
-  bool _busy = false;
+  final _auth=AuthService(); final _dispatch=DispatchService(); bool _busy=false;
 
   Future<bool> _allowed() async {
-    final role = await _auth.role();
-    if (role == 'admin' || role == 'owner' || role == 'developer') return true;
-    final claims = await _auth.claims();
-    final permissions = claims['permissions'];
-    return permissions is List && permissions.contains('manageDispatch');
+    final role=await _auth.role();
+    if(['admin','owner','developer'].contains(role))return true;
+    final c=await _auth.claims();
+    final p=c['permissions'];
+    return p is List && p.contains('manageDispatch');
   }
 
-  Future<void> _setLocation(QueryDocumentSnapshot<Map<String, dynamic>> doc) async {
-    final lat = TextEditingController();
-    final lng = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('تحديد موقع التسليم'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: lat, keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true), decoration: const InputDecoration(labelText: 'خط العرض')),
-            TextField(controller: lng, keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true), decoration: const InputDecoration(labelText: 'خط الطول')),
-          ]),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
-            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حفظ')),
-          ],
-        ),
-      ),
-    );
-    if (ok != true) return;
-    final latitude = double.tryParse(lat.text.trim());
-    final longitude = double.tryParse(lng.text.trim());
-    if (latitude == null || longitude == null || latitude.abs() > 90 || longitude.abs() > 180) {
-      _message('الإحداثيات غير صحيحة.');
-      return;
+  LatLng? _location(Map<String,dynamic> d) {
+    final raw=d['delivery_location']??d['deliveryLocation'];
+    if(raw is Map) {
+      final a=(raw['latitude'] as num?)?.toDouble(), b=(raw['longitude'] as num?)?.toDouble();
+      if(a!=null&&b!=null)return LatLng(a,b);
     }
-    await doc.reference.update({'deliveryLocation': GeoPoint(latitude, longitude), 'updatedAt': FieldValue.serverTimestamp()});
-    _message('تم حفظ موقع التسليم.');
+    if(raw is GeoPoint)return LatLng(raw.latitude,raw.longitude);
+    final a=(d['latitude'] as num?)?.toDouble(), b=(d['longitude'] as num?)?.toDouble();
+    return a!=null&&b!=null?LatLng(a,b):null;
   }
 
-  Future<void> _assign(QueryDocumentSnapshot<Map<String, dynamic>> doc) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    final destination = doc.data()['deliveryLocation'];
-    if (destination is! GeoPoint) {
-      _message('حدد موقع التسليم أولاً.');
-      return;
-    }
-    setState(() => _busy = true);
+  Future<void> _setLocation(Map<String,dynamic> order) async {
+    final current=_location(order);
+    final point=await Navigator.push<LatLng>(context,MaterialPageRoute(builder:(_)=>LocationPickerPage(
+      title:'تحديد موقع استلام الطلب',
+      initialLatitude:current?.latitude,
+      initialLongitude:current?.longitude,
+    )));
+    if(point==null)return;
+    setState(()=>_busy=true);
     try {
-      final candidate = await _dispatch.assignBestDriver(
-        orderId: doc.id,
-        destination: destination,
-        actorUid: user.uid,
-        actorRole: await _auth.role(),
+      await _dispatch.setDeliveryLocation(orderId:order['id'].toString(),latitude:point.latitude,longitude:point.longitude);
+      _message('تم حفظ موقع استلام الطلب على قاعدة الطلب.');
+    } catch(e){_message('تعذر حفظ الموقع: $e');} finally{if(mounted)setState(()=>_busy=false);}
+  }
+
+  Future<void> _assign(Map<String,dynamic> order) async {
+    final p=_location(order);
+    if(p==null){_message('حدد موقع استلام الطلب أولاً.');return;}
+    setState(()=>_busy=true);
+    try {
+      final candidate=await _dispatch.assignBestDriver(orderId:order['id'].toString(),latitude:p.latitude,longitude:p.longitude);
+      _message(candidate==null?'لا يوجد مندوب معتمد ومتصل وبموقع صالح حالياً.':'تم تعيين المندوب '+candidate.driverId+' على الطلب ('+candidate.distanceKm.toStringAsFixed(2)+' كم).');
+    } catch(e){_message('تعذر تعيين المندوب: $e');} finally{if(mounted)setState(()=>_busy=false);}
+  }
+
+  void _message(String s){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));}
+
+  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:FutureBuilder<bool>(
+    future:_allowed(),
+    builder:(context,access){
+      if(access.connectionState!=ConnectionState.done)return const Scaffold(body:Center(child:CircularProgressIndicator()));
+      if(access.data!=true)return const Scaffold(body:Center(child:Text('مركز التوزيع مخصص للحسابات المخولة.')));
+      return Scaffold(
+        appBar:AppBar(title:const Text('التوزيع والمندوبون'),actions:[IconButton(tooltip:'خريطة المندوبين',onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const DriverFleetMapPage())),icon:const Icon(Icons.map_outlined))]),
+        body:StreamBuilder<List<Map<String,dynamic>>>(
+          stream:_dispatch.pendingOrdersStream(),
+          builder:(context,snapshot){
+            if(snapshot.hasError)return Center(child:Padding(padding:const EdgeInsets.all(24),child:Text('تعذر تحميل طابور التوزيع.\n${snapshot.error}')));
+            if(snapshot.connectionState==ConnectionState.waiting)return const Center(child:CircularProgressIndicator());
+            final orders=snapshot.data??const <Map<String,dynamic>>[];
+            if(orders.isEmpty)return const Center(child:Padding(padding:EdgeInsets.all(24),child:Text('لا توجد طلبات بانتظار التوزيع حالياً.')));
+            return ListView.builder(padding:const EdgeInsets.all(16),itemCount:orders.length,itemBuilder:(context,i){
+              final o=orders[i]; final p=_location(o); final id=o['id'].toString();
+              return Card(margin:const EdgeInsets.only(bottom:12),child:ListTile(
+                leading:CircleAvatar(child:Icon(p==null?Icons.location_off_outlined:Icons.route_outlined)),
+                title:Text('طلب #'+id.substring(0,id.length>8?8:id.length),style:const TextStyle(fontWeight:FontWeight.w900)),
+                subtitle:Text((o['address']??'—').toString()+'\n'+(p==null?'يحتاج تحديد الموقع':'موقع الاستلام جاهز')),
+                isThreeLine:true,
+                trailing:Wrap(spacing:4,children:[
+                  IconButton(tooltip:'تحديد موقع الاستلام',onPressed:_busy?null:()=>_setLocation(o),icon:const Icon(Icons.edit_location_alt_outlined)),
+                  FilledButton.icon(onPressed:_busy||p==null?null:()=>_assign(o),icon:const Icon(Icons.local_shipping_outlined),label:const Text('تعيين')),
+                ]),
+              );
+            });
+          },
+        ),
       );
-      _message(candidate == null ? 'لا يوجد مندوب متاح بموقع صالح.' : 'تم التوزيع على ${candidate.driverId} ضمن ${candidate.distanceKm.toStringAsFixed(2)} كم.');
-    } on FirebaseException catch (e) {
-      _message('تعذر التوزيع: ${e.message ?? e.code}');
-    } on StateError catch (e) {
-      _message(e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  void _message(String text) {
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: FutureBuilder<bool>(
-        future: _allowed(),
-        builder: (context, access) {
-          if (access.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-          if (access.data != true) return const Scaffold(body: Center(child: Text('مركز التوزيع الذكي مخصص للحسابات المخولة.')));
-          final stream = FirebaseFirestore.instance.collection('orders').where('deliveryStatus', isEqualTo: 'awaiting_assignment').limit(100).snapshots();
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('التوزيع الذكي'),
-              actions: [
-                IconButton(tooltip: 'خريطة المندوبين', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DriverFleetMapPage())), icon: const Icon(Icons.map_outlined)),
-              ],
-            ),
-            body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: stream,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('تعذر تحميل طابور التوزيع.\n${snapshot.error}')));
-                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                final docs = snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                if (docs.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('لا توجد طلبات بانتظار التوزيع حالياً.')));
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final doc = docs[index];
-                    final data = doc.data();
-                    final hasLocation = data['deliveryLocation'] is GeoPoint;
-                    final shortId = doc.id.substring(0, doc.id.length > 8 ? 8 : doc.id.length);
-                    return Card(
-                      elevation: 0,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        leading: CircleAvatar(child: Icon(hasLocation ? Icons.route_outlined : Icons.location_off_outlined)),
-                        title: Text('طلب #$shortId', style: const TextStyle(fontWeight: FontWeight.w900)),
-                        subtitle: Text('${data['address'] ?? '—'}\n${hasLocation ? 'موقع التسليم جاهز' : 'يحتاج موقع تسليم'}'),
-                        isThreeLine: true,
-                        trailing: Wrap(spacing: 6, children: [
-                          IconButton(tooltip: 'تحديد الموقع', onPressed: _busy ? null : () => _setLocation(doc), icon: const Icon(Icons.edit_location_alt_outlined)),
-                          FilledButton.icon(onPressed: _busy || !hasLocation ? null : () => _assign(doc), icon: const Icon(Icons.auto_awesome), label: const Text('توزيع')),
-                        ]),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
+    },
+  ));
 }
