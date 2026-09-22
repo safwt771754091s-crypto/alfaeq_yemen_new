@@ -6,23 +6,37 @@ on:
       - "**"
   pull_request:
 
+concurrency:
+  group: flutter-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   analyze-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+      - name: Authenticate Google/Firebase
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      - uses: google-github-actions/setup-gcloud@v2
       - run: flutter pub get
       - name: Generate Firebase configuration
+        timeout-minutes: 5
         env:
           FIREBASE_PROJECT_ID: alfaeq-yemen-fed37
         run: |
           dart pub global activate flutterfire_cli
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
-          flutterfire configure --project="$FIREBASE_PROJECT_ID" --platforms=web --yes --out=lib/firebase_options.dart
+          timeout 180s flutterfire configure --project="$FIREBASE_PROJECT_ID" --platforms=web --yes --out=lib/firebase_options.dart
           test -s lib/firebase_options.dart
           grep -q "class DefaultFirebaseOptions" lib/firebase_options.dart
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
