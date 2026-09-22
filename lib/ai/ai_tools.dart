@@ -236,7 +236,27 @@ class AlfaeqAiToolRegistry {
     final snap=await _db.collection('carts').doc(user.uid).get();if(!snap.exists)return {'ok':true,'items':<Map<String,Object?>>[],'itemCount':0,'total':0,'currency':'YER'};final d=snap.data()??<String,dynamic>{};final items=_normalizeCartItems(d['items']);return {'ok':true,'items':items,'itemCount':items.length,'total':_cartTotal(items),'currency':d['currency']??'YER'};
   }
 
+  Future<void> _saveSupabaseCart(String uid,List<Map<String,Object?>> items,{String currency='YER'}) async {
+    await SupabaseService.client.from('carts').upsert({'uid':uid,'owner_id':uid,'items':items,'metadata':{'currency':currency},'updated_at':DateTime.now().toUtc().toIso8601String()},onConflict:'uid');
+  }
+
   Future<Map<String, Object?>> _addToCart(Map<String, Object?> args, {required bool userConfirmed}) async {
+    if(SupabaseService.isInitialized){
+      if(!userConfirmed)return {'ok':false,'error':'ينتظر تأكيد المستخدم.','permission':'confirmation_required'};
+      final user=_auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
+      final productId=(args['productId']??'').toString().trim();final quantity=(args['quantity'] as num?)?.toInt()??0;
+      if(productId.isEmpty||quantity<1||quantity>100)return {'ok':false,'error':'بيانات السلة غير صالحة.'};
+      final rows=await SupabaseService.client.from('products').select().eq('id',productId).eq('status','active').limit(1);
+      if(rows.isEmpty)return {'ok':false,'error':'المنتج غير موجود أو غير متاح.'};
+      final p=Map<String,dynamic>.from(rows.first);final stock=(p['stock_base'] as num?)?.toDouble()??0;if(stock<=0)return {'ok':false,'error':'المنتج غير متوفر.'};
+      final cart=await _getMyCart();final items=List<Map<String,Object?>>.from((cart['items'] as List? ?? const []).map((e)=>Map<String,Object?>.from(e as Map)));
+      final i=items.indexWhere((e)=>e['productId']==productId);final old=i<0?0:((items[i]['quantity'] as num?)?.toInt()??0);final next=old+quantity;
+      if(next>100||next>stock)return {'ok':false,'error':'الكمية المطلوبة تتجاوز المخزون أو الحد المسموح.'};
+      final item={'productId':productId,'name':p['name']??'منتج','quantity':next,'price':p['price'],'currency':p['currency']??'YER','storeId':p['store_id']};
+      if(i<0)items.add(Map<String,Object?>.from(item));else items[i]=Map<String,Object?>.from(item);
+      await _saveSupabaseCart(user.uid,items,currency:(p['currency']??'YER').toString());
+      return {'ok':true,'action':'added','productId':productId,'quantity':next,'total':_cartTotal(items)};
+    }
     if (!userConfirmed) return {'ok': false, 'error': 'ينتظر تأكيد المستخدم.', 'permission': 'confirmation_required'};
     final user = _auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
@@ -275,6 +295,15 @@ class AlfaeqAiToolRegistry {
   }
 
   Future<Map<String, Object?>> _updateCartItem(Map<String, Object?> args, {required bool userConfirmed}) async {
+    if(SupabaseService.isInitialized){
+      if(!userConfirmed)return {'ok':false,'error':'ينتظر تأكيد المستخدم.','permission':'confirmation_required'};
+      final user=_auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
+      final id=(args['productId']??'').toString();final qty=(args['quantity'] as num?)?.toInt()??0;
+      if(id.isEmpty||qty<1||qty>100)return {'ok':false,'error':'بيانات السلة غير صالحة.'};
+      final cart=await _getMyCart();final items=List<Map<String,Object?>>.from((cart['items'] as List? ?? const []).map((e)=>Map<String,Object?>.from(e as Map)));final i=items.indexWhere((e)=>e['productId']==id);
+      if(i<0)return {'ok':false,'error':'المنتج غير موجود في السلة.'};
+      items[i]['quantity']=qty;await _saveSupabaseCart(user.uid,items,currency:(cart['currency']??'YER').toString());return {'ok':true,'action':'updated','productId':id,'quantity':qty,'total':_cartTotal(items)};
+    }
     if (!userConfirmed) return {'ok': false, 'error': 'ينتظر تأكيد المستخدم.', 'permission': 'confirmation_required'};
     final user = _auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
@@ -292,6 +321,12 @@ class AlfaeqAiToolRegistry {
   }
 
   Future<Map<String, Object?>> _removeFromCart(Map<String, Object?> args, {required bool userConfirmed}) async {
+    if(SupabaseService.isInitialized){
+      if(!userConfirmed)return {'ok':false,'error':'ينتظر تأكيد المستخدم.','permission':'confirmation_required'};
+      final user=_auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};final id=(args['productId']??'').toString();
+      final cart=await _getMyCart();final items=List<Map<String,Object?>>.from((cart['items'] as List? ?? const []).map((e)=>Map<String,Object?>.from(e as Map)));final before=items.length;items.removeWhere((e)=>e['productId']==id);
+      if(before==items.length)return {'ok':false,'error':'المنتج غير موجود في السلة.'};await _saveSupabaseCart(user.uid,items,currency:(cart['currency']??'YER').toString());return {'ok':true,'action':'removed','productId':id,'itemCount':items.length,'total':_cartTotal(items)};
+    }
     if (!userConfirmed) return {'ok': false, 'error': 'ينتظر تأكيد المستخدم.', 'permission': 'confirmation_required'};
     final user = _auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
@@ -333,6 +368,16 @@ class AlfaeqAiToolRegistry {
   }
 
   Future<Map<String, Object?>> _createOrderDraft(Map<String, Object?> args, {required bool userConfirmed}) async {
+    if(SupabaseService.isInitialized){
+      final user=_auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
+      if(!userConfirmed)return {'ok':false,'error':'ينتظر تأكيد المستخدم.','permission':'confirmation_required'};
+      final raw=args['items'];final address=(args['address']??'').toString().trim();final payment=(args['paymentMethod']??'').toString();
+      if(raw is! List||raw.isEmpty||raw.length>20||address.isEmpty)return {'ok':false,'error':'بيانات الطلب غير مكتملة.'};
+      final items=raw.whereType<Map>().map((x)=>Map<String,dynamic>.from(x)).toList();
+      final orderId=await FirestoreService(preferSupabase:true).createOrder(customerId:user.uid,items:items,address:address,paymentMethod:payment);
+      await FirestoreService(preferSupabase:true).clearCart(user.uid);
+      return {'ok':true,'message':'تم إنشاء الطلب بنجاح.','orderId':orderId,'status':'pending'};
+    }
     final user = _auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
     if (!userConfirmed) return {'ok': false, 'error': 'ينتظر تأكيد المستخدم.', 'permission': 'confirmation_required'};
