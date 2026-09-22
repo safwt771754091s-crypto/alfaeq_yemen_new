@@ -474,7 +474,7 @@ class _OfferCard extends StatelessWidget {
         if (original is num) Text(original.toStringAsFixed(0), style: const TextStyle(color: Colors.grey, decoration: TextDecoration.lineThrough, fontSize: 10)),
       ]),
       const Spacer(), SizedBox(height: 34, child: FilledButton.icon(onPressed: onAdd, icon: const Icon(Icons.add_shopping_cart, size: 16), label: const Text('أضف'), style: FilledButton.styleFrom(backgroundColor: _blue, padding: EdgeInsets.zero))),
-    ]);
+    ]));
   }
 }
 
