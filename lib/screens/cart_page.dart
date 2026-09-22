@@ -123,6 +123,9 @@ class CartPage extends StatelessWidget {
           'total': total,
           'currency': currency,
         };
+        // The server transaction succeeded; clear the legacy Firebase cart so
+        // the existing catalog/cart UI cannot submit the same items twice.
+        await FirestoreService(preferSupabase: true).clearCart(uid);
       } else {
         try {
           final callable = FirebaseFunctions.instanceFor(region: 'us-central1').httpsCallable('createOrderFromCart');
@@ -181,6 +184,8 @@ class CartPage extends StatelessWidget {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } on FirebaseException catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء الطلب: ${e.message ?? e.code}')));
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر إنشاء الطلب من الخادم. تحقق من الاتصال وتسجيل الدخول ثم حاول مرة أخرى.')));
     }
   }
 
