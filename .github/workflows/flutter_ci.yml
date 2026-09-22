@@ -16,5 +16,14 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Generate Firebase configuration
+        env:
+          FIREBASE_PROJECT_ID: alfaeq-yemen-fed37
+        run: |
+          dart pub global activate flutterfire_cli
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+          flutterfire configure --project="$FIREBASE_PROJECT_ID" --platforms=web --yes --out=lib/firebase_options.dart
+          test -s lib/firebase_options.dart
+          grep -q "class DefaultFirebaseOptions" lib/firebase_options.dart
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter test
