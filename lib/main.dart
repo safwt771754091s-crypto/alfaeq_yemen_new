@@ -361,64 +361,67 @@ class _StoreCatalogCard extends StatelessWidget {
     }
 
     try {
-      final ref = FirebaseFirestore.instance.collection('carts').doc(user.uid);
-      await FirebaseFirestore.instance.runTransaction((tx) async {
-        final snap = await tx.get(ref);
-        final data = snap.data() ?? <String, dynamic>{};
-        final raw = data['items'];
-        final items = raw is List
-            ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-            : <Map<String, dynamic>>[];
-        final index = items.indexWhere((e) => e['productId'] == productId);
+      if (!SupabaseService.isInitialized) {
+        throw StateError('خدمة السلة غير مفعلة حالياً.');
+      }
+      final ref = SupabaseService.client.from('carts');
+      final existing = await ref
+          .select('items,metadata')
+          .eq('uid', user.uid)
+          .maybeSingle();
+      final rawExisting = existing?['items'];
+      final items = rawExisting is List
+          ? rawExisting.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+          : <Map<String, dynamic>>[];
+      final index = items.indexWhere((e) => e['productId'] == productId || e['product_id'] == productId);
 
-        if (index >= 0) {
-          final current = (items[index]['quantityBase'] as num?)?.toInt() ?? (((items[index]['quantity'] as num?) ?? 1) * unit.scale).round();
-          if (current >= stockBase || current >= unit.scale * 100) {
-            throw StateError('الكمية المطلوبة غير متوفرة في المخزون.');
-          }
-          final step = (items[index]['stepBase'] as num?)?.round() ?? unit.defaultStepBase;
-          final next = current + step;
-          if (next > stockBase) throw StateError('الكمية المطلوبة غير متوفرة في المخزون.');
-          items[index]['quantityBase'] = next;
-          items[index]['quantity'] = unit.fromBase(next);
-          items[index]['price'] = price;
-          items[index]['unitScale'] = unit.scale;
-          items[index]['saleUnit'] = unit.id;
-          items[index]['unitLabel'] = unit.label;
-          items[index]['baseUnit'] = unit.baseUnit;
-          items[index]['name'] = name;
-          items[index]['currency'] = currency;
-          items[index]['storeId'] = (p['storeId'] ?? store.id).toString();
-        } else {
-          items.add({
-            'productId': productId,
-            'storeId': (p['storeId'] ?? store.id).toString(),
-            'name': name,
-            'price': price,
-            'currency': currency,
-            'quantity': 1,
-            'quantityBase': unit.scale,
-            'unitScale': unit.scale,
-            'saleUnit': unit.id,
-            'unitLabel': unit.label,
-            'baseUnit': unit.baseUnit,
-            'stepBase': unit.defaultStepBase,
-            'minOrderBase': unit.defaultStepBase,
-          });
+      if (index >= 0) {
+        final current = (items[index]['quantityBase'] as num?)?.toInt() ??
+            (((items[index]['quantity'] as num?) ?? 1) * unit.scale).round();
+        if (current >= stockBase || current >= unit.scale * 100) {
+          throw StateError('الكمية المطلوبة غير متوفرة في المخزون.');
         }
+        final step = (items[index]['stepBase'] as num?)?.round() ?? unit.defaultStepBase;
+        final next = current + step;
+        if (next > stockBase) throw StateError('الكمية المطلوبة غير متوفرة في المخزون.');
+        items[index]['quantityBase'] = next;
+        items[index]['quantity'] = unit.fromBase(next);
+        items[index]['price'] = price;
+        items[index]['unitScale'] = unit.scale;
+        items[index]['saleUnit'] = unit.id;
+        items[index]['unitLabel'] = unit.label;
+        items[index]['baseUnit'] = unit.baseUnit;
+        items[index]['name'] = name;
+        items[index]['currency'] = currency;
+        items[index]['storeId'] = (p['storeId'] ?? store.id).toString();
+      } else {
+        items.add({
+          'productId': productId,
+          'storeId': (p['storeId'] ?? store.id).toString(),
+          'name': name,
+          'price': price,
+          'currency': currency,
+          'quantity': 1,
+          'quantityBase': unit.scale,
+          'unitScale': unit.scale,
+          'saleUnit': unit.id,
+          'unitLabel': unit.label,
+          'baseUnit': unit.baseUnit,
+          'stepBase': unit.defaultStepBase,
+          'minOrderBase': unit.defaultStepBase,
+        });
+      }
 
-        tx.set(
-          ref,
-          {
-            'ownerId': user.uid,
-            'items': items,
-            'currency': currency,
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
-      });
-
+      await ref.upsert({
+        'uid': user.uid,
+        'owner_id': user.uid,
+        'items': items,
+        'metadata': {
+          'currency': currency,
+          'source': 'flutter_web',
+        },
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'uid');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
