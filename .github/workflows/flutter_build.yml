@@ -1,0 +1,59 @@
+name: Flutter Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - supabase-migration-foundation
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Generate Firebase configuration
+        env:
+          FIREBASE_PROJECT_ID: alfaeq-yemen-fed37
+        run: |
+          dart pub global activate flutterfire_cli
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+          flutterfire configure --project="$FIREBASE_PROJECT_ID" --platforms=web --yes --out=lib/firebase_options.dart
+      - name: Build web
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: flutter build web --release --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alfaeq-yemen-web
+          path: build/web
+
+  build-android-debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Generate Firebase configuration
+        env:
+          FIREBASE_PROJECT_ID: alfaeq-yemen-fed37
+        run: |
+          dart pub global activate flutterfire_cli
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+          flutterfire configure --project="$FIREBASE_PROJECT_ID" --platforms=android --yes --out=lib/firebase_options.dart
+      - name: Build Android debug APK
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: flutter build apk --debug --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alfaeq-yemen-android-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
