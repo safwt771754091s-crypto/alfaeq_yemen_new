@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'supabase_service.dart';
+import '../core/product_units.dart';
 
 class CatalogDocument {
   final String id;
@@ -61,6 +62,9 @@ class CatalogService {
     final p = product.data;
     final price = p['price'];
     if (price is! num || price < 0) throw StateError('سعر الصنف غير صالح.');
+    final unit = ProductUnit.fromProduct(p);
+    final stockBase = ProductUnit.stockBase(p);
+    final stepBase = ProductUnit.stepFor(p);
 
     final stock = p['stock_base'] ?? p['stock'];
     if (stock is num && stock <= 0) throw StateError('هذا الصنف غير متوفر حالياً.');
@@ -72,18 +76,27 @@ class CatalogService {
       final items = raw is List ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
       final index = items.indexWhere((item) => item['productId'] == product.id || item['product_id'] == product.id);
       if (index >= 0) {
-        final current = (items[index]['quantity'] as num?)?.toInt() ?? 1;
-        final next = current + 1;
-        if (stock is num && next > stock.toInt()) throw StateError('لا يمكن تجاوز الكمية المتوفرة.');
-        if (next > 100) throw StateError('الحد الأقصى 100 قطعة للصنف.');
-        items[index]['quantity'] = next;
+        final rawBase = items[index]['quantityBase'] ?? items[index]['quantity_base'];
+        final currentBase = rawBase is num ? rawBase.round() : (((items[index]['quantity'] as num?) ?? 1) * unit.scale).round();
+        final nextBase = currentBase + stepBase;
+        if (stockBase > 0 && nextBase > stockBase) throw StateError('لا يمكن تجاوز الكمية المتوفرة.');
+        if (nextBase > unit.scale * 100) throw StateError('الحد الأقصى للكمية المطلوبة هو 100 وحدة بيع.');
+        items[index]['quantityBase'] = nextBase;
+        items[index]['quantity'] = unit.fromBase(nextBase);
       } else {
         items.add({
           'productId': product.id,
           'name': (p['name'] ?? p['title'] ?? 'صنف').toString(),
           'price': price,
           'currency': p['currency'] ?? 'YER',
-          'quantity': 1,
+          'quantity': unit.fromBase(unit.scale),
+          'quantityBase': unit.scale,
+          'unitScale': unit.scale,
+          'saleUnit': unit.id,
+          'unitLabel': unit.label,
+          'baseUnit': unit.baseUnit,
+          'stepBase': stepBase,
+          'minOrderBase': ProductUnit.minFor(p),
           'storeId': p['store_id'] ?? p['storeId'] ?? '',
           'merchantId': p['owner_id'] ?? p['ownerId'] ?? '',
           'ownerId': p['owner_id'] ?? p['ownerId'] ?? '',
@@ -108,18 +121,27 @@ class CatalogService {
       final items = rawItems is List ? rawItems.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
       final index = items.indexWhere((item) => item['productId'] == product.id);
       if (index >= 0) {
-        final current = (items[index]['quantity'] as num?)?.toInt() ?? 1;
-        final next = current + 1;
-        if (stock is num && next > stock.toInt()) throw StateError('لا يمكن تجاوز الكمية المتوفرة.');
-        if (next > 100) throw StateError('الحد الأقصى 100 قطعة للصنف.');
-        items[index]['quantity'] = next;
+        final rawBase = items[index]['quantityBase'];
+        final currentBase = rawBase is num ? rawBase.round() : (((items[index]['quantity'] as num?) ?? 1) * unit.scale).round();
+        final nextBase = currentBase + stepBase;
+        if (stockBase > 0 && nextBase > stockBase) throw StateError('لا يمكن تجاوز الكمية المتوفرة.');
+        if (nextBase > unit.scale * 100) throw StateError('الحد الأقصى للكمية المطلوبة هو 100 وحدة بيع.');
+        items[index]['quantityBase'] = nextBase;
+        items[index]['quantity'] = unit.fromBase(nextBase);
       } else {
         items.add({
           'productId': product.id,
           'name': (p['name'] ?? p['title'] ?? 'صنف').toString(),
           'price': price,
           'currency': p['currency'] ?? 'YER',
-          'quantity': 1,
+          'quantity': unit.fromBase(unit.scale),
+          'quantityBase': unit.scale,
+          'unitScale': unit.scale,
+          'saleUnit': unit.id,
+          'unitLabel': unit.label,
+          'baseUnit': unit.baseUnit,
+          'stepBase': stepBase,
+          'minOrderBase': ProductUnit.minFor(p),
           'storeId': p['storeId'] ?? '',
           'merchantId': p['merchantId'] ?? p['ownerId'] ?? '',
           'ownerId': p['ownerId'] ?? '',
