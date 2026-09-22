@@ -3,9 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 
 /// Compatibility data layer.
-///
-/// Firebase remains the fallback/backup while Supabase becomes the primary
-/// read path for catalog and platform data. Authentication is migrated later.
+/// Supabase is the primary path when enabled; Firebase remains the migration fallback.
 class FirestoreService {
   final FirebaseFirestore db;
   final SupabaseClient? supabase;
@@ -28,15 +26,9 @@ class FirestoreService {
             .eq('status', 'approved')
             .order('name');
         return List<Map<String, dynamic>>.from(rows);
-      } catch (_) {
-        // Firebase remains the read fallback during migration.
-      }
+      } catch (_) {}
     }
-    final snap = await db
-        .collection('stores')
-        .where('sectionId', isEqualTo: sectionId)
-        .where('status', isEqualTo: 'approved')
-        .get();
+    final snap = await db.collection('stores').where('sectionId', isEqualTo: sectionId).where('status', isEqualTo: 'approved').get();
     return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
   }
 
@@ -50,15 +42,9 @@ class FirestoreService {
             .eq('status', 'active')
             .order('name');
         return List<Map<String, dynamic>>.from(rows);
-      } catch (_) {
-        // Firebase remains the read fallback during migration.
-      }
+      } catch (_) {}
     }
-    final snap = await db
-        .collection('products')
-        .where('storeId', isEqualTo: storeId)
-        .where('status', isEqualTo: 'active')
-        .get();
+    final snap = await db.collection('products').where('storeId', isEqualTo: storeId).where('status', isEqualTo: 'active').get();
     return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
   }
 
@@ -75,7 +61,6 @@ class FirestoreService {
             'product_id': item['productId'] ?? item['product_id'],
             'quantity': item['quantity'],
           }).toList();
-
       final orderId = await supabase!.rpc('create_order', params: {
         'p_items': normalizedItems,
         'p_address': address,
@@ -99,7 +84,6 @@ class FirestoreService {
       final ownerId = store.data()?['ownerId']?.toString() ?? '';
       if (store.exists && ownerId.isNotEmpty) merchantIds.add(ownerId);
     }
-
     final ref = await db.collection('orders').add({
       'customerId': customerId,
       'merchantIds': merchantIds.toList(),
@@ -114,6 +98,42 @@ class FirestoreService {
     return ref.id;
   }
 
+  Future<void> clearCart(String uid) async {
+    if (preferSupabase && supabase != null) {
+      await supabase!.from('carts').upsert({
+        'uid': uid,
+        'owner_id': uid,
+        'items': <dynamic>[],
+        'metadata': <String, dynamic>{},
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'uid');
+      return;
+    }
+    await db.collection('carts').doc(uid).set({
+      'ownerId': uid,
+      'items': <Map<String, dynamic>>[],
+      'currency': 'YER',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Stream<List<Map<String, dynamic>>> supabaseMyOrders(String uid) {
+    if (supabase == null) return const Stream.empty();
+    return supabase!
+        .from('orders')
+        .stream(primaryKey: ['id'])
+        .eq('customer_id', uid)
+        .order('created_at', ascending: false)
+        .limit(50);
+  }
+
+  Future<Map<String, dynamic>?> supabaseOrder(String orderId) async {
+    if (supabase == null) return null;
+    final rows = await supabase!.from('orders').select().eq('id', orderId).limit(1);
+    if (rows.isEmpty) return null;
+    return Map<String, dynamic>.from(rows.first);
+  }
+
   Stream<DocumentSnapshot<Map<String, dynamic>>> order(String orderId) =>
       db.collection('orders').doc(orderId).snapshots();
 
@@ -121,9 +141,11 @@ class FirestoreService {
     if (preferSupabase && supabase != null) {
       await supabase!.from('orders').update({
         'delivery_status': status,
-        if (location != null) 'delivery_location': {
-          'latitude': location.latitude,
-          'longitude': location.longitude,
+        if (location != null) ...{
+          'driver_location': {
+            'latitude': location.latitude,
+            'longitude': location.longitude,
+          },
         },
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', orderId);
