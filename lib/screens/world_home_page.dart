@@ -567,96 +567,6 @@ class _StoresTab extends StatelessWidget {
       );
 }
 
-class _OffersPage extends StatelessWidget {
-  const _OffersPage();
-  int _discount(Map<String, dynamic> data) {
-    final p = data['discountPercent'];
-    final price = data['price'];
-    final original = data['originalPrice'];
-    if (p is num && p > 0 && p <= 100) return p.round();
-    if (price is num && original is num && original > price) return ((1 - price / original) * 100).round();
-    return 0;
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('العروض المميزة', style: TextStyle(fontWeight: FontWeight.w900))),
-        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection('products').where('status', isEqualTo: 'active').limit(100).snapshots(),
-          builder: (context, snapshot) {
-            final docs = (snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[]).where((d) => _discount(d.data()) > 0).toList();
-            if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-            if (docs.isEmpty) return const Center(child: _Info(title: 'لا توجد عروض حالياً', text: 'أضف خصماً حقيقياً إلى منتجاتك ليظهر هنا.'));
-            return GridView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: docs.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: .68),
-              itemBuilder: (_, i) {
-                final d = docs[i];
-                return _OfferCard(product: d, discount: _discount(d.data()), onAdd: () => _addProductToCart(context, d));
-              },
-            );
-          },
-        ),
-      );
-}
-
-Future<void> _addProductToCart(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> product) async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول أولاً.')));
-    return;
-  }
-  final data = product.data();
-  final price = data['price'];
-  final stock = data['stock'];
-  if (price is! num || price < 0) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سعر الصنف غير صالح.')));
-    return;
-  }
-  if (stock is num && stock <= 0) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هذا الصنف غير متوفر حالياً.')));
-    return;
-  }
-  final name = (data['name'] ?? data['title'] ?? 'صنف').toString();
-  final cartRef = FirebaseFirestore.instance.collection('carts').doc(user.uid);
-  try {
-    await FirebaseFirestore.instance.runTransaction((tx) async {
-      final snap = await tx.get(cartRef);
-      final cart = snap.data() ?? <String, dynamic>{};
-      final rawItems = cart['items'];
-      final items = rawItems is List ? rawItems.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList() : <Map<String, dynamic>>[];
-      final itemIndex = items.indexWhere((item) => item['productId'] == product.id);
-      if (itemIndex >= 0) {
-        final current = (items[itemIndex]['quantity'] as num?)?.toInt() ?? 1;
-        final next = current + 1;
-        if (stock is num && next > stock.toInt()) throw StateError('لا يمكن تجاوز الكمية المتوفرة.');
-        if (next > 100) throw StateError('الحد الأقصى 100 قطعة للصنف.');
-        items[itemIndex]['quantity'] = next;
-      } else {
-        items.add({
-          'productId': product.id,
-          'name': name,
-          'price': price,
-          'currency': data['currency'] ?? 'YER',
-          'quantity': 1,
-          'storeId': data['storeId'] ?? '',
-          'merchantId': data['merchantId'] ?? data['ownerId'] ?? '',
-          'ownerId': data['ownerId'] ?? '',
-          'imageUrl': data['imageUrl'] ?? data['image'] ?? '',
-          'addedAt': Timestamp.now(),
-        });
-      }
-      tx.set(cartRef, {'ownerId': user.uid, 'customerId': user.uid, 'items': items, 'currency': data['currency'] ?? cart['currency'] ?? 'YER', 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-    });
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تمت إضافة «$name» إلى السلة.')));
-  } on StateError catch (e) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-  } on FirebaseException catch (e) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحديث السلة: ${e.message}')));
-  }
-}
-
 class _SectionCard extends StatelessWidget {
   final AppSection section;
   const _SectionCard({required this.section});
@@ -842,7 +752,7 @@ class _StoreCard extends StatelessWidget {
                         ),
                         IconButton(
                           onPressed: () =>
-                              _addProductToCart(context, product),
+                              _addProductToCart(context, CatalogDocument.fromFirestore(product)),
                           tooltip: 'أضف للسلة',
                           icon: const Icon(
                             Icons.add_shopping_cart,
@@ -851,7 +761,7 @@ class _StoreCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    onTap: () => _addProductToCart(context, product),
+                    onTap: () => _addProductToCart(context, CatalogDocument.fromFirestore(product)),
                   );
                 }).toList(),
               );
