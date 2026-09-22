@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// Central Supabase bootstrap and configuration.
 ///
@@ -17,6 +18,7 @@ class SupabaseService {
       url: projectUrl,
       anonKey: publishableKey,
       debug: false,
+      accessToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
     );
   }
 
