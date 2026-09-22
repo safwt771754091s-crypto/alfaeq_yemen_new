@@ -68,6 +68,27 @@ jobs:
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
       - uses: google-github-actions/setup-gcloud@v2
+      - name: Create Android platform
+        run: |
+          flutter create . --platforms android --org com.alfaeq
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          path = Path('android/app/src/main/AndroidManifest.xml')
+          text = path.read_text()
+          permissions = (
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n'
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
+          )
+          if 'android.permission.ACCESS_FINE_LOCATION' not in text:
+              marker = '    <application'
+              if marker not in text:
+                  raise SystemExit('AndroidManifest.xml does not contain the expected application tag')
+              text = text.replace(marker, permissions + marker, 1)
+              path.write_text(text)
+          ET.parse(path)
+          print(f'Valid AndroidManifest.xml: {path.stat().st_size} bytes')
+          PY
       - run: flutter pub get
       - name: Install Firebase CLI
         run: |
