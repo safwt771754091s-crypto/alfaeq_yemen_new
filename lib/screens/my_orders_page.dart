@@ -38,7 +38,7 @@ class _SupabaseOrders extends StatelessWidget {
         if (snapshot.hasError) {
           return Center(child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('تعذر تحميل الطلبات من الخادم.\n\${snapshot.error}', textAlign: TextAlign.center),
+            child: Text('تعذر تحميل الطلبات من الخادم.\n${snapshot.error}', textAlign: TextAlign.center),
           ));
         }
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
@@ -59,7 +59,7 @@ class _FirebaseOrders extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.hasError) return Center(child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text('تعذر تحميل الطلبات.\n\${snapshot.error}', textAlign: TextAlign.center),
+          child: Text('تعذر تحميل الطلبات.\n${snapshot.error}', textAlign: TextAlign.center),
         ));
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         final orders = [...(snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])]
@@ -121,13 +121,13 @@ class _OrdersList extends StatelessWidget {
                 Row(children: [
                   const Icon(Icons.receipt_long_outlined),
                   const SizedBox(width: 10),
-                  Expanded(child: Text('الطلب #\${id.length > 8 ? id.substring(0, 8) : id}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17))),
+                  Expanded(child: Text('الطلب #${id.length > 8 ? id.substring(0, 8) : id}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17))),
                   _StatusChip(label: _orderLabel(status), status: status),
                 ]),
                 const SizedBox(height: 12),
                 Row(children: [
-                  Expanded(child: Text('$itemCount \${itemCount == 1 ? 'صنف' : 'أصناف'}')),
-                  Text('\${total ?? 0} $currency', style: const TextStyle(fontWeight: FontWeight.w900)),
+                  Expanded(child: Text('$itemCount ${itemCount == 1 ? 'صنف' : 'أصناف'}')),
+                  Text('${total ?? 0} $currency', style: const TextStyle(fontWeight: FontWeight.w900)),
                 ]),
                 const SizedBox(height: 8),
                 Row(children: [
