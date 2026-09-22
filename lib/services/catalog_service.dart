@@ -64,7 +64,7 @@ class CatalogService {
     if (price is! num || price < 0) throw StateError('سعر الصنف غير صالح.');
     final unit = ProductUnit.fromProduct(p);
     final stockBase = ProductUnit.stockBase(p);
-    final stepBase = ProductUnit.stepFor(p);
+    final stepBase = unit.stepFor(p);
 
     final stock = p['stock_base'] ?? p['stock'];
     if (stock is num && stock <= 0) throw StateError('هذا الصنف غير متوفر حالياً.');
@@ -96,7 +96,7 @@ class CatalogService {
           'unitLabel': unit.label,
           'baseUnit': unit.baseUnit,
           'stepBase': stepBase,
-          'minOrderBase': ProductUnit.minFor(p),
+          'minOrderBase': unit.minFor(p),
           'storeId': p['store_id'] ?? p['storeId'] ?? '',
           'merchantId': p['owner_id'] ?? p['ownerId'] ?? '',
           'ownerId': p['owner_id'] ?? p['ownerId'] ?? '',
@@ -141,7 +141,7 @@ class CatalogService {
           'unitLabel': unit.label,
           'baseUnit': unit.baseUnit,
           'stepBase': stepBase,
-          'minOrderBase': ProductUnit.minFor(p),
+          'minOrderBase': unit.minFor(p),
           'storeId': p['storeId'] ?? '',
           'merchantId': p['merchantId'] ?? p['ownerId'] ?? '',
           'ownerId': p['ownerId'] ?? '',
