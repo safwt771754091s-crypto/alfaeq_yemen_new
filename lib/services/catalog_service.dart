@@ -11,9 +11,6 @@ class CatalogDocument {
     final id = (copy.remove('id') ?? '').toString();
     return CatalogDocument(id: id, data: copy);
   }
-
-  factory CatalogDocument.fromFirestore(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
-      CatalogDocument(id: doc.id, data: doc.data());
 }
 
 class CatalogService {
@@ -22,7 +19,7 @@ class CatalogService {
   const CatalogService({this.useSupabase = true});
 
   Future<List<CatalogDocument>> activeProducts({String? storeId, int limit = 100}) async {
-    if (!SupabaseService.isInitialized) {
+    if (!useSupabase || !SupabaseService.isInitialized) {
       throw StateError('خدمة الكتالوج الجديدة غير مفعلة.');
     }
     var query = SupabaseService.client.from('products').select().eq('status', 'active');
@@ -32,7 +29,7 @@ class CatalogService {
   }
 
   Future<List<CatalogDocument>> approvedStores(String sectionId, {int limit = 30}) async {
-    if (!SupabaseService.isInitialized) {
+    if (!useSupabase || !SupabaseService.isInitialized) {
       throw StateError('خدمة الكتالوج الجديدة غير مفعلة.');
     }
     final rows = await SupabaseService.client
@@ -46,63 +43,67 @@ class CatalogService {
   }
 
   Future<void> addToCart(String uid, CatalogDocument product) async {
+    if (!useSupabase || !SupabaseService.isInitialized) {
+      throw StateError('خدمة السلة الجديدة غير مفعلة.');
+    }
+
     final p = product.data;
     final price = p['price'];
     if (price is! num || price < 0) throw StateError('سعر الصنف غير صالح.');
     final unit = ProductUnit.fromProduct(p);
     final stockBase = ProductUnit.stockBase(p);
     final stepBase = unit.stepFor(p);
-
     final stock = p['stock_base'] ?? p['stock'];
     if (stock is num && stock <= 0) throw StateError('هذا الصنف غير متوفر حالياً.');
 
-    if (!SupabaseService.isInitialized) {
-      throw StateError('خدمة السلة الجديدة غير مفعلة.');
-    }
-    {
+    final client = SupabaseService.client;
+    final existing = await client.from('carts').select('items').eq('uid', uid).maybeSingle();
+    final raw = existing?['items'];
+    final items = raw is List
+        ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : <Map<String, dynamic>>[];
 
-      final client = SupabaseService.client;
-      final existing = await client.from('carts').select('items').eq('uid', uid).maybeSingle();
-      final raw = existing?['items'];
-      final items = raw is List ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
-      final index = items.indexWhere((item) => item['productId'] == product.id || item['product_id'] == product.id);
-      if (index >= 0) {
-        final rawBase = items[index]['quantityBase'] ?? items[index]['quantity_base'];
-        final currentBase = rawBase is num ? rawBase.round() : (((items[index]['quantity'] as num?) ?? 1) * unit.scale).round();
-        final nextBase = currentBase + stepBase;
-        if (stockBase > 0 && nextBase > stockBase) throw StateError('لا يمكن تجاوز الكمية المتوفرة.');
-        if (nextBase > unit.scale * 100) throw StateError('الحد الأقصى للكمية المطلوبة هو 100 وحدة بيع.');
-        items[index]['quantityBase'] = nextBase;
-        items[index]['quantity'] = unit.fromBase(nextBase);
-      } else {
-        items.add({
-          'productId': product.id,
-          'name': (p['name'] ?? p['title'] ?? 'صنف').toString(),
-          'price': price,
-          'currency': p['currency'] ?? 'YER',
-          'quantity': unit.fromBase(unit.scale),
-          'quantityBase': unit.scale,
-          'unitScale': unit.scale,
-          'saleUnit': unit.id,
-          'unitLabel': unit.label,
-          'baseUnit': unit.baseUnit,
-          'stepBase': stepBase,
-          'minOrderBase': unit.minFor(p),
-          'storeId': p['store_id'] ?? p['storeId'] ?? '',
-          'merchantId': p['owner_id'] ?? p['ownerId'] ?? '',
-          'ownerId': p['owner_id'] ?? p['ownerId'] ?? '',
-          'imageUrl': p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '',
-        });
-      }
-      await client.from('carts').upsert({
-        'uid': uid,
-        'owner_id': uid,
-        'items': items,
-        'metadata': <String, dynamic>{},
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'uid');
-      return;
+    final index = items.indexWhere(
+      (item) => item['productId'] == product.id || item['product_id'] == product.id,
+    );
+
+    if (index >= 0) {
+      final rawBase = items[index]['quantityBase'] ?? items[index]['quantity_base'];
+      final currentBase = rawBase is num
+          ? rawBase.round()
+          : (((items[index]['quantity'] as num?) ?? 1) * unit.scale).round();
+      final nextBase = currentBase + stepBase;
+      if (stockBase > 0 && nextBase > stockBase) throw StateError('لا يمكن تجاوز الكمية المتوفرة.');
+      if (nextBase > unit.scale * 100) throw StateError('الحد الأقصى للكمية المطلوبة هو 100 وحدة بيع.');
+      items[index]['quantityBase'] = nextBase;
+      items[index]['quantity'] = unit.fromBase(nextBase);
+    } else {
+      items.add({
+        'productId': product.id,
+        'name': (p['name'] ?? p['title'] ?? 'صنف').toString(),
+        'price': price,
+        'currency': p['currency'] ?? 'YER',
+        'quantity': unit.fromBase(unit.scale),
+        'quantityBase': unit.scale,
+        'unitScale': unit.scale,
+        'saleUnit': unit.id,
+        'unitLabel': unit.label,
+        'baseUnit': unit.baseUnit,
+        'stepBase': stepBase,
+        'minOrderBase': unit.minFor(p),
+        'storeId': p['store_id'] ?? p['storeId'] ?? '',
+        'merchantId': p['owner_id'] ?? p['ownerId'] ?? '',
+        'ownerId': p['owner_id'] ?? p['ownerId'] ?? '',
+        'imageUrl': p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '',
+      });
     }
-    throw StateError('الكتالوج والسلة متصلان الآن بـ Supabase فقط.');
+
+    await client.from('carts').upsert({
+      'uid': uid,
+      'owner_id': uid,
+      'items': items,
+      'metadata': <String, dynamic>{},
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'uid');
   }
 }
