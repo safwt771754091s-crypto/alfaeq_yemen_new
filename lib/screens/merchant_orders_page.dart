@@ -35,7 +35,14 @@ class _MerchantOrdersPageState extends State<MerchantOrdersPage>{
           if(s.hasError)return Center(child:Text('تعذر تحميل الطلبات.\n${s.error}'));
           if(s.connectionState==ConnectionState.waiting)return const Center(child:CircularProgressIndicator());
           final os=s.data??const <Map<String,dynamic>>[];if(os.isEmpty)return const Center(child:Text('لا توجد طلبات مرتبطة بمتجرك حالياً.'));
-          return RefreshIndicator(onRefresh:()async{setState((){});},child:ListView.builder(padding:const EdgeInsets.all(16),itemCount:os.length,itemBuilder:(c,i)=>_OrderCard(order:os[i],busy:_busy,onStatus:_setStatus));
+          return RefreshIndicator(
+            onRefresh: () async { if (mounted) setState(() {}); },
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: os.length,
+              itemBuilder: (c, i) => _OrderCard(order: os[i], busy: _busy, onStatus: _setStatus),
+            ),
+          );
         }),);
     }));
   void _message(String t){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(t)));}
