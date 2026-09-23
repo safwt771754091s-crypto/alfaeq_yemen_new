@@ -141,16 +141,26 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
         if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
         final docs = (snapshot.data ?? const <Map<String, dynamic>>[]).map((e) => Map<String, dynamic>.from(e)).toList();
         if (docs.isEmpty) return const _EmptyCard(text: 'لم تنشئ متجراً بعد.');
-        return Column(children: docs.map((data) {
-          final id = '${data['id'] ?? ''}'; final selected = _selectedStoreId == id;
-          return Card(elevation: 0, child: ListTile(
-            selected: selected, leading: CircleAvatar(backgroundColor: const Color(0xFFE7F3EE), child: Icon(Icons.storefront_outlined, color: Theme.of(context).colorScheme.primary)),
-            title: Text('${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900)),
-            subtitle: Text('${data['status'] ?? 'pending'} • ${data['phone'] ?? ''}'),
-            trailing: selected ? const Icon(Icons.check_circle) : const Icon(Icons.chevron_left),
-            onTap: () => setState(() => _selectedStoreId = id),
+        final children = <Widget>[];
+        for (final data in docs) {
+          final id = '\${data['id'] ?? ''}';
+          final selected = _selectedStoreId == id;
+          children.add(Card(
+            elevation: 0,
+            child: ListTile(
+              selected: selected,
+              leading: CircleAvatar(
+                backgroundColor: const Color(0xFFE7F3EE),
+                child: Icon(Icons.storefront_outlined, color: Theme.of(context).colorScheme.primary),
+              ),
+              title: Text('\${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900)),
+              subtitle: Text('\${data['status'] ?? 'pending'} • \${data['phone'] ?? ''}'),
+              trailing: selected ? const Icon(Icons.check_circle) : const Icon(Icons.chevron_left),
+              onTap: () => setState(() => _selectedStoreId = id),
+            ),
           ));
-        }).toList());
+        }
+        return Column(children: children);
       },
     );
   }
@@ -176,15 +186,26 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
         if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
         final docs = (snapshot.data ?? const <Map<String, dynamic>>[]).map((e) => Map<String, dynamic>.from(e)).toList();
         if (docs.isEmpty) return const _EmptyCard(text: 'لا توجد أصناف لهذا المتجر بعد.');
-        return Column(children: docs.map((data) => Card(elevation: 0, child: ListTile(
-          leading: const Icon(Icons.inventory_2_outlined),
-          title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
-          subtitle: Text('مخزون: ${data['stock'] ?? 0} • حالة: ${data['status'] ?? 'active'}'),
-          trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('${data['price'] ?? 0} ${data['currency'] ?? 'YER'}', style: const TextStyle(fontWeight: FontWeight.w900)),
-            TextButton(onPressed: () => _updateProduct(data), child: const Text('تعديل')),
-          ]),
-        )).toList());
+        final children = <Widget>[];
+        for (final data in docs) {
+          children.add(Card(
+            elevation: 0,
+            child: ListTile(
+              leading: const Icon(Icons.inventory_2_outlined),
+              title: Text('\${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text('مخزون: \${data['stock'] ?? 0} • حالة: \${data['status'] ?? 'active'}'),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('\${data['price'] ?? 0} \${data['currency'] ?? 'YER'}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                  TextButton(onPressed: () => _updateProduct(data), child: const Text('تعديل')),
+                ],
+              ),
+            ),
+          ));
+        }
+        return Column(children: children);
       },
     );
   }
