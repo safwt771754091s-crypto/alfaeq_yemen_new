@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
@@ -42,7 +41,7 @@ class _MerchantApprovalPageState extends State<MerchantApprovalPage> {
   }
 
   Future<void> _setStatus(Map<String, dynamic> store, String status) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = const AuthService().currentUser;
     if (user == null || !await _isStaff()) {
       _message('غير مصرح لك بإدارة اعتماد المتاجر.');
       return;
