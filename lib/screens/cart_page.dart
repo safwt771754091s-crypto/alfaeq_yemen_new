@@ -18,7 +18,7 @@ class _CartPageState extends State<CartPage> {
   bool _busy = false;
   String? _error;
   List<Map<String, dynamic>> _items = [];
-  String _currency = 'USD';
+  String _currency = 'YER';
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
@@ -163,7 +163,8 @@ class _CartPageState extends State<CartPage> {
         customerId: _uid, items: _items, address: address, paymentMethod: paymentMethod,
         latitude: deliveryPoint?.latitude, longitude: deliveryPoint?.longitude,
       );
-      await _saveItems([]);
+      // The Supabase create_order RPC clears the cart in the same transaction.
+      if (mounted) setState(() => _items = []);
       if (!mounted) return;
       await showDialog<void>(
         context: context,
