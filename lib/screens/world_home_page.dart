@@ -752,7 +752,7 @@ class _StoreCard extends StatelessWidget {
                         ),
                         IconButton(
                           onPressed: () =>
-                              _addProductToCart(context, CatalogDocument.fromLegacyMap(product)),
+                              _addProductToCart(context, CatalogDocument.fromLegacyMap(product.data())),
                           tooltip: 'أضف للسلة',
                           icon: const Icon(
                             Icons.add_shopping_cart,
@@ -761,7 +761,7 @@ class _StoreCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    onTap: () => _addProductToCart(context, CatalogDocument.fromLegacyMap(product)),
+                    onTap: () => _addProductToCart(context, CatalogDocument.fromLegacyMap(product.data())),
                   );
                 }).toList(),
               );
