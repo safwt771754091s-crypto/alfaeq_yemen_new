@@ -1,5 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 
 import '../core/app_sections.dart';
 import '../services/location_service.dart';
@@ -30,7 +30,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     _storeName.dispose(); _phone.dispose(); _address.dispose(); _productName.dispose(); _price.dispose(); _stock.dispose(); super.dispose();
   }
 
-  User? get _user => FirebaseAuth.instance.currentUser;
+  AuthUser? get _user => const AuthService().currentUser;
 
   Future<void> _createStore() async {
     final user = _user;
