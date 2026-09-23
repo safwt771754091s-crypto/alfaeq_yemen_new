@@ -12,9 +12,6 @@ class CatalogDocument {
     return CatalogDocument(id: id, data: copy);
   }
 
-  factory CatalogDocument.fromFirestore(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
-      CatalogDocument(id: doc.id, data: doc.data());
-}
 
 class CatalogService {
   final bool useSupabase;
