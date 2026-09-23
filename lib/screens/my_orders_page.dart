@@ -51,13 +51,6 @@ class _OrdersList extends StatelessWidget {
   final List<Map<String, dynamic>> orders;
   const _OrdersList({required this.orders});
 
-  static DateTime timestamp(dynamic value) {
-    if (value is Timestamp) return value.toDate();
-    if (value is DateTime) return value;
-    if (value is String) return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
-    return DateTime.fromMillisecondsSinceEpoch(0);
-  }
-
   @override
   Widget build(BuildContext context) {
     if (orders.isEmpty) {
