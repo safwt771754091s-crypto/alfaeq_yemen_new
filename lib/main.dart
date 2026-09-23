@@ -16,6 +16,7 @@ import 'screens/merchant_invite_page.dart';
 import 'screens/my_orders_page.dart';
 import 'services/auth_service.dart';
 import 'services/supabase_service.dart';
+import 'services/catalog_service.dart';
 
 import 'core/product_units.dart';
 
