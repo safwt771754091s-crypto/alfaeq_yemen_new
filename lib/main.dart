@@ -316,121 +316,102 @@ class HomePage extends StatelessWidget {
       };
 }
 
-class SectionPage extends StatelessWidget {
+class SectionPage extends StatefulWidget {
   final AppSection section;
   const SectionPage({super.key, required this.section});
+  @override
+  State<SectionPage> createState() => _SectionPageState();
+}
+
+class _SectionPageState extends State<SectionPage> {
+  final CatalogService _catalog = const CatalogService();
+  late Future<List<CatalogDocument>> _stores;
+
+  @override
+  void initState() {
+    super.initState();
+    _stores = _catalog.approvedStores(widget.section.id);
+  }
 
   @override
   Widget build(BuildContext context) => Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
-          appBar: AppBar(title: Text(section.title)),
-          body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('stores').where('sectionId', isEqualTo: section.id).where('status', isEqualTo: 'approved').snapshots(),
+          appBar: AppBar(title: Text(widget.section.title)),
+          body: FutureBuilder<List<CatalogDocument>>(
+            future: _stores,
             builder: (context, snapshot) {
-              if (snapshot.hasError) return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('تعذر قراءة المتاجر: ${snapshot.error}', textAlign: TextAlign.center)));
-              if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-              final stores = snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-              if (stores.isEmpty) return ListView(padding: const EdgeInsets.all(20), children: [Text(section.title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)), const SizedBox(height: 8), Text(section.subtitle), const SizedBox(height: 24), const Card(child: ListTile(leading: Icon(Icons.store_outlined), title: Text('لا يوجد تجار معتمدون بعد'), subtitle: Text('سيظهر المتجر هنا مباشرة بعد حفظه واعتماده في قاعدة البيانات.')))]);
-              return ListView(padding: const EdgeInsets.all(16), children: [Text(section.title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)), const SizedBox(height: 6), Text(section.subtitle), const SizedBox(height: 18), ...stores.map((store) => _StoreCatalogCard(store: store))]);
+              if (snapshot.hasError) {
+                return Center(child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text('تعذر تحميل المتاجر: ${snapshot.error}', textAlign: TextAlign.center),
+                ));
+              }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final stores = snapshot.data ?? const <CatalogDocument>[];
+              if (stores.isEmpty) {
+                return ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    Text(widget.section.title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 8),
+                    Text(widget.section.subtitle),
+                    const SizedBox(height: 24),
+                    const Card(child: ListTile(
+                      leading: Icon(Icons.store_outlined),
+                      title: Text('لا يوجد تجار معتمدون بعد'),
+                      subtitle: Text('سيظهر المتجر هنا بعد اعتماده في قاعدة البيانات.'),
+                    )),
+                  ],
+                );
+              }
+              return ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Text(widget.section.title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  Text(widget.section.subtitle),
+                  const SizedBox(height: 18),
+                  ...stores.map((store) => _StoreCatalogCard(store: store)),
+                ],
+              );
             },
           ),
         ),
       );
 }
 
-class _StoreCatalogCard extends StatelessWidget {
-  final QueryDocumentSnapshot<Map<String, dynamic>> store;
+class _StoreCatalogCard extends StatefulWidget {
+  final CatalogDocument store;
   const _StoreCatalogCard({required this.store});
+  @override
+  State<_StoreCatalogCard> createState() => _StoreCatalogCardState();
+}
 
-  Future<void> _addToCart(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> product) async {
+class _StoreCatalogCardState extends State<_StoreCatalogCard> {
+  final CatalogService _catalog = const CatalogService();
+  late Future<List<CatalogDocument>> _products;
+
+  @override
+  void initState() {
+    super.initState();
+    _products = _catalog.activeProducts(storeId: widget.store.id, limit: 5000);
+  }
+
+  Future<void> _addToCart(BuildContext context, CatalogDocument product) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول أولاً.')));
       return;
     }
-    final p = product.data();
-    final productId = product.id;
-    final name = (p['name'] ?? 'صنف').toString();
-    final price = p['price'];
-    final unit = ProductUnit.fromProduct(p);
-    final stockBase = ProductUnit.stockBase(p);
-    final currency = (p['currency'] ?? 'YER').toString();
-    if (price is! num || price < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سعر الصنف غير صالح.')));
-      return;
-    }
-    if (stockBase <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هذا الصنف غير متوفر حالياً.')));
-      return;
-    }
-
     try {
-      if (!SupabaseService.isInitialized) {
-        throw StateError('خدمة السلة غير مفعلة حالياً.');
-      }
-      final ref = SupabaseService.client.from('carts');
-      final existing = await ref
-          .select('items,metadata')
-          .eq('uid', user.uid)
-          .maybeSingle();
-      final rawExisting = existing?['items'];
-      final items = rawExisting is List
-          ? rawExisting.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-          : <Map<String, dynamic>>[];
-      final index = items.indexWhere((e) => e['productId'] == productId || e['product_id'] == productId);
-
-      if (index >= 0) {
-        final current = (items[index]['quantityBase'] as num?)?.toInt() ??
-            (((items[index]['quantity'] as num?) ?? 1) * unit.scale).round();
-        if (current >= stockBase || current >= unit.scale * 100) {
-          throw StateError('الكمية المطلوبة غير متوفرة في المخزون.');
-        }
-        final step = (items[index]['stepBase'] as num?)?.round() ?? unit.defaultStepBase;
-        final next = current + step;
-        if (next > stockBase) throw StateError('الكمية المطلوبة غير متوفرة في المخزون.');
-        items[index]['quantityBase'] = next;
-        items[index]['quantity'] = unit.fromBase(next);
-        items[index]['price'] = price;
-        items[index]['unitScale'] = unit.scale;
-        items[index]['saleUnit'] = unit.id;
-        items[index]['unitLabel'] = unit.label;
-        items[index]['baseUnit'] = unit.baseUnit;
-        items[index]['name'] = name;
-        items[index]['currency'] = currency;
-        items[index]['storeId'] = (p['storeId'] ?? store.id).toString();
-      } else {
-        items.add({
-          'productId': productId,
-          'storeId': (p['storeId'] ?? store.id).toString(),
-          'name': name,
-          'price': price,
-          'currency': currency,
-          'quantity': 1,
-          'quantityBase': unit.scale,
-          'unitScale': unit.scale,
-          'saleUnit': unit.id,
-          'unitLabel': unit.label,
-          'baseUnit': unit.baseUnit,
-          'stepBase': unit.defaultStepBase,
-          'minOrderBase': unit.defaultStepBase,
-        });
-      }
-
-      await ref.upsert({
-        'uid': user.uid,
-        'owner_id': user.uid,
-        'items': items,
-        'metadata': {
-          'currency': currency,
-          'source': 'flutter_web',
-        },
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'uid');
+      await _catalog.addToCart(user.uid, product);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('تمت إضافة «$name» إلى السلة.'),
+            content: Text('تمت إضافة «${product.data['name'] ?? 'الصنف'}» إلى السلة.'),
             action: SnackBarAction(
               label: 'فتح السلة',
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage())),
@@ -440,14 +421,14 @@ class _StoreCatalogCard extends StatelessWidget {
       }
     } on StateError catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    } on FirebaseException catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إضافة الصنف للسلة: ${e.message ?? e.code}')));
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إضافة الصنف للسلة: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final data = store.data();
+    final data = widget.store.data;
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
       child: Padding(
@@ -460,24 +441,34 @@ class _StoreCatalogCard extends StatelessWidget {
             subtitle: Text('${data['address'] ?? ''} • ${data['phone'] ?? ''}'),
           ),
           const Divider(),
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('products').where('storeId', isEqualTo: store.id).where('status', isEqualTo: 'active').limit(5000).snapshots(),
+          FutureBuilder<List<CatalogDocument>>(
+            future: _products,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
               if (snapshot.hasError) return Text('تعذر تحميل الأصناف: ${snapshot.error}');
-              final products = snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-              if (products.isEmpty) return const Padding(padding: EdgeInsets.all(8), child: Text('لا توجد أصناف مضافة لهذا المتجر بعد.'));
+              final products = snapshot.data ?? const <CatalogDocument>[];
+              if (products.isEmpty) return const Padding(
+                padding: EdgeInsets.all(8),
+                child: Text('لا توجد أصناف مضافة لهذا المتجر بعد.'),
+              );
               return Column(children: products.map((product) {
-                final p = product.data();
+                final p = product.data;
                 final stockBase = ProductUnit.stockBase(p);
                 final unit = ProductUnit.fromProduct(p);
                 final price = p['price'] ?? 0;
                 final currency = p['currency'] ?? 'YER';
+                final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
                 return Card(
                   elevation: 0,
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    leading: Builder(builder: (context) { final imageUrl = (p['imageUrl'] ?? '').toString(); if (imageUrl.isEmpty) return CircleAvatar(child: Icon(stockBase > 0 ? Icons.inventory_2_outlined : Icons.remove_shopping_cart_outlined)); return ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(imageUrl, width: 54, height: 54, fit: BoxFit.cover, errorBuilder: (_, __, ___) => CircleAvatar(child: Icon(stockBase > 0 ? Icons.inventory_2_outlined : Icons.remove_shopping_cart_outlined)))); }),
+                    leading: imageUrl.isEmpty
+                        ? CircleAvatar(child: Icon(stockBase > 0 ? Icons.inventory_2_outlined : Icons.remove_shopping_cart_outlined))
+                        : ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.network(imageUrl, width: 54, height: 54, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => CircleAvatar(child: Icon(stockBase > 0 ? Icons.inventory_2_outlined : Icons.remove_shopping_cart_outlined))),
+                          ),
                     title: Text('${p['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
                     subtitle: Text('${p['description'] ?? ''}\nالمتوفر: ${ProductUnit.formatBase(p, stockBase)}', maxLines: 3, overflow: TextOverflow.ellipsis),
                     isThreeLine: true,
