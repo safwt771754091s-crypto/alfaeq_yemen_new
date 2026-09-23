@@ -58,16 +58,20 @@ void main() {
       expect(portal, contains('const MerchantOrdersPage()'));
     });
 
-    test('merchant orders are scoped by merchantIds and status changes are audited', () {
+    test('merchant orders are scoped by Supabase store ownership and server-side transitions', () {
       final orders = File('lib/screens/merchant_orders_page.dart').readAsStringSync();
-      final service = File('lib/services/firestore_service.dart').readAsStringSync();
-      final rules = File('firestore.rules').readAsStringSync();
-      expect(orders, contains("where('merchantIds', arrayContains: user.uid)"));
-      expect(orders, contains("collection('auditLogs')"));
-      expect(orders, contains('merchant_order_status_'));
-      expect(service, contains("'merchantIds': merchantIds.toList()"));
-      expect(rules, contains("request.auth.uid in resource.data.merchantIds"));
-      expect(rules, contains("request.resource.data.merchantIds == resource.data.merchantIds"));
+      final migration = File('supabase/migrations/20260923160000_stage4_merchant_order_transitions.sql').readAsStringSync();
+      expect(orders, contains("from('stores').select('id').eq('owner_id',uid)"));
+      expect(orders, contains("overlaps('merchant_ids',ids)"));
+      expect(orders, contains("rpc('transition_order'"));
+      expect(orders, contains("p_status':status"));
+      expect(migration, contains('s.owner_id = uid'));
+      expect(migration, contains('s.id = o.merchant_id or s.id = any(o.merchant_ids)'));
+      expect(migration, contains("raise exception 'not authorized'"));
+      expect(migration, contains("raise exception 'invalid merchant order transition'"));
+      expect(migration, contains("current_status='pending' and p_status in ('accepted','cancelled')"));
+      expect(migration, contains("current_status='accepted' and p_status in ('preparing','cancelled')"));
+      expect(migration, contains("current_status='preparing' and p_status='ready_for_pickup'"));
     });
 
     test('driver center is role-gated and delivery transitions preserve assignment', () {
