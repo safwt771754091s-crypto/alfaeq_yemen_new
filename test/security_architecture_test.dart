@@ -37,7 +37,7 @@ void main() {
       final approval = File('lib/screens/merchant_approval_page.dart').readAsStringSync();
       final rules = File('firestore.rules').readAsStringSync();
       expect(merchant, contains("'status': 'pending'"));
-      expect(merchant, contains("'ownerId': user.uid"));
+      expect(merchant, contains("'owner_id': user.uid"));
       expect(approval, contains('Future<bool> _isStaff()'));
       expect(approval, contains("where('status', isEqualTo: 'pending')"));
       expect(approval, contains("'reviewedBy': user.uid"));
@@ -109,7 +109,7 @@ void main() {
       expect(onboarding, contains('LocationPickerPage'));
       expect(onboarding, contains('LocationService.requireCurrentPosition'));
       expect(merchant, contains('LocationService.requireCurrentPosition'));
-      expect(merchant, contains("'location': location"));
+      expect(merchant, contains("'location': {'latitude': position.latitude, 'longitude': position.longitude, 'source': 'device'}"));
       expect(rules, contains('function validLocation'));
       expect(rules, contains("!('location' in request.resource.data) || validLocation(request.resource.data)"));
       expect(rules, contains("request.resource.data.get('uid', request.auth.uid) == request.auth.uid"));
