@@ -169,6 +169,22 @@ class AuthService {
   }
 
   Future<void> _recordLoginEvent(User user, {required String provider, String action = 'login'}) async {
+    // Keep telemetry sinks independent so a Firestore outage cannot prevent
+    // the production Supabase login_events -> email notification pipeline.
+    if (SupabaseService.isInitialized) {
+      try {
+        await SupabaseService.client.from('login_events').insert({
+          'uid': user.uid,
+          'email': user.email,
+          'provider': provider,
+          'action': action,
+          'login_at': DateTime.now().toUtc().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('Supabase login event failed: $e');
+      }
+    }
+
     try {
       await db.collection('loginEvents').add({
         'uid': user.uid,
@@ -178,16 +194,18 @@ class AuthService {
         'loginAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       });
-      if (SupabaseService.isInitialized) {
-        await SupabaseService.client.from('login_events').insert({'uid': user.uid, 'email': user.email, 'provider': provider, 'action': action, 'login_at': DateTime.now().toUtc().toIso8601String()});
-      }
+    } catch (e) {
+      debugPrint('Firestore login event failed: $e');
+    }
+
+    try {
       await db.collection('users').doc(user.uid).set({
         'lastLoginAt': FieldValue.serverTimestamp(),
         'lastSeen': FieldValue.serverTimestamp(),
         'isOnline': true,
       }, SetOptions(merge: true));
-    } catch (_) {
-      // Authentication must never fail because telemetry is unavailable.
+    } catch (e) {
+      debugPrint('Login presence update failed: $e');
     }
   }
 
