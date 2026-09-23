@@ -19,7 +19,7 @@ class _CartPageState extends State<CartPage> {
   String? _error;
   List<Map<String, dynamic>> _items = [];
   String _currency = 'USD';
-  String get _uid => const AuthService().currentAuthUser?.uid ?? '';
+  String get _uid => const AuthService().currentUser?.uid ?? '';
 
   @override
   void initState() { super.initState(); _loadCart(); }
