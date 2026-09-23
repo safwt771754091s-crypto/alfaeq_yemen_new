@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../services/firestore_service.dart';
+import '../services/supabase_service.dart';
 import 'live_tracking_map_page.dart';
 
 class _SupabaseOrderTracking extends StatelessWidget {
@@ -32,7 +33,26 @@ class _SupabaseOrderTracking extends StatelessWidget {
           _InfoRow(icon: Icons.account_balance_wallet_outlined, title: 'طريقة الدفع', value: DeliveryTracking._paymentLabel((data['payment_method'] ?? '').toString())),
         ]))),
         const SizedBox(height: 12),
-        Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(12), child: Column(children: stages.map((stage) => ListTile(dense: true, title: Text(stage['label'] as String), trailing: Icon(stage['active'] == true ? Icons.check_circle : Icons.radio_button_unchecked)).toList()))),
+        Card(
+          elevation: 0,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                for (final stage in stages)
+                  ListTile(
+                    dense: true,
+                    title: Text(stage['label'] as String),
+                    trailing: Icon(
+                      stage['active'] == true
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
         if ((data['address'] ?? '').toString().isNotEmpty) ...[const SizedBox(height: 12), Card(elevation: 0, child: ListTile(leading: const Icon(Icons.location_on_outlined), title: const Text('عنوان التوصيل'), subtitle: Text((data['address'] ?? '').toString())))],
         if (location is Map && location['latitude'] is num && location['longitude'] is num) ...[const SizedBox(height: 12), Card(elevation: 0, child: ListTile(leading: const Icon(Icons.my_location_outlined), title: const Text('آخر موقع للمندوب'), subtitle: Text('خط العرض: ${location['latitude']}\nخط الطول: ${location['longitude']}')))],
         const SizedBox(height: 12),
