@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/app_sections.dart';
 import '../services/location_service.dart';
 import '../core/product_units.dart';
+import '../services/supabase_service.dart';
 
 class MerchantCenterPage extends StatefulWidget {
   const MerchantCenterPage({super.key});
@@ -72,7 +73,12 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     if (price == null || price < 0 || stock == null || stock < 0) { _message('السعر والكمية يجب أن يكونا أرقاماً صحيحة وغير سالبة.'); return; }
     setState(() => _saving = true);
     try {
-      await FirebaseFirestore.instance.collection('products').add({'storeId': storeId, 'ownerId': user.uid, 'createdBy': user.uid, 'name': name, 'price': price, 'currency': 'YER', 'stock': stock, 'stockBase': ProductUnit.fromId(_saleUnit).toBase(stock).round(), 'saleUnit': _saleUnit, 'unitLabel': ProductUnit.fromId(_saleUnit).label, 'baseUnit': ProductUnit.fromId(_saleUnit).baseUnit, 'unitScale': ProductUnit.fromId(_saleUnit).scale, 'stepBase': ProductUnit.fromId(_saleUnit).defaultStepBase, 'minOrderBase': ProductUnit.fromId(_saleUnit).defaultStepBase, 'soldQuantity': 0, 'soldQuantityBase': 0, 'status': 'active', 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp()});
+      final unit = ProductUnit.fromId(_saleUnit);
+      if (SupabaseService.isInitialized) {
+        await SupabaseService.client.from('products').insert({'id': '${storeId}_${DateTime.now().microsecondsSinceEpoch}', 'store_id': storeId, 'owner_id': user.uid, 'name': name, 'price': price, 'currency': 'YER', 'stock': stock, 'stock_base': unit.toBase(stock).round(), 'sale_unit': unit.id, 'unit_label': unit.label, 'base_unit': unit.baseUnit, 'unit_scale': unit.scale, 'step_base': unit.defaultStepBase, 'min_order_base': unit.defaultStepBase, 'sold_quantity': 0, 'sold_quantity_base': 0, 'status': 'active', 'updated_at': DateTime.now().toUtc().toIso8601String()});
+      } else {
+        await FirebaseFirestore.instance.collection('products').add({'storeId': storeId, 'ownerId': user.uid, 'createdBy': user.uid, 'name': name, 'price': price, 'currency': 'YER', 'stock': stock, 'stockBase': unit.toBase(stock).round(), 'saleUnit': unit.id, 'unitLabel': unit.label, 'baseUnit': unit.baseUnit, 'unitScale': unit.scale, 'stepBase': unit.defaultStepBase, 'minOrderBase': unit.defaultStepBase, 'soldQuantity': 0, 'soldQuantityBase': 0, 'status': 'active', 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp()});
+      }
       _productName.clear(); _price.clear(); _stock.clear(); _message('تم حفظ الصنف بنجاح.');
     } on FirebaseException catch (e) { _message('تعذر حفظ الصنف: ${e.message ?? e.code}'); }
     finally { if (mounted) setState(() => _saving = false); }
@@ -86,7 +92,12 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     if (result != true) return;
     final price = num.tryParse(priceController.text.trim()); final stock = int.tryParse(stockController.text.trim());
     if (price == null || price < 0 || stock == null || stock < 0) { _message('السعر والمخزون غير صالحين.'); return; }
-    await doc.reference.update({'price': price, 'stock': stock, 'updatedAt': FieldValue.serverTimestamp()});
+    final unit = ProductUnit.fromProduct(data);
+    if (SupabaseService.isInitialized) {
+      await SupabaseService.client.from('products').update({'price': price, 'stock': stock, 'stock_base': unit.toBase(stock).round(), 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', doc.id);
+    } else {
+      await doc.reference.update({'price': price, 'stock': stock, 'stockBase': unit.toBase(stock).round(), 'updatedAt': FieldValue.serverTimestamp()});
+    }
   }
 
   void _message(String text) { if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text))); }
