@@ -1,7 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +18,7 @@ import 'core/product_units.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseService.initialize();
   runApp(const AlfaeqBootstrapApp());
 }
 
@@ -50,7 +47,6 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
     // One-time migration reset: the current release changed the auth/data
     // path. Clear any persisted legacy session so testing starts from a clean
     // login screen. New logins are not affected on subsequent launches.
-    final prefs = await SharedPreferences.getInstance();
     const migrationKey = 'alfaeq_auth_migration_2026_09_22_2';
     if (prefs.getBool(migrationKey) != true) {
       await FirebaseAuth.instance.signOut();
@@ -177,12 +173,12 @@ class HomePage extends StatelessWidget {
             actions: [
               IconButton(tooltip: 'ذكاء الفائق', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage())), icon: const Icon(Icons.auto_awesome)),
               StreamBuilder<List<Map<String, dynamic>>>(
-                stream: FirebaseAuth.instance.currentUser == null || !SupabaseService.isInitialized
+                stream: const AuthService().currentUser == null || !SupabaseService.isInitialized
                     ? null
                     : SupabaseService.client
                         .from('carts')
                         .stream(primaryKey: ['uid'])
-                        .eq('uid', FirebaseAuth.instance.currentUser!.uid),
+                        .eq('uid', const AuthService().currentUser!.uid),
                 builder: (context, snapshot) {
                   var count = 0;
                   final rows = snapshot.data ?? const <Map<String, dynamic>>[];
@@ -402,7 +398,7 @@ class _StoreCatalogCardState extends State<_StoreCatalogCard> {
   }
 
   Future<void> _addToCart(BuildContext context, CatalogDocument product) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = const AuthService().currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول أولاً.')));
       return;
