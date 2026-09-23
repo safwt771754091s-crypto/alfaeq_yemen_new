@@ -1,10 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
 import '../services/auth_service.dart';
 import '../services/catalog_service.dart';
+import '../services/supabase_service.dart';
 import 'ai_assistant_page.dart';
 import 'cart_page.dart';
 import 'location_picker_page.dart';
@@ -60,11 +59,11 @@ class _MainBottomBar extends StatelessWidget {
       (Icons.receipt_long_outlined, Icons.receipt_long, 'طلباتي'),
       (Icons.person_outline, Icons.person, 'حسابي'),
     ];
-    final user = FirebaseAuth.instance.currentUser;
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: user == null ? null : FirebaseFirestore.instance.collection('carts').doc(user.uid).snapshots(),
+    final user = SupabaseService.isInitialized ? SupabaseService.client.auth.currentUser : null;
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: user == null ? null : SupabaseService.client.from('carts').stream(primaryKey: ['uid']).eq('uid', user.id).limit(1),
       builder: (context, snapshot) {
-        final data = snapshot.data?.data() ?? <String, dynamic>{};
+        final data = (snapshot.data?.isNotEmpty ?? false) ? snapshot.data!.first : <String, dynamic>{};
         final raw = data['items'];
         var cartCount = 0;
         if (raw is List) {
@@ -507,11 +506,11 @@ class _OffersPage extends StatelessWidget {
 }
 
 Future<void> _addProductToCart(BuildContext context, CatalogDocument product) async {
-  final user = FirebaseAuth.instance.currentUser;
+  final user = SupabaseService.isInitialized ? SupabaseService.client.auth.currentUser : null;
   if (user == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول أولاً.'))); return; }
   final name = (product.data['name'] ?? product.data['title'] ?? 'صنف').toString();
   try {
-    await const CatalogService().addToCart(user.uid, product);
+    await const CatalogService().addToCart(user.id, product);
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تمت إضافة «' + name + '» إلى السلة.')));
   } on StateError catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -599,418 +598,46 @@ class _SectionCard extends StatelessWidget {
 class WorldSectionPage extends StatelessWidget {
   final AppSection section;
   const WorldSectionPage({super.key, required this.section});
-
   @override
   Widget build(BuildContext context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(section.title, style: const TextStyle(fontWeight: FontWeight.w900)),
-            actions: [
-              IconButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage())), tooltip: 'السلة', icon: const Icon(Icons.shopping_cart_outlined)),
-            ],
-          ),
-          body: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFE7F3EE), Color(0xFFEAF2F8)]), borderRadius: BorderRadius.circular(24)),
-                child: Row(
-                  children: [
-                    Container(width: 56, height: 56, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17)), child: Icon(_SectionCard.iconFor(section.icon), color: _green, size: 31)),
-                    const SizedBox(width: 13),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(section.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 3),
-                      Text(section.subtitle, style: const TextStyle(color: Colors.black54, height: 1.3)),
-                    ])),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(decoration: InputDecoration(hintText: 'ابحث في ${section.title}...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none))),
-              const SizedBox(height: 18),
-              const Text('المتاجر المعتمدة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 9),
-              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance.collection('stores').where('sectionId', isEqualTo: section.id).where('status', isEqualTo: 'approved').limit(30).snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()));
-                  if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المتاجر', text: 'تحقق من الاتصال والصلاحيات.');
-                  final stores = snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                  if (stores.isEmpty) return const _Info(title: 'لا توجد متاجر معتمدة بعد', text: 'سيظهر هنا المحتوى الحقيقي عند اعتماد المتاجر.');
-                  return Column(children: stores.map((document) => _StoreCard(store: document)).toList());
-                },
-              ),
-            ],
-          ),
-        ),
-      );
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(title: Text(section.title, style: const TextStyle(fontWeight: FontWeight.w900)),
+        actions: [IconButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage())), icon: const Icon(Icons.shopping_cart_outlined))]),
+      body: ListView(padding: const EdgeInsets.fromLTRB(16,12,16,28), children: [
+        Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(gradient: const LinearGradient(colors:[Color(0xFFE7F3EE),Color(0xFFEAF2F8)]), borderRadius: BorderRadius.circular(24)),
+          child: Row(children:[Container(width:56,height:56,decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(17)),child:Icon(_SectionCard.iconFor(section.icon),color:_green,size:31)),const SizedBox(width:13),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(section.title,style:const TextStyle(fontSize:22,fontWeight:FontWeight.w900)),const SizedBox(height:3),Text(section.subtitle,style:const TextStyle(color:Colors.black54,height:1.3))]))])),
+        const SizedBox(height:14),
+        TextField(decoration:InputDecoration(hintText:'ابحث في ${section.title}...',prefixIcon:const Icon(Icons.search),filled:true,fillColor:Colors.white,border:OutlineInputBorder(borderRadius:BorderRadius.all(Radius.circular(18)),borderSide:BorderSide.none))),
+        const SizedBox(height:18), const Text('المتاجر المعتمدة',style:TextStyle(fontSize:20,fontWeight:FontWeight.w900)),const SizedBox(height:9),
+        FutureBuilder<List<CatalogDocument>>(future:const CatalogService().approvedStores(section.id,limit:30),builder:(context,snapshot){
+          if(snapshot.connectionState==ConnectionState.waiting)return const Center(child:Padding(padding:EdgeInsets.all(28),child:CircularProgressIndicator()));
+          if(snapshot.hasError)return const _Info(title:'تعذر تحميل المتاجر',text:'تحقق من الاتصال والصلاحيات.');
+          final stores=snapshot.data??const <CatalogDocument>[]; if(stores.isEmpty)return const _Info(title:'لا توجد متاجر معتمدة بعد',text:'سيظهر هنا المحتوى الحقيقي عند اعتماد المتاجر.');
+          return Column(children:stores.map((document)=>_StoreCard(store:document)).toList());
+        }),
+      ]),
+    ),
+  );
 }
-
 class _StoreCard extends StatelessWidget {
-  final QueryDocumentSnapshot<Map<String, dynamic>> store;
+  final CatalogDocument store;
   const _StoreCard({required this.store});
-
-  @override
-  Widget build(BuildContext context) {
-    final data = store.data();
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        leading: const CircleAvatar(
-          backgroundColor: Color(0xFFF1F6FF),
-          child: Icon(Icons.storefront_outlined, color: _blue),
-        ),
-        title: Text(
-          data['name']?.toString() ?? 'متجر',
-          style: const TextStyle(fontWeight: FontWeight.w900),
-        ),
-        subtitle: Text(data['address']?.toString() ?? 'عنوان غير محدد'),
-        children: [
-          Container(height: 1, color: const Color(0xFFE8ECEA)),
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance
-                .collection('products')
-                .where('storeId', isEqualTo: store.id)
-                .where('status', isEqualTo: 'active')
-                .limit(5000)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(),
-                );
-              }
-              if (snapshot.hasError) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('تعذر تحميل الأصناف.'),
-                );
-              }
-              final products = snapshot.data?.docs ??
-                  const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-              if (products.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('لا توجد أصناف نشطة حالياً.'),
-                );
-              }
-              return Column(
-                children: products.map((product) {
-                  final p = product.data();
-                  final imageUrl =
-                      (p['imageUrl'] ?? p['image'] ?? '').toString();
-                  final price = p['price'];
-                  Widget leading;
-                  if (imageUrl.isEmpty) {
-                    leading = const CircleAvatar(
-                      backgroundColor: Color(0xFFF1F6FF),
-                      child: Icon(Icons.inventory_2_outlined, color: _blue),
-                    );
-                  } else {
-                    leading = ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        imageUrl,
-                        width: 48,
-                        height: 48,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const CircleAvatar(
-                          child: Icon(Icons.broken_image_outlined),
-                        ),
-                      ),
-                    );
-                  }
-
-                  final priceText = price is num
-                      ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}'
-                      : 'عند الطلب';
-                  final stock = p['stock'];
-                  final stockSource = (p['stockSource'] ?? '').toString();
-                  final stockText = stockSource == 'unverified' && (stock is num && stock <= 0)
-                      ? 'المخزون يحتاج إدخالاً'
-                      : 'المتوفر: ${stock ?? '—'}';
-
-                  return ListTile(
-                    leading: leading,
-                    title: Text(
-                      p['name']?.toString() ?? 'صنف',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    subtitle: Text(stockText),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          priceText,
-                          style: const TextStyle(fontWeight: FontWeight.w900),
-                        ),
-                        IconButton(
-                          onPressed: () =>
-                              _addProductToCart(context, CatalogDocument.fromFirestore(product)),
-                          tooltip: 'أضف للسلة',
-                          icon: const Icon(
-                            Icons.add_shopping_cart,
-                            color: _blue,
-                          ),
-                        ),
-                      ],
-                    ),
-                    onTap: () => _addProductToCart(context, CatalogDocument.fromFirestore(product)),
-                  );
-                }).toList(),
-              );
-            },
-          ),
-        ],
-      ),
-    );
+  @override Widget build(BuildContext context){
+    final data=store.data;
+    return Card(elevation:0,margin:const EdgeInsets.only(bottom:12),clipBehavior:Clip.antiAlias,child:ExpansionTile(
+      leading:const CircleAvatar(backgroundColor:Color(0xFFF1F6FF),child:Icon(Icons.storefront_outlined,color:_blue)),
+      title:Text(data['name']?.toString()??'متجر',style:const TextStyle(fontWeight:FontWeight.w900)),
+      subtitle:Text(data['address']?.toString()??'عنوان غير محدد'),
+      children:[Container(height:1,color:const Color(0xFFE8ECEA)),
+        FutureBuilder<List<CatalogDocument>>(future:const CatalogService().activeProducts(storeId:store.id,limit:5000),builder:(context,snapshot){
+          if(snapshot.connectionState==ConnectionState.waiting)return const Padding(padding:EdgeInsets.all(16),child:CircularProgressIndicator());
+          if(snapshot.hasError)return const Padding(padding:EdgeInsets.all(16),child:Text('تعذر تحميل الأصناف.'));
+          final products=snapshot.data??const <CatalogDocument>[]; if(products.isEmpty)return const Padding(padding:EdgeInsets.all(16),child:Text('لا توجد أصناف نشطة حالياً.'));
+          return Column(children:products.map((product){final p=product.data;final imageUrl=(p['image_url']??p['imageUrl']??p['image']??'').toString();final price=p['price'];Widget leading;
+            if(imageUrl.isEmpty)leading=const CircleAvatar(backgroundColor:Color(0xFFF1F6FF),child:Icon(Icons.inventory_2_outlined,color:_blue));else leading=ClipRRect(borderRadius:BorderRadius.circular(10),child:Image.network(imageUrl,width:48,height:48,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const CircleAvatar(child:Icon(Icons.broken_image_outlined))));
+            final stock=p['stock'];return ListTile(leading:leading,title:Text(p['name']?.toString()??'صنف',style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:Text('المتوفر: ${stock??'—'}'),trailing:Row(mainAxisSize:MainAxisSize.min,children:[Text(price is num?'${price.toStringAsFixed(0)} ${p['currency']??'YER'}':'عند الطلب',style:const TextStyle(fontWeight:FontWeight.w900)),IconButton(onPressed:()=>_addProductToCart(context,product),icon:const Icon(Icons.add_shopping_cart,color:_blue))]),onTap:()=>_addProductToCart(context,product));}).toList());
+        })
+      ]));
   }
-}
-
-class ServicesHubPage extends StatelessWidget {
-  const ServicesHubPage({super.key});
-  @override
-  Widget build(BuildContext context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text('الخدمات', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 8),
-            const Text('الوصول السريع إلى خدمات الفائق يمن.', style: TextStyle(color: Colors.black54)),
-            const SizedBox(height: 18),
-            _ServiceTile(icon: Icons.shopping_cart_outlined, title: 'السلة', subtitle: 'مراجعة الأصناف قبل الطلب', page: const CartPage()),
-            _ServiceTile(icon: Icons.local_shipping_outlined, title: 'طلباتي', subtitle: 'متابعة الطلبات والتوصيل', page: const MyOrdersPage()),
-            _ServiceTile(icon: Icons.account_balance_wallet_outlined, title: 'المحافظ', subtitle: 'مركز المحافظ والخدمات المالية', page: const WalletCenterPage()),
-            _ServiceTile(icon: Icons.auto_awesome, title: 'ذكاء الفائق', subtitle: 'مساعد المنصة', page: const AiAssistantPage()),
-          ],
-        ),
-      );
-}
-
-class _ServiceTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Widget page;
-  const _ServiceTile({required this.icon, required this.title, required this.subtitle, required this.page});
-  @override
-  Widget build(BuildContext context) => Card(
-        elevation: 0,
-        child: ListTile(
-          leading: CircleAvatar(backgroundColor: const Color(0xFFF1F6FF), child: Icon(icon, color: _blue)),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
-          subtitle: Text(subtitle),
-          trailing: const Icon(Icons.chevron_left),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page)),
-        ),
-      );
-}
-
-class WalletCenterPage extends StatefulWidget {
-  const WalletCenterPage({super.key});
-  @override
-  State<WalletCenterPage> createState() => _WalletCenterPageState();
-}
-
-class _WalletCenterPageState extends State<WalletCenterPage> {
-  final _amount = TextEditingController();
-  final _recipient = TextEditingController();
-  bool _busy = false;
-
-  @override
-  void dispose() {
-    _amount.dispose();
-    _recipient.dispose();
-    super.dispose();
-  }
-
-  Future<void> _ensureWallet(String uid) async {
-    final ref = FirebaseFirestore.instance.collection('wallets').doc(uid);
-    if ((await ref.get()).exists) return;
-    await ref.set({
-      'uid': uid, 'currency': 'YER', 'status': 'active',
-      'availableBalance': 0, 'version': 1,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  Future<void> _operation(String type) async {
-    final user = FirebaseAuth.instance.currentUser;
-    final amount = num.tryParse(_amount.text.trim());
-    if (user == null || amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل مبلغاً صحيحاً.')));
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await FirebaseFirestore.instance.collection('walletOperations').add({
-        'uid': user.uid, 'type': type, 'amount': amount,
-        'currency': 'YER', 'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      _amount.clear();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(type == 'deposit' ? 'تم إرسال طلب الإيداع للمراجعة.' : 'تم إرسال طلب السحب للمراجعة.')));
-    } on FirebaseException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء العملية: ' + (e.message ?? e.code))));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _transfer() async {
-    final user = FirebaseAuth.instance.currentUser;
-    final recipient = _recipient.text.trim();
-    final amount = num.tryParse(_amount.text.trim());
-    if (user == null || recipient.isEmpty || amount == null || amount <= 0 || recipient == user.uid) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تحقق من UID المستلم والمبلغ.')));
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await FirebaseFirestore.instance.collection('walletOperations').add({
-        'uid': user.uid, 'recipientUid': recipient, 'type': 'transfer',
-        'amount': amount, 'currency': 'YER', 'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      _amount.clear(); _recipient.clear();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال التحويل للمعالجة الآمنة.')));
-    } on FirebaseException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال التحويل: ' + (e.message ?? e.code))));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const Scaffold(body: Center(child: Text('يجب تسجيل الدخول أولاً.')));
-    final walletRef = FirebaseFirestore.instance.collection('wallets').doc(user.uid);
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(title: const Text('المحفظة المالية', style: TextStyle(fontWeight: FontWeight.w900))),
-        body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: walletRef.snapshots(),
-          builder: (context, snapshot) {
-            final data = snapshot.data?.data();
-            if (data == null) {
-              return Center(child: FilledButton.icon(
-                onPressed: _busy ? null : () async { setState(() => _busy = true); try { await _ensureWallet(user.uid); } finally { if (mounted) setState(() => _busy = false); } },
-                icon: const Icon(Icons.account_balance_wallet_outlined),
-                label: const Text('تفعيل محفظتي'),
-              ));
-            }
-            final balance = num.tryParse('${data['availableBalance'] ?? 0}') ?? 0;
-            return ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Card(color: _navy, child: Padding(
-                  padding: const EdgeInsets.all(22),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('الرصيد المتاح', style: TextStyle(color: Colors.white70)),
-                    const SizedBox(height: 6),
-                    Text('$balance YER', style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 8),
-                    Text(data['status'] == 'active' ? 'المحفظة نشطة' : 'حالة المحفظة: ' + (data['status']?.toString() ?? 'غير معروفة'), style: const TextStyle(color: Colors.white70)),
-                  ]),
-                )),
-                const SizedBox(height: 14),
-                Card(child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    const Text('عملية مالية', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 10),
-                    TextField(controller: _amount, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المبلغ', suffixText: 'YER')),
-                    const SizedBox(height: 10),
-                    TextField(controller: _recipient, decoration: const InputDecoration(labelText: 'UID المستلم للتحويل')),
-                    const SizedBox(height: 12),
-                    Wrap(spacing: 8, runSpacing: 8, children: [
-                      OutlinedButton.icon(onPressed: _busy ? null : () => _operation('deposit'), icon: const Icon(Icons.add_circle_outline), label: const Text('إيداع')),
-                      OutlinedButton.icon(onPressed: _busy ? null : () => _operation('withdraw'), icon: const Icon(Icons.remove_circle_outline), label: const Text('سحب')),
-                      FilledButton.icon(onPressed: _busy ? null : _transfer, icon: const Icon(Icons.swap_horiz), label: const Text('تحويل')),
-                    ]),
-                    const SizedBox(height: 8),
-                    const Text('الإيداع والسحب للمراجعة، والتحويل يعالج آلياً بعد تحقق الخادم من الرصيد.', style: TextStyle(color: Colors.black54)),
-                  ]),
-                )),
-                const SizedBox(height: 14),
-                const Text('آخر العمليات', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 8),
-                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: FirebaseFirestore.instance.collection('walletOperations').where('uid', isEqualTo: user.uid).limit(30).snapshots(),
-                  builder: (context, ops) {
-                    if (ops.hasError) return Text('تعذر تحميل العمليات: ' + ops.error.toString());
-                    final docs = ops.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                    if (docs.isEmpty) return const Card(child: ListTile(title: Text('لا توجد عمليات مالية بعد.')));
-                    return Column(children: docs.map((doc) {
-                      final op = doc.data();
-                      final type = op['type']?.toString() ?? '';
-                      final label = type == 'transfer' ? 'تحويل' : type == 'deposit' ? 'إيداع' : 'سحب';
-                      return Card(elevation: 0, child: ListTile(
-                        leading: Icon(type == 'deposit' ? Icons.add_circle : type == 'withdraw' ? Icons.remove_circle : Icons.swap_horiz),
-                        title: Text(label + ' • ' + (op['amount'] ?? 0).toString() + ' YER', style: const TextStyle(fontWeight: FontWeight.w800)),
-                        subtitle: Text('الحالة: ' + (op['status'] ?? 'pending').toString()),
-                      ));
-                    }).toList());
-                  },
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _AccountTab extends StatelessWidget {
-  const _AccountTab();
-  Future<void> _logout(BuildContext context) async => AuthService().signOut();
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 22, 16, 28),
-      children: [
-        const Text('حسابي', style: TextStyle(color: _navy, fontSize: 28, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 16),
-        Card(child: ListTile(
-          leading: const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.person_outline, color: _blue)),
-          title: Text(user?.displayName ?? 'مستخدم الفائق', style: const TextStyle(fontWeight: FontWeight.w900)),
-          subtitle: Text(user?.email ?? user?.phoneNumber ?? 'حساب مسجل الدخول'),
-        )),
-        ListTile(leading: const Icon(Icons.shopping_cart_outlined, color: _blue), title: const Text('السلة', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage()))),
-        ListTile(leading: const Icon(Icons.receipt_long_outlined, color: _blue), title: const Text('طلباتي وتتبع التوصيل', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersPage()))),
-        ListTile(leading: const Icon(Icons.account_balance_wallet_outlined, color: _blue), title: const Text('محفظتي', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletCenterPage()))),
-        ListTile(leading: const Icon(Icons.auto_awesome, color: _blue), title: const Text('ذكاء الفائق يمن', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()))),
-        const Divider(height: 24),
-        FilledButton.icon(onPressed: () => _logout(context), icon: const Icon(Icons.logout), label: const Text('تسجيل الخروج'), style: FilledButton.styleFrom(backgroundColor: _navy)),
-      ],
-    );
-  }
-}
-
-class _Info extends StatelessWidget {
-  final String title;
-  final String text;
-  const _Info({required this.title, required this.text});
-  @override
-  Widget build(BuildContext context) => Card(
-        elevation: 0,
-        child: Padding(padding: const EdgeInsets.all(18), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
-          Text(text, style: const TextStyle(color: Colors.black54)),
-        ])),
-      );
 }
