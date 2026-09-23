@@ -42,6 +42,7 @@ jobs:
           path: build/web
 
   deploy-web:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build-web
     runs-on: ubuntu-latest
     permissions:
