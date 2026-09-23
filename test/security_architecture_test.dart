@@ -58,16 +58,20 @@ void main() {
       expect(portal, contains('const MerchantOrdersPage()'));
     });
 
-    test('merchant orders are scoped by merchantIds and status changes are audited', () {
+    test('merchant orders are scoped by Supabase store ownership and server-side transitions', () {
       final orders = File('lib/screens/merchant_orders_page.dart').readAsStringSync();
-      final service = File('lib/services/firestore_service.dart').readAsStringSync();
-      final rules = File('firestore.rules').readAsStringSync();
-      expect(orders, contains("where('merchantIds', arrayContains: user.uid)"));
-      expect(orders, contains("collection('auditLogs')"));
-      expect(orders, contains('merchant_order_status_'));
-      expect(service, contains("'merchantIds': merchantIds.toList()"));
-      expect(rules, contains("request.auth.uid in resource.data.merchantIds"));
-      expect(rules, contains("request.resource.data.merchantIds == resource.data.merchantIds"));
+      final migration = File('supabase/migrations/20260923160000_stage4_merchant_order_transitions.sql').readAsStringSync();
+      expect(orders, contains("from('stores').select('id').eq('owner_id',uid)"));
+      expect(orders, contains("overlaps('merchant_ids',ids)"));
+      expect(orders, contains("rpc('transition_order'"));
+      expect(orders, contains("p_status':status"));
+      expect(migration, contains('s.owner_id = uid'));
+      expect(migration, contains('s.id = o.merchant_id or s.id = any(o.merchant_ids)'));
+      expect(migration, contains("raise exception 'not authorized'"));
+      expect(migration, contains("raise exception 'invalid merchant order transition'"));
+      expect(migration, contains("current_status='pending' and p_status in ('accepted','cancelled')"));
+      expect(migration, contains("current_status='accepted' and p_status in ('preparing','cancelled')"));
+      expect(migration, contains("current_status='preparing' and p_status='ready_for_pickup'"));
     });
 
     test('driver center is role-gated and delivery transitions preserve assignment', () {
@@ -116,27 +120,23 @@ void main() {
       expect(rules, contains("request.resource.data.get('role', resource.data.get('role', 'customer')) == resource.data.get('role', 'customer')"));
     });
 
-    test('order flow prevents forged delivery state and enforces sequential transitions', () {
-      final rules = File('firestore.rules').readAsStringSync();
-      final service = File('lib/services/firestore_service.dart').readAsStringSync();
+    test('order flow prevents forged merchant state through the Supabase RPC', () {
+      final migration = File('supabase/migrations/20260923160000_stage4_merchant_order_transitions.sql').readAsStringSync();
       final merchant = File('lib/screens/merchant_orders_page.dart').readAsStringSync();
-      final driver = File('lib/screens/driver_center_page.dart').readAsStringSync();
-      expect(rules, contains("request.resource.data.status == 'pending'"));
-      expect(rules, contains("request.resource.data.deliveryStatus == 'awaiting_assignment'"));
-      expect(rules, contains("!('driverId' in request.resource.data)"));
-      expect(rules, contains("!('deliveredAt' in request.resource.data)"));
-      expect(rules, contains("function validMerchantStatusTransition()"));
-      expect(rules, contains("function validDeliveryTransition()"));
-      expect(rules, contains("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])"));
-      expect(rules, contains("request.resource.data.deliveryStatus in ['assigned', 'picked_up', 'out_for_delivery', 'delivered', 'failed']"));
-      expect(service, contains("'deliveryStatus': 'awaiting_assignment'"));
-      expect(service, contains("'merchantIds': merchantIds.toList()"));
-      expect(merchant, contains("onStatus(doc, 'accepted')"));
-      expect(merchant, contains("onStatus(doc, 'preparing')"));
-      expect(merchant, contains("onStatus(doc, 'ready_for_pickup')"));
-      expect(driver, contains("_setStatus(id,'picked_up')"));
-      expect(driver, contains("_setStatus(id,'out_for_delivery')"));
-      expect(driver, contains("_setStatus(id,'delivered')"));
+      expect(migration, contains('security definer'));
+      expect(migration, contains("uid := auth.uid()::text"));
+      expect(migration, contains("if uid is null then raise exception 'not authenticated'"));
+      expect(migration, contains("select exists("));
+      expect(migration, contains('s.owner_id = uid'));
+      expect(migration, contains("raise exception 'not authorized'"));
+      expect(migration, contains("raise exception 'invalid merchant order transition'"));
+      expect(migration, contains("p_status in ('accepted','cancelled')"));
+      expect(migration, contains("p_status in ('preparing','cancelled')"));
+      expect(migration, contains("p_status='ready_for_pickup'"));
+      expect(merchant, contains("if(status=='pending')"));
+      expect(merchant, contains("if(status=='accepted')"));
+      expect(merchant, contains("if(status=='preparing')"));
+      expect(merchant, contains("onStatus(order,'cancelled')"));
     });
   });
 }
