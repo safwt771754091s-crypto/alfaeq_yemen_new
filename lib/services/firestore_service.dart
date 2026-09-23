@@ -133,6 +133,15 @@ class FirestoreService {
         .limit(50);
   }
 
+  Stream<List<Map<String, dynamic>>> supabaseOrderStream(String orderId) {
+    if (supabase == null) return const Stream.empty();
+    return supabase!
+        .from('orders')
+        .stream(primaryKey: ['id'])
+        .eq('id', orderId)
+        .limit(1);
+  }
+
   Future<Map<String, dynamic>?> supabaseOrder(String orderId) async {
     if (supabase == null) return null;
     final rows = await supabase!.from('orders').select().eq('id', orderId).limit(1);
