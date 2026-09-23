@@ -14,7 +14,14 @@ class SupabaseService {
     'SUPABASE_URL',
     defaultValue: 'https://esvljorjykzgrpnrxnma.supabase.co',
   );
-  // Supabase publishable keys are designed for public clients. Keep this as a\n  // build-safe fallback so the web app cannot silently disable its real backend\n  // when CI does not inject SUPABASE_PUBLISHABLE_KEY.\n  static const publishableKey = String.fromEnvironment(\n    'SUPABASE_PUBLISHABLE_KEY',\n    defaultValue: 'sb_publishable_xJfLBgrqWM8yEa3FM9qfig_FwnfTKue',\n  );
+
+  // Supabase publishable keys are designed for public clients. Keep this as a
+  // build-safe fallback so the web app cannot silently disable its real backend
+  // when CI does not inject SUPABASE_PUBLISHABLE_KEY.
+  static const publishableKey = String.fromEnvironment(
+    'SUPABASE_PUBLISHABLE_KEY',
+    defaultValue: 'sb_publishable_xJfLBgrqWM8yEa3FM9qfig_FwnfTKue',
+  );
 
   static Future<void> initialize() async {
     if (publishableKey.isEmpty) return;
