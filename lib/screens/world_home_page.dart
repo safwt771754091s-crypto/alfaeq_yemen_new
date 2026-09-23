@@ -258,12 +258,18 @@ class _HomeHeader extends StatelessWidget {
                 ),
               ),
               IconButton(onPressed: onNotifications, icon: const Icon(Icons.notifications_none, color: Colors.white)),
-              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: FirebaseAuth.instance.currentUser == null ? null : FirebaseFirestore.instance.collection('carts').doc(FirebaseAuth.instance.currentUser!.uid).snapshots(),
+              StreamBuilder<List<Map<String, dynamic>>>(
+                stream: SupabaseService.isInitialized && SupabaseService.client.auth.currentUser != null
+                    ? SupabaseService.client.from('carts').stream(primaryKey: ['uid']).eq('uid', SupabaseService.client.auth.currentUser!.id).limit(1)
+                    : null,
                 builder: (context, snapshot) {
-                  final raw = snapshot.data?.data()?['items'];
+                  final raw = snapshot.data?.isNotEmpty == true ? snapshot.data!.first['items'] : null;
                   var count = 0;
-                  if (raw is List) for (final item in raw) if (item is Map && item['quantity'] is num) count += (item['quantity'] as num).toInt();
+                  if (raw is List) {
+                    for (final item in raw) {
+                      if (item is Map && item['quantity'] is num) count += (item['quantity'] as num).toInt();
+                    }
+                  }
                   return IconButton(onPressed: onCart, icon: _CartBadgeIcon(icon: Icons.shopping_cart_outlined, count: count, color: Colors.white));
                 },
               ),
@@ -640,4 +646,49 @@ class _StoreCard extends StatelessWidget {
         })
       ]));
   }
+}
+
+class _AccountTab extends StatelessWidget {
+  const _AccountTab();
+  @override
+  Widget build(BuildContext context) {
+    final user = SupabaseService.isInitialized ? SupabaseService.client.auth.currentUser : null;
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text('حسابي', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: _navy)),
+        const SizedBox(height: 16),
+        Card(child: ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+          title: Text(user?.email ?? 'غير مسجل الدخول'),
+          subtitle: const Text('حساب الفائق يمن'),
+        )),
+        const SizedBox(height: 12),
+        if (user != null) FilledButton.icon(
+          onPressed: () async {
+            await AuthService().signOut();
+          },
+          icon: const Icon(Icons.logout),
+          label: const Text('تسجيل الخروج'),
+        ),
+      ],
+    );
+  }
+}
+
+class _Info extends StatelessWidget {
+  final String title;
+  final String text;
+  const _Info({required this.title, required this.text});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(18),
+    margin: const EdgeInsets.symmetric(vertical: 8),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+    child: Column(children: [
+      Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
+      const SizedBox(height: 6),
+      Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
+    ]),
+  );
 }
