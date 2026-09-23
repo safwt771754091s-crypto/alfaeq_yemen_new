@@ -7,6 +7,7 @@ on:
       - main
       - supabase-migration-foundation
       - fix-web-platform-core
+      - fix/stage4-cart-catalog-link
   pull_request:
     branches:
       - main
