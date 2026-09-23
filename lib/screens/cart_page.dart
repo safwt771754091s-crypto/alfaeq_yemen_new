@@ -163,7 +163,8 @@ class _CartPageState extends State<CartPage> {
         customerId: _uid, items: _items, address: address, paymentMethod: paymentMethod,
         latitude: deliveryPoint?.latitude, longitude: deliveryPoint?.longitude,
       );
-      await _saveItems([]);
+      // Stage 3 checkout clears the Supabase cart atomically inside create_order.
+      if (mounted) setState(() => _items = []);
       if (!mounted) return;
       await showDialog<void>(
         context: context,
