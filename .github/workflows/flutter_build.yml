@@ -56,7 +56,8 @@ jobs:
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           RECAPTCHA_ENTERPRISE_SITE_KEY: ${{ secrets.RECAPTCHA_ENTERPRISE_SITE_KEY }}
-        run: flutter build web --release --base-href /alfaeq_yemen_new/ --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" --dart-define=RECAPTCHA_ENTERPRISE_SITE_KEY="$RECAPTCHA_ENTERPRISE_SITE_KEY"
+        run: flutter build web --release --pwa-strategy=none --base-href /alfaeq_yemen_new/ --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" --dart-define=RECAPTCHA_ENTERPRISE_SITE_KEY="$RECAPTCHA_ENTERPRISE_SITE_KEY"
+          rm -f build/web/flutter_service_worker.js
       - uses: actions/upload-artifact@v4
         with:
           name: alfaeq-yemen-web
