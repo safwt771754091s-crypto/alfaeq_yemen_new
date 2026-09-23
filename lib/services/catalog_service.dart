@@ -11,6 +11,11 @@ class CatalogDocument {
     final id = (copy.remove('id') ?? '').toString();
     return CatalogDocument(id: id, data: copy);
   }
+
+  factory CatalogDocument.fromLegacyMap(Map<String, dynamic> data, {String? id}) {
+    return CatalogDocument(id: id ?? (data['id'] ?? data['productId'] ?? '').toString(), data: Map<String, dynamic>.from(data));
+  }
+
 }
 
 class CatalogService {
