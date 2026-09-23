@@ -12,6 +12,10 @@ class CatalogDocument {
     return CatalogDocument(id: id, data: copy);
   }
 
+  // Compatibility for legacy callers; data is now sourced from Supabase only.
+  factory CatalogDocument.fromFirestore(Map<String, dynamic> row) =>
+      CatalogDocument.fromSupabase(row);
+}
 
 class CatalogService {
   final bool useSupabase;
