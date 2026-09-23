@@ -7,6 +7,7 @@ on:
       - main
       - supabase-migration-foundation
       - fix-web-platform-core
+      - fix/production-inventory-sync
   pull_request:
     branches:
       - main
@@ -48,6 +49,8 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Generate Android platform
+        run: flutter create --platforms=android --project-name=alfaeq_yemen_new .
       - name: Build Android debug APK
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
