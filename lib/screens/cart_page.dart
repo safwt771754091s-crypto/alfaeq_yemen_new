@@ -1,5 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../core/product_units.dart';
@@ -19,7 +19,7 @@ class _CartPageState extends State<CartPage> {
   String? _error;
   List<Map<String, dynamic>> _items = [];
   String _currency = 'USD';
-  String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
+  String get _uid => const AuthService().currentAuthUser?.uid ?? '';
 
   @override
   void initState() { super.initState(); _loadCart(); }
