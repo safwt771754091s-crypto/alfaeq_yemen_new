@@ -143,7 +143,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
         if (docs.isEmpty) return const _EmptyCard(text: 'لم تنشئ متجراً بعد.');
         final children = <Widget>[];
         for (final data in docs) {
-          final id = '\${data['id'] ?? ''}';
+          final id = '${data['id'] ?? ''}';
           final selected = _selectedStoreId == id;
           children.add(Card(
             elevation: 0,
@@ -153,8 +153,8 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
                 backgroundColor: const Color(0xFFE7F3EE),
                 child: Icon(Icons.storefront_outlined, color: Theme.of(context).colorScheme.primary),
               ),
-              title: Text('\${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900)),
-              subtitle: Text('\${data['status'] ?? 'pending'} • \${data['phone'] ?? ''}'),
+              title: Text('${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900)),
+              subtitle: Text('${data['status'] ?? 'pending'} • ${data['phone'] ?? ''}'),
               trailing: selected ? const Icon(Icons.check_circle) : const Icon(Icons.chevron_left),
               onTap: () => setState(() => _selectedStoreId = id),
             ),
@@ -192,13 +192,13 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
             elevation: 0,
             child: ListTile(
               leading: const Icon(Icons.inventory_2_outlined),
-              title: Text('\${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: Text('مخزون: \${data['stock'] ?? 0} • حالة: \${data['status'] ?? 'active'}'),
+              title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text('مخزون: ${data['stock'] ?? 0} • حالة: ${data['status'] ?? 'active'}'),
               trailing: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('\${data['price'] ?? 0} \${data['currency'] ?? 'YER'}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                  Text('${data['price'] ?? 0} ${data['currency'] ?? 'YER'}', style: const TextStyle(fontWeight: FontWeight.w900)),
                   TextButton(onPressed: () => _updateProduct(data), child: const Text('تعديل')),
                 ],
               ),
