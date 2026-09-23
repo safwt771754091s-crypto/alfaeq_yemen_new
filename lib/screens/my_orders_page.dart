@@ -19,7 +19,7 @@ class MyOrdersPage extends StatelessWidget {
             ? const Center(child: Text('يجب تسجيل الدخول لعرض طلباتك.'))
             : SupabaseService.isInitialized
                 ? _SupabaseOrders(userId: user.uid)
-                : _FirebaseOrders(userId: user.uid),
+                : const Center(child: Text('قاعدة بيانات الإنتاج غير متاحة حالياً.')),
       ),
     );
   }
@@ -43,28 +43,6 @@ class _SupabaseOrders extends StatelessWidget {
         }
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         return _OrdersList(orders: snapshot.data ?? const <Map<String, dynamic>>[]);
-      },
-    );
-  }
-}
-
-class _FirebaseOrders extends StatelessWidget {
-  final String userId;
-  const _FirebaseOrders({required this.userId});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('orders').where('customerId', isEqualTo: userId).limit(50).snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return Center(child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('تعذر تحميل الطلبات.\n${snapshot.error}', textAlign: TextAlign.center),
-        ));
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        final orders = [...(snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])]
-          ..sort((a, b) => _OrdersList.timestamp(b.data()['createdAt']).compareTo(_OrdersList.timestamp(a.data()['createdAt'])));
-        return _OrdersList(orders: orders.map((doc) => {'id': doc.id, ...doc.data()}).toList());
       },
     );
   }
