@@ -7,6 +7,7 @@ on:
       - main
       - supabase-migration-foundation
       - fix-web-platform-core
+      - fix/production-inventory-sync
   pull_request:
     branches:
       - main
@@ -17,6 +18,8 @@ concurrency:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 jobs:
   build-web:
@@ -28,36 +31,42 @@ jobs:
         with:
           channel: stable
           cache: true
-      - name: Authenticate Google/Firebase
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-      - uses: google-github-actions/setup-gcloud@v2
       - run: flutter pub get
-      - name: Install Firebase CLI
-        run: |
-          curl -sL https://firebase.tools | bash
-          firebase --version
-          firebase projects:list --project="$FIREBASE_PROJECT_ID" --json >/dev/null
-      - name: Generate Firebase configuration
-        timeout-minutes: 5
-        env:
-          FIREBASE_PROJECT_ID: alfaeq-yemen-fed37
-        run: |
-          dart pub global activate flutterfire_cli
-          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
-          timeout 180s flutterfire configure --project="$FIREBASE_PROJECT_ID" --platforms=web --yes --out=lib/firebase_options.dart
-          test -s lib/firebase_options.dart
-          grep -q "class DefaultFirebaseOptions" lib/firebase_options.dart
       - name: Build web
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-          RECAPTCHA_ENTERPRISE_SITE_KEY: ${{ secrets.RECAPTCHA_ENTERPRISE_SITE_KEY }}
-        run: flutter build web --release --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" --dart-define=RECAPTCHA_ENTERPRISE_SITE_KEY="$RECAPTCHA_ENTERPRISE_SITE_KEY"
+        run: flutter build web --release --base-href /alfaeq_yemen_new/ --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - uses: actions/upload-artifact@v4
         with:
           name: alfaeq-yemen-web
           path: build/web
+
+  deploy-web:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-web
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: alfaeq-yemen-web
+          path: build/web
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v6
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/web
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
 
   build-android-debug:
     runs-on: ubuntu-latest
@@ -68,52 +77,11 @@ jobs:
         with:
           channel: stable
           cache: true
-      - name: Authenticate Google/Firebase
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-      - uses: google-github-actions/setup-gcloud@v2
-      - name: Create Android platform
-        run: |
-          flutter create . --platforms android --org com.alfaeq
-          python3 - <<'PY'
-          from pathlib import Path
-          import xml.etree.ElementTree as ET
-          path = Path('android/app/src/main/AndroidManifest.xml')
-          text = path.read_text()
-          permissions = (
-              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n'
-              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
-          )
-          if 'android.permission.ACCESS_FINE_LOCATION' not in text:
-              marker = '    <application'
-              if marker not in text:
-                  raise SystemExit('AndroidManifest.xml does not contain the expected application tag')
-              text = text.replace(marker, permissions + marker, 1)
-              path.write_text(text)
-          ET.parse(path)
-          print(f'Valid AndroidManifest.xml: {path.stat().st_size} bytes')
-          PY
       - run: flutter pub get
-      - name: Install Firebase CLI
-        run: |
-          curl -sL https://firebase.tools | bash
-          firebase --version
-          firebase projects:list --project="$FIREBASE_PROJECT_ID" --json >/dev/null
-      - name: Generate Firebase configuration
-        timeout-minutes: 5
-        env:
-          FIREBASE_PROJECT_ID: alfaeq-yemen-fed37
-        run: |
-          dart pub global activate flutterfire_cli
-          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
-          timeout 180s flutterfire configure --project="$FIREBASE_PROJECT_ID" --platforms=android --android-package-name=com.alfaeq.alfaeq_yemen --yes --out=lib/firebase_options.dart
-          test -s lib/firebase_options.dart
-          grep -q "class DefaultFirebaseOptions" lib/firebase_options.dart
+      - name: Generate Android platform
+        run: flutter create --platforms=android --project-name=alfaeq_yemen_new .
       - name: Build Android debug APK
-        env:
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-        run: flutter build apk --debug --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+        run: flutter build apk --debug --dart-define=SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY:-}"
       - uses: actions/upload-artifact@v4
         with:
           name: alfaeq-yemen-android-debug

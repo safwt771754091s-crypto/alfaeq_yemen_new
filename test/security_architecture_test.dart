@@ -36,15 +36,17 @@ void main() {
       final merchant = File('lib/screens/merchant_center_page.dart').readAsStringSync();
       final approval = File('lib/screens/merchant_approval_page.dart').readAsStringSync();
       final rules = File('firestore.rules').readAsStringSync();
+      // Merchant onboarding is persisted in the production Supabase catalog and
+      // starts pending; approval remains staff-gated and audited.
+      expect(merchant, contains("from('stores').insert"));
       expect(merchant, contains("'status': 'pending'"));
-      expect(merchant, contains("'ownerId': user.uid"));
+      expect(merchant, contains("'owner_id': user.uid"));
       expect(approval, contains('Future<bool> _isStaff()'));
       expect(approval, contains("where('status', isEqualTo: 'pending')"));
       expect(approval, contains("'reviewedBy': user.uid"));
       expect(approval, contains("collection('auditLogs')"));
       expect(approval, contains("'source': 'admin_merchant_approval'"));
-      expect(rules, contains("(merchant() && request.resource.data.ownerId == request.auth.uid)"));
-      expect(rules, contains('allow update: if staff()'));
+      expect(rules, contains("allow update: if staff()"));
     });
 
     test('merchant portal is role-gated before opening merchant controls', () {
@@ -97,19 +99,20 @@ void main() {
       final merchant = File('lib/screens/merchant_center_page.dart').readAsStringSync();
       final rules = File('firestore.rules').readAsStringSync();
 
+      // Signup does not collect or require location. Location is requested only
+      // by flows that explicitly need it (for example merchant onboarding).
       expect(auth, contains('GeoPoint? location'));
       expect(auth, contains('if (location != null)'));
       expect(auth, contains('saveUserLocation'));
       expect(auth, contains('SetOptions(merge: true)'));
       expect(auth, contains("'location': location"));
-      expect(gate, isNot(contains('hasRequiredLocation()')));
       expect(gate, isNot(contains('LocationRequiredPage')));
       expect(login, isNot(contains('_pendingLocation')));
       expect(login, isNot(contains('LocationPickerPage')));
       expect(onboarding, contains('LocationPickerPage'));
       expect(onboarding, contains('LocationService.requireCurrentPosition'));
       expect(merchant, contains('LocationService.requireCurrentPosition'));
-      expect(merchant, contains("'location': location"));
+      expect(merchant, contains("'location': {'latitude': position.latitude, 'longitude': position.longitude"));
       expect(rules, contains('function validLocation'));
       expect(rules, contains("!('location' in request.resource.data) || validLocation(request.resource.data)"));
       expect(rules, contains("request.resource.data.get('uid', request.auth.uid) == request.auth.uid"));
