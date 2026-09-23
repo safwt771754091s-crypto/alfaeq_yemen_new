@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/supabase_service.dart';
-import 'live_tracking_map_page.dart';
 
 class _SupabaseOrderTracking extends StatelessWidget {
   final String orderId; final String uid;
@@ -66,7 +65,7 @@ class DeliveryTracking extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentUid = const AuthService().currentAuthUser?.uid;
+    final currentUid = const AuthService().currentUser?.uid;
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
       appBar: AppBar(title: const Text('تتبع الطلب', style: TextStyle(fontWeight: FontWeight.w900))),
       body: currentUid == null
