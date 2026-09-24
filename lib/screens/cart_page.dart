@@ -18,7 +18,7 @@ class _CartPageState extends State<CartPage> {
   bool _busy = false;
   String? _error;
   List<Map<String, dynamic>> _items = [];
-  String _currency = 'USD';
+  String _currency = 'YER';
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
@@ -35,7 +35,7 @@ class _CartPageState extends State<CartPage> {
       final raw = row?['items'];
       _items = raw is List ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
       final meta = row?['metadata'];
-      _currency = meta is Map && meta['currency'] != null ? meta['currency'].toString() : (_items.isNotEmpty ? (_items.first['currency'] ?? 'USD').toString() : 'USD');
+      _currency = meta is Map && meta['currency'] != null ? meta['currency'].toString() : (_items.isNotEmpty ? (_items.first['currency'] ?? 'YER').toString() : 'YER');
     } catch (e) {
       _error = 'تعذر تحميل السلة من الخادم: $e';
     } finally {
