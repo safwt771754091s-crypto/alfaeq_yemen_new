@@ -160,6 +160,27 @@
               },
               "renameOutput": true,
               "outputKey": "productUpdated"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.eventType}}",
+                    "rightValue": "merchant.invite.created",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "merchantInvite"
             }
           ]
         }
@@ -379,6 +400,32 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Google Sheets — AutomationEvents",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Sheets — AutomationEvents",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Image Studio — Product Asset",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Sheets — AutomationEvents",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -398,7 +445,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "alfaeq-n8n-v1",
+  "versionId": "alfaeq-n8n-v2",
   "meta": {
     "templateCredsSetupCompleted": false
   }
