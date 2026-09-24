@@ -238,8 +238,7 @@ class _HomeHeader extends StatelessWidget {
                 ),
               ),
               IconButton(onPressed: onNotifications, icon: const Icon(Icons.notifications_none, color: Colors.white)),
-              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                return IconButton(onPressed: onCart, icon: _CartBadgeIcon(icon: Icons.shopping_cart_outlined, count: 0, color: Colors.white)),
+              IconButton(onPressed: onCart, icon: _CartBadgeIcon(icon: Icons.shopping_cart_outlined, count: 0, color: Colors.white)),
             ],
           ),
           const SizedBox(height: 12),
@@ -733,8 +732,6 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
     super.dispose();
   }
 
-  Future<void> _ensureWallet(String uid) async {
-  }
   Future<Map<String, dynamic>?> _loadWallet(String uid) async {
     final row = await SupabaseService.client.from('wallets').select().eq('uid', uid).maybeSingle();
     return row == null ? null : Map<String, dynamic>.from(row);
@@ -788,21 +785,20 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
                 FutureBuilder<List<Map<String, dynamic>>>(
                   future: SupabaseService.client.from('wallet_operations').select().eq('uid', user.uid).order('created_at', ascending: false).limit(30),
                   builder: (context, ops) {
-                    if (ops.hasError) return Text('تعذر تحميل العمليات: ${ops.error}');
                     if (ops.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                    final docs = ops.data ?? const <Map<String, dynamic>>[];
-                    if (docs.isEmpty) return const Card(child: ListTile(title: Text('لا توجد عمليات مالية بعد.')));
-                    return Column(children: docs.map((op) {
-                      final type = op['type']?.toString() ?? '';
-                      final label = type == 'transfer' ? 'تحويل' : type == 'deposit' ? 'إيداع' : 'سحب';
+                    if (ops.hasError) return Text('تعذر تحميل العمليات: '+ops.error.toString());
+                    final rows = ops.data ?? const <Map<String, dynamic>>[];
+                    if (rows.isEmpty) return const Card(child: ListTile(title: Text('لا توجد عمليات مالية بعد.')));
+                    return Column(children: rows.map((row) {
+                      final type = row['type']?.toString() ?? 'operation';
                       return Card(elevation: 0, child: ListTile(
-                        leading: Icon(type == 'deposit' ? Icons.add_circle : type == 'withdraw' ? Icons.remove_circle : Icons.swap_horiz),
-                        title: Text(label + ' • ' + (op['amount'] ?? 0).toString() + ' YER', style: const TextStyle(fontWeight: FontWeight.w800)),
-                        subtitle: Text('الحالة: ' + (op['status'] ?? 'pending').toString()),
+                        leading: const Icon(Icons.receipt_long_outlined, color: _blue),
+                        title: Text(type+' • '+(row['amount'] ?? 0).toString()+' YER', style: const TextStyle(fontWeight: FontWeight.w800)),
+                        subtitle: Text('الحالة: '+(row['status'] ?? 'pending').toString()),
                       ));
                     }).toList());
                   },
-                ),
+                )
               ],
             );
           },
