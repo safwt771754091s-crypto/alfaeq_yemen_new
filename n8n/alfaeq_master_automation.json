@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $json.body || $json;\nconst secret = $headers['x-alfaeq-automation-secret'] || '';\nif (secret !== $env.ALFAEQ_N8N_SHARED_SECRET) {\n  throw new Error('Invalid Alfaeq automation secret');\n}\nreturn [{json:{\n  source: body.source,\n  version: body.version,\n  eventId: body.eventId,\n  eventType: body.eventType,\n  occurredAt: body.occurredAt,\n  data: body.data || {}\n}}];"
+        "jsCode": "const body = $json.body || $json;\nconst secret = $headers['x-alfaeq-automation-secret'] || '';\nif (secret !== $env.ALFAEQ_N8N_SHARED_SECRET) throw new Error('Invalid Alfaeq automation secret');\nconst required = ['eventId','eventType','occurredAt'];\nfor (const key of required) if (!body[key]) throw new Error('Missing event field: ' + key);\nreturn [{json:{source: body.source || 'alfaeq_yemen_new', version: body.version || 1, eventId: body.eventId, eventType: body.eventType, occurredAt: body.occurredAt, data: body.data || {}}}];"
       },
       "id": "normalize",
       "name": "Validate & Normalize",
@@ -118,6 +118,48 @@
               },
               "renameOutput": true,
               "outputKey": "store"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.eventType}}",
+                    "rightValue": "order.updated",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "orderUpdated"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.eventType}}",
+                    "rightValue": "product.updated",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "productUpdated"
             }
           ]
         }
@@ -262,7 +304,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\"ok\":true,\"source\":\"alfaeq_yemen\",\"eventId\":\"{{$json.eventId}}\"}",
+        "responseBody": "={\"ok\":true,\"source\":\"alfaeq_yemen_new\",\"eventId\":\"{{$json.eventId}}\",\"eventType\":\"{{$json.eventType}}\"}",
         "options": {}
       },
       "id": "response",
