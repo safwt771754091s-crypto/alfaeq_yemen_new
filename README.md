@@ -5,3 +5,7 @@
 - Android وWeb سيُبنيان من نفس commit.
 - Firebase السحابي وبياناته لم يتم حذفها.
 - لا توجد بيانات تجريبية للمتاجر أو الأسعار.
+
+## Production build checkpoint
+
+آخر دفعة إنتاجية تجمع Customer Catalog + Supabase Cart + Atomic Checkout + Merchant Orders + GitHub Pages deployment.
