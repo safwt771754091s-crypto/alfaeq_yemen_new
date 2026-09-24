@@ -69,6 +69,7 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
           await FirebaseAppCheck.instance.activate(
             providerWeb: ReCaptchaEnterpriseProvider(siteKey),
           );
+          await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
         } catch (e) {
           debugPrint('Web App Check activation failed: $e');
         }
@@ -79,6 +80,7 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
           providerAndroid: const AndroidPlayIntegrityProvider(),
           providerApple: const AppleAppAttestProvider(),
         );
+        await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
       } catch (e) {
         debugPrint('Mobile App Check activation failed: $e');
       }
