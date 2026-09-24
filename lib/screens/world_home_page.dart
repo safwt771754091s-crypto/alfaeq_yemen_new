@@ -721,17 +721,6 @@ class WalletCenterPage extends StatefulWidget {
 }
 
 class _WalletCenterPageState extends State<WalletCenterPage> {
-  final _amount = TextEditingController();
-  final _recipient = TextEditingController();
-  bool _busy = false;
-
-  @override
-  void dispose() {
-    _amount.dispose();
-    _recipient.dispose();
-    super.dispose();
-  }
-
   Future<Map<String, dynamic>?> _loadWallet(String uid) async {
     final row = await SupabaseService.client.from('wallets').select().eq('uid', uid).maybeSingle();
     return row == null ? null : Map<String, dynamic>.from(row);
@@ -764,21 +753,10 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
                 ])),
                 ),
                 const SizedBox(height: 14),
-                Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  const Text('طلب عملية مالية', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 10),
-                  TextField(controller: _amount, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المبلغ', suffixText: 'YER')),
-                  const SizedBox(height: 10),
-                  TextField(controller: _recipient, decoration: const InputDecoration(labelText: 'UID المستلم للتحويل')),
-                  const SizedBox(height: 12),
-                  Wrap(spacing: 8, runSpacing: 8, children: [
-                    OutlinedButton.icon(onPressed: _busy ? null : () => _operation('deposit'), icon: const Icon(Icons.add_circle_outline), label: const Text('إيداع')),
-                    OutlinedButton.icon(onPressed: _busy ? null : () => _operation('withdraw'), icon: const Icon(Icons.remove_circle_outline), label: const Text('سحب')),
-                    FilledButton.icon(onPressed: _busy ? null : _transfer, icon: const Icon(Icons.swap_horiz), label: const Text('تحويل')),
-                  ]),
-                  const SizedBox(height: 8),
-                  const Text('الإيداع والسحب والتحويل تُسجّل كطلبات آمنة ولا تغيّر الرصيد مباشرة من التطبيق.', style: TextStyle(color: Colors.black54)),
-                ])),
+                const _Info(
+                  title: 'العمليات المالية',
+                  text: 'الإيداع والسحب والتحويل تُنفّذ فقط عبر العمليات الآمنة في الخادم. لا يتم تعديل الرصيد مباشرة من التطبيق.',
+                ),
                 const SizedBox(height: 14),
                 const Text('آخر العمليات', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 8),
