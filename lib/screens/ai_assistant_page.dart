@@ -45,15 +45,19 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       if (!mounted) return;
       final detail = e.toString();
       final lower = detail.toLowerCase();
-      final hint = lower.contains('app check') || lower.contains('appcheck')
-          ? 'الطلب رُفض بسبب App Check.'
+      final isRecaptchaError = lower.contains('recaptcha') ||
+          lower.contains('app check') ||
+          lower.contains('appcheck');
+      final hint = isRecaptchaError
+          ? 'تعذر التحقق من حماية التطبيق في المتصفح. أعد تحميل الصفحة وحاول مرة أخرى.'
           : lower.contains('permission') || lower.contains('unauthenticated')
               ? 'تحقق من تسجيل الدخول والصلاحيات.'
               : lower.contains('not found') || lower.contains('model')
                   ? 'تحقق من تفعيل Firebase AI Logic والنموذج في مشروع Firebase.'
                   : 'تحقق من الاتصال وإعداد Firebase AI Logic.';
+      debugPrint('AI assistant error: $detail');
       setState(() => _messages.add(_AiMessage(
-        text: 'تعذر تشغيل ذكاء الفائق. $hint\\n\\nتفاصيل التشخيص: $detail',
+        text: 'تعذر تشغيل ذكاء الفائق. $hint',
         fromUser: false,
         error: true,
       )));
