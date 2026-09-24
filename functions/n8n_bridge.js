@@ -29,7 +29,7 @@ async function forward(eventType, id, data) {
       'x-alfaeq-automation-secret': config.sharedSecret,
     },
     body: JSON.stringify({
-      source: 'alfaeq_yemen',
+      source: 'alfaeq_yemen_new',
       version: 1,
       eventId: id,
       eventType,
@@ -65,7 +65,9 @@ function trigger(document, eventType) {
 }
 
 exports.n8nOrderCreated = trigger('orders/{orderId}', 'order.created');
+exports.n8nOrderUpdated = trigger('orders/{orderId}', 'order.updated');
 exports.n8nProductCreated = trigger('products/{productId}', 'product.created');
+exports.n8nProductUpdated = trigger('products/{productId}', 'product.updated');
 exports.n8nStoreCreated = trigger('stores/{storeId}', 'store.created');
 exports.n8nWhatsAppImportCreated = trigger('whatsappProductImports/{importId}', 'whatsapp.product_import.created');
 exports.n8nMerchantInviteCreated = trigger('merchantInvites/{inviteId}', 'merchant.invite.created');
