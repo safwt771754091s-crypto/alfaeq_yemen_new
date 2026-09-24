@@ -123,9 +123,6 @@ class _CartPageState extends State<CartPage> {
               decoration: const InputDecoration(labelText: 'طريقة الدفع'),
               items: const [
                 DropdownMenuItem(value: 'cash_on_delivery', child: Text('الدفع عند الاستلام')),
-                DropdownMenuItem(value: 'al_kuraimi', child: Text('الكريمي')),
-                DropdownMenuItem(value: 'cash_wallet', child: Text('محفظة نقدية')),
-                DropdownMenuItem(value: 'jeeb_wallet', child: Text('جيـب')),
               ],
               onChanged: (v) => setDialogState(() => paymentMethod = v ?? 'cash_on_delivery'),
             ),
