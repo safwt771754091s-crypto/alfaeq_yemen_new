@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../core/app_sections.dart';
 import '../services/auth_service.dart';
 import '../services/catalog_service.dart';
+import '../services/supabase_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'ai_assistant_page.dart';
 import 'cart_page.dart';
 import 'location_picker_page.dart';
@@ -52,7 +54,7 @@ class _MainBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = const [
+    const items = [
       (Icons.home_outlined, Icons.home, 'الرئيسية'),
       (Icons.storefront_outlined, Icons.storefront, 'المتاجر'),
       (Icons.shopping_cart_outlined, Icons.shopping_cart, 'السلة'),
@@ -60,38 +62,31 @@ class _MainBottomBar extends StatelessWidget {
       (Icons.person_outline, Icons.person, 'حسابي'),
     ];
     return Container(
-          decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFE5EAF0)))),
-          child: SafeArea(
-            top: false,
-            child: Row(
-              children: List.generate(items.length, (i) {
-                final selected = selectedIndex == i;
-                final item = items[i];
-                final icon = i == 2
-                    ? _CartBadgeIcon(icon: selected ? item.$2 : item.$1, count: cartCount, color: selected ? _blue : _navy)
-                    : Icon(selected ? item.$2 : item.$1, color: selected ? _blue : _navy, size: 24);
-                return Expanded(
-                  child: InkWell(
-                    onTap: () => onSelected(i),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          icon,
-                          const SizedBox(height: 3),
-                          Text(item.$3, style: TextStyle(color: selected ? _blue : _navy, fontSize: 11, fontWeight: selected ? FontWeight.w900 : FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }),
+      decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFE5EAF0)))),
+      child: SafeArea(
+        top: false,
+        child: Row(children: List.generate(items.length, (i) {
+          final selected = selectedIndex == i;
+          final item = items[i];
+          final icon = i == 2
+              ? _CartBadgeIcon(icon: selected ? item.$2 : item.$1, count: 0, color: selected ? _blue : _navy)
+              : Icon(selected ? item.$2 : item.$1, color: selected ? _blue : _navy, size: 24);
+          return Expanded(child: InkWell(
+            onTap: () => onSelected(i),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                icon,
+                const SizedBox(height: 3),
+                Text(item.$3, style: TextStyle(color: selected ? _blue : _navy, fontSize: 11, fontWeight: selected ? FontWeight.w900 : FontWeight.w600)),
+              ]),
             ),
-          ),
+          ));
+        })),
+      ),
+    );
   }
 }
-
 class _CartBadgeIcon extends StatelessWidget {
   final IconData icon;
   final int count;
@@ -739,76 +734,10 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
   }
 
   Future<void> _ensureWallet(String uid) async {
-    await SupabaseService.client.from('wallets').upsert({
-      'uid': uid,
-      'currency': 'YER',
-      'status': 'active',
-      'available_balance': 0,
-      'version': 1,
-    }, onConflict: 'uid');
   }
-
-  Future<void> _operation(String type) async {
-    final user = FirebaseAuth.instance.currentUser;
-    final amount = num.tryParse(_amount.text.trim());
-    if (user == null || amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل مبلغاً صحيحاً.')));
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await SupabaseService.client.from('wallet_operations').insert({
-        'uid': user.uid,
-        'type': type,
-        'amount': amount,
-        'currency': 'YER',
-        'status': 'pending',
-        'metadata': <String, dynamic>{},
-      });
-      _amount.clear();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(type == 'deposit' ? 'تم إرسال طلب الإيداع للمراجعة.' : 'تم إرسال طلب السحب للمراجعة.')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء العملية: $e')));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _transfer() async {
-    final user = FirebaseAuth.instance.currentUser;
-    final recipient = _recipient.text.trim();
-    final amount = num.tryParse(_amount.text.trim());
-    if (user == null || recipient.isEmpty || amount == null || amount <= 0 || recipient == user.uid) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تحقق من UID المستلم والمبلغ.')));
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await SupabaseService.client.from('wallet_operations').insert({
-        'uid': user.uid,
-        'type': 'transfer',
-        'amount': amount,
-        'currency': 'YER',
-        'status': 'pending',
-        'metadata': {'recipient_uid': recipient},
-      });
-      _amount.clear();
-      _recipient.clear();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال التحويل للمراجعة الآمنة.')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال التحويل: $e')));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   Future<Map<String, dynamic>?> _loadWallet(String uid) async {
     final row = await SupabaseService.client.from('wallets').select().eq('uid', uid).maybeSingle();
-    if (row == null) {
-      await _ensureWallet(uid);
-      return await SupabaseService.client.from('wallets').select().eq('uid', uid).maybeSingle();
-    }
-    return Map<String, dynamic>.from(row);
+    return row == null ? null : Map<String, dynamic>.from(row);
   }
 
   @override
