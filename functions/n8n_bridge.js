@@ -1,4 +1,4 @@
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { getFirestore } = require('firebase-admin/firestore');
 const { logger } = require('firebase-functions');
 
@@ -44,7 +44,7 @@ async function forward(eventType, id, data) {
   }
 }
 
-function trigger(document, eventType) {
+function createdTrigger(document, eventType) {
   return onDocumentCreated(
     { document, region: 'us-central1', retry: true },
     async (event) => {
@@ -64,10 +64,30 @@ function trigger(document, eventType) {
   );
 }
 
-exports.n8nOrderCreated = trigger('orders/{orderId}', 'order.created');
-exports.n8nOrderUpdated = trigger('orders/{orderId}', 'order.updated');
-exports.n8nProductCreated = trigger('products/{productId}', 'product.created');
-exports.n8nProductUpdated = trigger('products/{productId}', 'product.updated');
-exports.n8nStoreCreated = trigger('stores/{storeId}', 'store.created');
-exports.n8nWhatsAppImportCreated = trigger('whatsappProductImports/{importId}', 'whatsapp.product_import.created');
-exports.n8nMerchantInviteCreated = trigger('merchantInvites/{inviteId}', 'merchant.invite.created');
+function updatedTrigger(document, eventType) {
+  return onDocumentUpdated(
+    { document, region: 'us-central1', retry: true },
+    async (event) => {
+      const id = event.params[Object.keys(event.params)[0]];
+      const data = event.data?.after?.data() || {};
+      try {
+        await forward(eventType, id, data);
+      } catch (error) {
+        logger.error('n8n automation delivery failed', {
+          eventType,
+          id,
+          error: error?.message || String(error),
+        });
+        throw error;
+      }
+    },
+  );
+}
+
+exports.n8nOrderCreated = createdTrigger('orders/{orderId}', 'order.created');
+exports.n8nOrderUpdated = updatedTrigger('orders/{orderId}', 'order.updated');
+exports.n8nProductCreated = createdTrigger('products/{productId}', 'product.created');
+exports.n8nProductUpdated = updatedTrigger('products/{productId}', 'product.updated');
+exports.n8nStoreCreated = createdTrigger('stores/{storeId}', 'store.created');
+exports.n8nWhatsAppImportCreated = createdTrigger('whatsappProductImports/{importId}', 'whatsapp.product_import.created');
+exports.n8nMerchantInviteCreated = createdTrigger('merchantInvites/{inviteId}', 'merchant.invite.created');
