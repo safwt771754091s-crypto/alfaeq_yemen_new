@@ -5,6 +5,7 @@ import '../core/app_sections.dart';
 import '../services/auth_service.dart';
 import '../services/catalog_service.dart';
 import '../services/supabase_service.dart';
+import '../services/public_content_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'ai_assistant_page.dart';
 import 'cart_page.dart';
@@ -154,6 +155,8 @@ class _HomeTabState extends State<_HomeTab> {
               _CategoriesSection(onOpen: widget.onOpen),
               const SizedBox(height: 22),
               _OffersSection(onAddToCart: (product) => _addProductToCart(context, product)),
+              const SizedBox(height: 20),
+              const _PublicUpdatesSection(),
               const SizedBox(height: 24),
               const _BenefitsBar(),
             ]),
@@ -489,6 +492,50 @@ Future<void> _addProductToCart(BuildContext context, CatalogDocument product) as
   } catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحديث السلة: ' + e.toString())));
   }
+}
+
+class _PublicUpdatesSection extends StatelessWidget {
+  const _PublicUpdatesSection();
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<SiteUpdateDocument>>(
+    future: const PublicContentService().publishedUpdates(limit: 6),
+    builder: (context, snapshot) {
+      final updates = snapshot.data ?? const <SiteUpdateDocument>[];
+      if (snapshot.connectionState == ConnectionState.waiting && updates.isEmpty) {
+        return const LinearProgressIndicator();
+      }
+      if (snapshot.hasError || updates.isEmpty) return const SizedBox.shrink();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('آخر تحديثات الفائق', style: TextStyle(color: _navy, fontSize: 21, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          ...updates.map((item) => Card(
+            elevation: 0,
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFF1F6FF),
+                child: Icon(Icons.campaign_outlined, color: _blue),
+              ),
+              title: Text(item.data['title']?.toString() ?? 'تحديث جديد', style: const TextStyle(fontWeight: FontWeight.w900)),
+              subtitle: Text(item.data['summary']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis),
+              onTap: () {
+                final url = item.data['cta_url']?.toString();
+                if (url != null && url.isNotEmpty) {
+                  // The full destination can be opened by the existing URL launcher layer.
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(item.data['cta_label']?.toString() ?? 'تفاصيل التحديث')),
+                  );
+                }
+              },
+            ),
+          )),
+        ],
+      );
+    },
+  );
 }
 
 class _BenefitsBar extends StatelessWidget {
