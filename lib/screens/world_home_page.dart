@@ -244,14 +244,7 @@ class _HomeHeader extends StatelessWidget {
               ),
               IconButton(onPressed: onNotifications, icon: const Icon(Icons.notifications_none, color: Colors.white)),
               StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: FirebaseAuth.instance.currentUser == null ? null : FirebaseFirestore.instance.collection('carts').doc(FirebaseAuth.instance.currentUser!.uid).snapshots(),
-                builder: (context, snapshot) {
-                  final raw = snapshot.data?.data()?['items'];
-                  var count = 0;
-                  if (raw is List) for (final item in raw) if (item is Map && item['quantity'] is num) count += (item['quantity'] as num).toInt();
-                  return IconButton(onPressed: onCart, icon: _CartBadgeIcon(icon: Icons.shopping_cart_outlined, count: count, color: Colors.white));
-                },
-              ),
+                return IconButton(onPressed: onCart, icon: _CartBadgeIcon(icon: Icons.shopping_cart_outlined, count: 0, color: Colors.white)),
             ],
           ),
           const SizedBox(height: 12),
@@ -746,14 +739,13 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
   }
 
   Future<void> _ensureWallet(String uid) async {
-    final ref = FirebaseFirestore.instance.collection('wallets').doc(uid);
-    if ((await ref.get()).exists) return;
-    await ref.set({
-      'uid': uid, 'currency': 'YER', 'status': 'active',
-      'availableBalance': 0, 'version': 1,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    await SupabaseService.client.from('wallets').upsert({
+      'uid': uid,
+      'currency': 'YER',
+      'status': 'active',
+      'available_balance': 0,
+      'version': 1,
+    }, onConflict: 'uid');
   }
 
   Future<void> _operation(String type) async {
@@ -765,15 +757,18 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
     }
     setState(() => _busy = true);
     try {
-      await FirebaseFirestore.instance.collection('walletOperations').add({
-        'uid': user.uid, 'type': type, 'amount': amount,
-        'currency': 'YER', 'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
+      await SupabaseService.client.from('wallet_operations').insert({
+        'uid': user.uid,
+        'type': type,
+        'amount': amount,
+        'currency': 'YER',
+        'status': 'pending',
+        'metadata': <String, dynamic>{},
       });
       _amount.clear();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(type == 'deposit' ? 'تم إرسال طلب الإيداع للمراجعة.' : 'تم إرسال طلب السحب للمراجعة.')));
-    } on FirebaseException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء العملية: ' + (e.message ?? e.code))));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء العملية: $e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -789,84 +784,86 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
     }
     setState(() => _busy = true);
     try {
-      await FirebaseFirestore.instance.collection('walletOperations').add({
-        'uid': user.uid, 'recipientUid': recipient, 'type': 'transfer',
-        'amount': amount, 'currency': 'YER', 'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
+      await SupabaseService.client.from('wallet_operations').insert({
+        'uid': user.uid,
+        'type': 'transfer',
+        'amount': amount,
+        'currency': 'YER',
+        'status': 'pending',
+        'metadata': {'recipient_uid': recipient},
       });
-      _amount.clear(); _recipient.clear();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال التحويل للمعالجة الآمنة.')));
-    } on FirebaseException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال التحويل: ' + (e.message ?? e.code))));
+      _amount.clear();
+      _recipient.clear();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال التحويل للمراجعة الآمنة.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال التحويل: $e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<Map<String, dynamic>?> _loadWallet(String uid) async {
+    final row = await SupabaseService.client.from('wallets').select().eq('uid', uid).maybeSingle();
+    if (row == null) {
+      await _ensureWallet(uid);
+      return await SupabaseService.client.from('wallets').select().eq('uid', uid).maybeSingle();
+    }
+    return Map<String, dynamic>.from(row);
   }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const Scaffold(body: Center(child: Text('يجب تسجيل الدخول أولاً.')));
-    final walletRef = FirebaseFirestore.instance.collection('wallets').doc(user.uid);
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(title: const Text('المحفظة المالية', style: TextStyle(fontWeight: FontWeight.w900))),
-        body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: walletRef.snapshots(),
-          builder: (context, snapshot) {
-            final data = snapshot.data?.data();
-            if (data == null) {
-              return Center(child: FilledButton.icon(
-                onPressed: _busy ? null : () async { setState(() => _busy = true); try { await _ensureWallet(user.uid); } finally { if (mounted) setState(() => _busy = false); } },
-                icon: const Icon(Icons.account_balance_wallet_outlined),
-                label: const Text('تفعيل محفظتي'),
-              ));
-            }
-            final balance = num.tryParse('${data['availableBalance'] ?? 0}') ?? 0;
+        body: FutureBuilder<Map<String, dynamic>?>(
+          future: _loadWallet(user.uid),
+          builder: (context, walletSnapshot) {
+            if (walletSnapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+            if (walletSnapshot.hasError) return Center(child: Text('تعذر تحميل المحفظة: ${walletSnapshot.error}'));
+            final data = walletSnapshot.data ?? <String, dynamic>{};
+            final balance = num.tryParse('${data['available_balance'] ?? 0}') ?? 0;
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Card(color: _navy, child: Padding(
-                  padding: const EdgeInsets.all(22),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('الرصيد المتاح', style: TextStyle(color: Colors.white70)),
-                    const SizedBox(height: 6),
-                    Text('$balance YER', style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 8),
-                    Text(data['status'] == 'active' ? 'المحفظة نشطة' : 'حالة المحفظة: ' + (data['status']?.toString() ?? 'غير معروفة'), style: const TextStyle(color: Colors.white70)),
-                  ]),
-                )),
+                Card(color: _navy, child: Padding(padding: const EdgeInsets.all(22), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('الرصيد المتاح', style: TextStyle(color: Colors.white70)),
+                  const SizedBox(height: 6),
+                  Text('$balance YER', style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 8),
+                  Text(data['status'] == 'active' ? 'المحفظة نشطة' : 'حالة المحفظة: ' + (data['status']?.toString() ?? 'غير معروفة'), style: const TextStyle(color: Colors.white70)),
+                ])),
+                ),
                 const SizedBox(height: 14),
-                Card(child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    const Text('عملية مالية', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 10),
-                    TextField(controller: _amount, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المبلغ', suffixText: 'YER')),
-                    const SizedBox(height: 10),
-                    TextField(controller: _recipient, decoration: const InputDecoration(labelText: 'UID المستلم للتحويل')),
-                    const SizedBox(height: 12),
-                    Wrap(spacing: 8, runSpacing: 8, children: [
-                      OutlinedButton.icon(onPressed: _busy ? null : () => _operation('deposit'), icon: const Icon(Icons.add_circle_outline), label: const Text('إيداع')),
-                      OutlinedButton.icon(onPressed: _busy ? null : () => _operation('withdraw'), icon: const Icon(Icons.remove_circle_outline), label: const Text('سحب')),
-                      FilledButton.icon(onPressed: _busy ? null : _transfer, icon: const Icon(Icons.swap_horiz), label: const Text('تحويل')),
-                    ]),
-                    const SizedBox(height: 8),
-                    const Text('الإيداع والسحب للمراجعة، والتحويل يعالج آلياً بعد تحقق الخادم من الرصيد.', style: TextStyle(color: Colors.black54)),
+                Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  const Text('طلب عملية مالية', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 10),
+                  TextField(controller: _amount, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المبلغ', suffixText: 'YER')),
+                  const SizedBox(height: 10),
+                  TextField(controller: _recipient, decoration: const InputDecoration(labelText: 'UID المستلم للتحويل')),
+                  const SizedBox(height: 12),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    OutlinedButton.icon(onPressed: _busy ? null : () => _operation('deposit'), icon: const Icon(Icons.add_circle_outline), label: const Text('إيداع')),
+                    OutlinedButton.icon(onPressed: _busy ? null : () => _operation('withdraw'), icon: const Icon(Icons.remove_circle_outline), label: const Text('سحب')),
+                    FilledButton.icon(onPressed: _busy ? null : _transfer, icon: const Icon(Icons.swap_horiz), label: const Text('تحويل')),
                   ]),
-                )),
+                  const SizedBox(height: 8),
+                  const Text('الإيداع والسحب والتحويل تُسجّل كطلبات آمنة ولا تغيّر الرصيد مباشرة من التطبيق.', style: TextStyle(color: Colors.black54)),
+                ])),
                 const SizedBox(height: 14),
                 const Text('آخر العمليات', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 8),
-                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: FirebaseFirestore.instance.collection('walletOperations').where('uid', isEqualTo: user.uid).limit(30).snapshots(),
+                FutureBuilder<List<Map<String, dynamic>>>(
+                  future: SupabaseService.client.from('wallet_operations').select().eq('uid', user.uid).order('created_at', ascending: false).limit(30),
                   builder: (context, ops) {
-                    if (ops.hasError) return Text('تعذر تحميل العمليات: ' + ops.error.toString());
-                    final docs = ops.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                    if (ops.hasError) return Text('تعذر تحميل العمليات: ${ops.error}');
+                    if (ops.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+                    final docs = ops.data ?? const <Map<String, dynamic>>[];
                     if (docs.isEmpty) return const Card(child: ListTile(title: Text('لا توجد عمليات مالية بعد.')));
-                    return Column(children: docs.map((doc) {
-                      final op = doc.data();
+                    return Column(children: docs.map((op) {
                       final type = op['type']?.toString() ?? '';
                       final label = type == 'transfer' ? 'تحويل' : type == 'deposit' ? 'إيداع' : 'سحب';
                       return Card(elevation: 0, child: ListTile(
@@ -885,7 +882,6 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
     );
   }
 }
-
 class _AccountTab extends StatelessWidget {
   const _AccountTab();
   Future<void> _logout(BuildContext context) async => AuthService().signOut();
