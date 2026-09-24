@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/app_sections.dart';
 import 'firebase_options.dart';
@@ -141,9 +142,58 @@ class AlfaeqYemenApp extends StatelessWidget {
   Widget _initialHome() {
     if (kIsWeb) {
       final token = Uri.base.queryParameters['merchant_invite'];
-      if (token != null && token.isNotEmpty) return MerchantInvitePage(token: token);
+      if (token != null && token.isNotEmpty) return RootBackGuard(child: MerchantInvitePage(token: token));
     }
-    return const AuthGate();
+    return RootBackGuard(child: const AuthGate());
+  }
+}
+
+
+/// يمنع الخروج غير المقصود من التطبيق عند الضغط على زر الرجوع في الصفحة الجذر.
+/// الضغطة الأولى تُظهر تنبيهًا، والضغطة الثانية خلال ثانيتين تُغلق التطبيق.
+class RootBackGuard extends StatefulWidget {
+  final Widget child;
+
+  const RootBackGuard({super.key, required this.child});
+
+  @override
+  State<RootBackGuard> createState() => _RootBackGuardState();
+}
+
+class _RootBackGuardState extends State<RootBackGuard> {
+  DateTime? _lastBackPress;
+
+  Future<void> _handleBack() async {
+    final now = DateTime.now();
+    final last = _lastBackPress;
+    if (last != null && now.difference(last) <= const Duration(seconds: 2)) {
+      await SystemNavigator.pop();
+      return;
+    }
+
+    _lastBackPress = now;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('اضغط مرة أخرى خلال ثانيتين للخروج من التطبيق.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && !kIsWeb) {
+          _handleBack();
+        }
+      },
+      child: widget.child,
+    );
   }
 }
 
