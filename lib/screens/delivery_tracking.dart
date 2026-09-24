@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import '../services/supabase_service.dart';
 import 'live_tracking_map_page.dart';
 
@@ -119,7 +120,6 @@ class _OrderTrackingView extends StatelessWidget {
       ],
     );
   }
-}
 
   static List<Map<String, dynamic>> _deliveryStages(String status) {
     const names = <String, String>{
