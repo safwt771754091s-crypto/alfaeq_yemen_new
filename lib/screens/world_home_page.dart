@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -60,19 +59,7 @@ class _MainBottomBar extends StatelessWidget {
       (Icons.receipt_long_outlined, Icons.receipt_long, 'طلباتي'),
       (Icons.person_outline, Icons.person, 'حسابي'),
     ];
-    final user = FirebaseAuth.instance.currentUser;
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: user == null ? null : FirebaseFirestore.instance.collection('carts').doc(user.uid).snapshots(),
-      builder: (context, snapshot) {
-        final data = snapshot.data?.data() ?? <String, dynamic>{};
-        final raw = data['items'];
-        var cartCount = 0;
-        if (raw is List) {
-          for (final item in raw) {
-            if (item is Map && item['quantity'] is num) cartCount += (item['quantity'] as num).toInt();
-          }
-        }
-        return Container(
+    return Container(
           decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFE5EAF0)))),
           child: SafeArea(
             top: false,
@@ -102,9 +89,6 @@ class _MainBottomBar extends StatelessWidget {
               }),
             ),
           ),
-        );
-      },
-    );
   }
 }
 
@@ -633,14 +617,14 @@ class WorldSectionPage extends StatelessWidget {
               const SizedBox(height: 18),
               const Text('المتاجر المعتمدة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 9),
-              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance.collection('stores').where('sectionId', isEqualTo: section.id).where('status', isEqualTo: 'approved').limit(30).snapshots(),
+              FutureBuilder<List<CatalogDocument>>(
+                future: CatalogService().approvedStores(section.id, limit: 30),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()));
-                  if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المتاجر', text: 'تحقق من الاتصال والصلاحيات.');
-                  final stores = snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                  if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المتاجر', text: 'تحقق من اتصال قاعدة البيانات.');
+                  final stores = snapshot.data ?? const <CatalogDocument>[];
                   if (stores.isEmpty) return const _Info(title: 'لا توجد متاجر معتمدة بعد', text: 'سيظهر هنا المحتوى الحقيقي عند اعتماد المتاجر.');
-                  return Column(children: stores.map((document) => _StoreCard(store: document)).toList());
+                  return Column(children: stores.map((store) => _StoreCard(store: store)).toList());
                 },
               ),
             ],
@@ -650,12 +634,12 @@ class WorldSectionPage extends StatelessWidget {
 }
 
 class _StoreCard extends StatelessWidget {
-  final QueryDocumentSnapshot<Map<String, dynamic>> store;
+  final CatalogDocument store;
   const _StoreCard({required this.store});
 
   @override
   Widget build(BuildContext context) {
-    final data = store.data();
+    final data = store.data;
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
@@ -665,106 +649,37 @@ class _StoreCard extends StatelessWidget {
           backgroundColor: Color(0xFFF1F6FF),
           child: Icon(Icons.storefront_outlined, color: _blue),
         ),
-        title: Text(
-          data['name']?.toString() ?? 'متجر',
-          style: const TextStyle(fontWeight: FontWeight.w900),
-        ),
+        title: Text(data['name']?.toString() ?? 'متجر', style: const TextStyle(fontWeight: FontWeight.w900)),
         subtitle: Text(data['address']?.toString() ?? 'عنوان غير محدد'),
         children: [
           Container(height: 1, color: const Color(0xFFE8ECEA)),
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance
-                .collection('products')
-                .where('storeId', isEqualTo: store.id)
-                .where('status', isEqualTo: 'active')
-                .limit(5000)
-                .snapshots(),
+          FutureBuilder<List<CatalogDocument>>(
+            future: CatalogService().activeProducts(storeId: store.id, limit: 5000),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(),
+              if (snapshot.connectionState == ConnectionState.waiting) return const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator());
+              if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(16), child: Text('تعذر تحميل الأصناف.'));
+              final products = snapshot.data ?? const <CatalogDocument>[];
+              if (products.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد أصناف نشطة حالياً.'));
+              return Column(children: products.map((product) {
+                final p = product.data;
+                final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
+                final price = p['price'];
+                final leading = imageUrl.isEmpty
+                    ? const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.inventory_2_outlined, color: _blue))
+                    : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(imageUrl, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(child: Icon(Icons.broken_image_outlined))));
+                final priceText = price is num ? price.toStringAsFixed(0) + ' ' + (p['currency'] ?? 'YER').toString() : 'عند الطلب';
+                final stock = p['stock_base'] ?? p['stock'];
+                return ListTile(
+                  leading: leading,
+                  title: Text(p['name']?.toString() ?? 'صنف', style: const TextStyle(fontWeight: FontWeight.w800)),
+                  subtitle: Text('المتوفر: ' + (stock ?? '—').toString()),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(priceText, style: const TextStyle(fontWeight: FontWeight.w900)),
+                    IconButton(onPressed: () => _addProductToCart(context, product), tooltip: 'أضف للسلة', icon: const Icon(Icons.add_shopping_cart, color: _blue)),
+                  ]),
+                  onTap: () => _addProductToCart(context, product),
                 );
-              }
-              if (snapshot.hasError) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('تعذر تحميل الأصناف.'),
-                );
-              }
-              final products = snapshot.data?.docs ??
-                  const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-              if (products.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('لا توجد أصناف نشطة حالياً.'),
-                );
-              }
-              return Column(
-                children: products.map((product) {
-                  final p = product.data();
-                  final imageUrl =
-                      (p['imageUrl'] ?? p['image'] ?? '').toString();
-                  final price = p['price'];
-                  Widget leading;
-                  if (imageUrl.isEmpty) {
-                    leading = const CircleAvatar(
-                      backgroundColor: Color(0xFFF1F6FF),
-                      child: Icon(Icons.inventory_2_outlined, color: _blue),
-                    );
-                  } else {
-                    leading = ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        imageUrl,
-                        width: 48,
-                        height: 48,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const CircleAvatar(
-                          child: Icon(Icons.broken_image_outlined),
-                        ),
-                      ),
-                    );
-                  }
-
-                  final priceText = price is num
-                      ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}'
-                      : 'عند الطلب';
-                  final stock = p['stock'];
-                  final stockSource = (p['stockSource'] ?? '').toString();
-                  final stockText = stockSource == 'unverified' && (stock is num && stock <= 0)
-                      ? 'المخزون يحتاج إدخالاً'
-                      : 'المتوفر: ${stock ?? '—'}';
-
-                  return ListTile(
-                    leading: leading,
-                    title: Text(
-                      p['name']?.toString() ?? 'صنف',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    subtitle: Text(stockText),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          priceText,
-                          style: const TextStyle(fontWeight: FontWeight.w900),
-                        ),
-                        IconButton(
-                          onPressed: () =>
-                              _addProductToCart(context, CatalogDocument.fromLegacyMap(product.data())),
-                          tooltip: 'أضف للسلة',
-                          icon: const Icon(
-                            Icons.add_shopping_cart,
-                            color: _blue,
-                          ),
-                        ),
-                      ],
-                    ),
-                    onTap: () => _addProductToCart(context, CatalogDocument.fromLegacyMap(product.data())),
-                  );
-                }).toList(),
-              );
+              }).toList());
             },
           ),
         ],
@@ -772,7 +687,6 @@ class _StoreCard extends StatelessWidget {
     );
   }
 }
-
 class ServicesHubPage extends StatelessWidget {
   const ServicesHubPage({super.key});
   @override
