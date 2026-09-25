@@ -61,16 +61,14 @@ class AiProviderRouter {
 
     await _client.from('audit_logs').insert({
       'actor_uid': user.id,
-      'actor_email': user.email,
-      'role': role,
       'action': operation,
       'result': result,
+      'source': 'ai_provider_router',
       'details': {
+        'role': role,
         'provider': provider,
         'metadata': metadata ?? const <String, dynamic>{},
       },
-      'source': 'ai_provider_router',
-      'created_at': DateTime.now().toUtc().toIso8601String(),
     });
   }
 
