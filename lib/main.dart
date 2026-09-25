@@ -1,11 +1,8 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/app_sections.dart';
-import 'firebase_options.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/ai_assistant_page.dart';
 import 'screens/auth_gate.dart';
@@ -42,9 +39,6 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
 
   Future<void> _initializeServices() async {
     // Supabase is the application authentication and data backend.
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
     await SupabaseService.initialize();
 
     // One-time migration reset: the current release changed the auth/data
@@ -61,29 +55,7 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
       await prefs.setBool(migrationKey, true);
     }
 
-    if (kIsWeb) {
-      const siteKey = String.fromEnvironment('RECAPTCHA_ENTERPRISE_SITE_KEY');
-      if (siteKey.isNotEmpty) {
-        try {
-          await FirebaseAppCheck.instance.activate(
-            providerWeb: ReCaptchaEnterpriseProvider(siteKey),
-          );
-          await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
-        } catch (e) {
-          debugPrint('Web App Check activation failed: $e');
-        }
-      }
-    } else {
-      try {
-        await FirebaseAppCheck.instance.activate(
-          providerAndroid: const AndroidPlayIntegrityProvider(),
-          providerApple: const AppleAppAttestProvider(),
-        );
-        await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
-      } catch (e) {
-        debugPrint('Mobile App Check activation failed: $e');
-      }
-    }
+
   }
 
   @override
