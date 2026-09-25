@@ -108,7 +108,7 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
   Future<void> _revokeSessions(Map<String, dynamic> user) async {
     final uid = user['uid'] as String?; if (uid == null) return;
     try { await _adminUsers('revoke_sessions', {'uid': uid}); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إلغاء الجلسات الحالية.'))); }
-    on FirebaseFunctionsException catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? e.code))); }
+    on FunctionException catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? e.code))); }
   }
 
   List<Map<String, dynamic>> get _visibleUsers {
