@@ -14,12 +14,19 @@ void main() {
       expect(source, contains("'create_order_draft'"));
     });
 
-    test('AI service uses limited-use App Check tokens', () {
+    test('AI service uses the Supabase to Unsloth gateway and confirmation flow', () {
       final source = File('lib/ai/ai_service.dart').readAsStringSync();
-      expect(source, contains('FirebaseAI.googleAI'));
-      expect(source, contains('useLimitedUseAppCheckTokens: true'));
-      expect(source, contains('_executeThroughGateway'));
-      expect(source, contains('ai_action_waiting_confirmation'));
+      final gateway = File('lib/services/unsloth_ai_service.dart').readAsStringSync();
+      expect(source, contains("import '../services/unsloth_ai_service.dart';"));
+      expect(source, contains('final UnslothAiService _ai;'));
+      expect(source, contains('_ai.chatCompletion('));
+      expect(source, contains('requiresConfirmation'));
+      expect(source, contains('_pendingAction'));
+      expect(source, contains('confirmPendingAction'));
+      expect(source, isNot(contains('FirebaseAI.googleAI')));
+      expect(source, isNot(contains('useLimitedUseAppCheckTokens')));
+      expect(gateway, contains('ai-gateway'));
+      expect(gateway, contains('Supabase'));
     });
 
     test('Firestore rules keep audit logs append-only and user-owned data scoped', () {
@@ -84,13 +91,11 @@ void main() {
       expect(driver, contains("eq('driver_id',user.uid)"));
       expect(driver, contains("status=='assigned'"));
       expect(driver, contains("_setStatus(id,'delivered')"));
-      expect(gate, contains('final role = roleSnapshot.data ?? \'customer\';'));
+      expect(gate, contains("final role = roleSnapshot.data ?? 'customer';"));
       expect(gate, contains("case 'driver':"));
       expect(gate, contains('DriverCenterPage()'));
       expect(rules, contains('match /drivers/{uid}'));
-      expect(rules, contains('match /drivers/{uid}'));
       expect(driver, contains("rpc('driver_update_order'"));
-      expect(driver, contains("eq('driver_id',user.uid)"));
     });
 
     test('location is optional at signup and requested only by location-dependent features', () {
@@ -126,7 +131,7 @@ void main() {
       expect(migration, contains('security definer'));
       expect(migration, contains("uid := auth.uid()::text"));
       expect(migration, contains("if uid is null then raise exception 'not authenticated'"));
-      expect(migration, contains("select exists("));
+      expect(migration, contains('select exists('));
       expect(migration, contains('s.owner_id = uid'));
       expect(migration, contains("raise exception 'not authorized'"));
       expect(migration, contains("raise exception 'invalid merchant order transition'"));
