@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
 
 class MerchantApprovalPage extends StatefulWidget {
   const MerchantApprovalPage({super.key});
@@ -23,7 +24,7 @@ class _MerchantApprovalPageState extends State<MerchantApprovalPage> {
   }
 
   Future<void> _setStatus(DocumentSnapshot<Map<String, dynamic>> doc, String status) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = SupabaseService.client.auth.currentUser;
     if (user == null || !await _isStaff()) {
       _message('غير مصرح لك بإدارة اعتماد المتاجر.');
       return;
