@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -19,7 +19,7 @@ class _CartPageState extends State<CartPage> {
   String? _error;
   List<Map<String, dynamic>> _items = [];
   String _currency = 'YER';
-  String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
+  String get _uid => SupabaseService.client.auth.currentUser?.uid ?? '';
 
   @override
   void initState() { super.initState(); _loadCart(); }
