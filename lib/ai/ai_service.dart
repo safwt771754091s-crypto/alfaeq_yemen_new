@@ -296,7 +296,8 @@ create_order_draft ينشئ طلباً معلّقاً فقط ولا ينفذ أ�
     _messages.clear();
     _resetSystemMessage();
     _pendingAction = null;
-  }}
+  }
+}
 
 class _PendingAiAction {
   final String name;
