@@ -1,4 +1,5 @@
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/supabase_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -26,10 +27,11 @@ class _MerchantInvitesPageState extends State<MerchantInvitesPage> {
     final label = _label.text.trim();
     setState(() => _busy = true);
     try {
-      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
-          .httpsCallable('createMerchantInvite');
-      final result = await callable.call(<String, dynamic>{'label': label});
-      final raw = result.data;
+      final response = await SupabaseService.client.functions.invoke(
+        'create-merchant-invite',
+        body: <String, dynamic>{'label': label},
+      );
+      final raw = response.data;
       final data = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
       final link = data['url']?.toString().trim() ?? '';
       if (link.isEmpty || !Uri.tryParse(link).toString().startsWith('http')) {
@@ -40,8 +42,10 @@ class _MerchantInvitesPageState extends State<MerchantInvitesPage> {
       _label.clear();
       await Clipboard.setData(ClipboardData(text: link));
       _message('تم إنشاء الرابط وعرضه ونسخه للحافظة.');
-    } on FirebaseFunctionsException catch (e) {
-      _message(e.message ?? 'تعذر إنشاء رابط التاجر.');
+    } on PostgrestException catch (e) {
+      _message(e.message);
+    } catch (e) {
+      _message('تعذر إنشاء رابط التاجر: $e');
     } catch (e) {
       _message('تعذر إنشاء الرابط: $e');
     } finally {
