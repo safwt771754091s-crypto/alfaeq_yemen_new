@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -55,7 +55,7 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
   }
 
   Future<void> _createStore() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = SupabaseService.client.auth.currentUser;
     final name = _storeName.text.trim();
     final phone = _phone.text.trim();
     if (user == null || name.isEmpty || phone.isEmpty) {
@@ -86,7 +86,7 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
   }
 
   Future<void> _createProduct() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = SupabaseService.client.auth.currentUser;
     final storeId = _selectedStoreId;
     final name = _productName.text.trim();
     final price = num.tryParse(_price.text.trim());
