@@ -307,6 +307,27 @@
               },
               "renameOutput": true,
               "outputKey": "siteUpdateDeleted"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.eventType}}",
+                    "rightValue": "test.ping",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "test"
             }
           ]
         }
@@ -594,6 +615,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -613,7 +641,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "alfaeq-n8n-v2",
+  "versionId": "alfaeq-n8n-v3",
   "meta": {
     "templateCredsSetupCompleted": false
   }
