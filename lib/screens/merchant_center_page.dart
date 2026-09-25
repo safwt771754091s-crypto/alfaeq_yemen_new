@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/app_sections.dart';
 import '../services/location_service.dart';
 import '../core/product_units.dart';
+import '../services/supabase_service.dart';
 
 class MerchantCenterPage extends StatefulWidget {
   const MerchantCenterPage({super.key});
@@ -47,8 +48,8 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
         'address': _address.text.trim(),
         'sectionId': _sectionId,
         'status': 'pending',
-        'ownerId': user.uid,
-        'createdBy': user.uid,
+        'ownerId': user.id,
+        'createdBy': user.id,
         'location': location,
         'latitude': position.latitude,
         'longitude': position.longitude,
@@ -72,7 +73,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     if (price == null || price < 0 || stock == null || stock < 0) { _message('السعر والكمية يجب أن يكونا أرقاماً صحيحة وغير سالبة.'); return; }
     setState(() => _saving = true);
     try {
-      await FirebaseFirestore.instance.collection('products').add({'storeId': storeId, 'ownerId': user.uid, 'createdBy': user.uid, 'name': name, 'price': price, 'currency': 'YER', 'stock': stock, 'stockBase': ProductUnit.fromId(_saleUnit).toBase(stock).round(), 'saleUnit': _saleUnit, 'unitLabel': ProductUnit.fromId(_saleUnit).label, 'baseUnit': ProductUnit.fromId(_saleUnit).baseUnit, 'unitScale': ProductUnit.fromId(_saleUnit).scale, 'stepBase': ProductUnit.fromId(_saleUnit).defaultStepBase, 'minOrderBase': ProductUnit.fromId(_saleUnit).defaultStepBase, 'soldQuantity': 0, 'soldQuantityBase': 0, 'status': 'active', 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp()});
+      await FirebaseFirestore.instance.collection('products').add({'storeId': storeId, 'ownerId': user.id, 'createdBy': user.id, 'name': name, 'price': price, 'currency': 'YER', 'stock': stock, 'stockBase': ProductUnit.fromId(_saleUnit).toBase(stock).round(), 'saleUnit': _saleUnit, 'unitLabel': ProductUnit.fromId(_saleUnit).label, 'baseUnit': ProductUnit.fromId(_saleUnit).baseUnit, 'unitScale': ProductUnit.fromId(_saleUnit).scale, 'stepBase': ProductUnit.fromId(_saleUnit).defaultStepBase, 'minOrderBase': ProductUnit.fromId(_saleUnit).defaultStepBase, 'soldQuantity': 0, 'soldQuantityBase': 0, 'status': 'active', 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp()});
       _productName.clear(); _price.clear(); _stock.clear(); _message('تم حفظ الصنف بنجاح.');
     } on FirebaseException catch (e) { _message('تعذر حفظ الصنف: ${e.message ?? e.code}'); }
     finally { if (mounted) setState(() => _saving = false); }
@@ -96,7 +97,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     final user = _user;
     if (user == null) return const _Gate(message: 'يجب تسجيل الدخول إلى مركز التاجر.');
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(appBar: AppBar(title: const Text('مركز التاجر'), actions: [IconButton(onPressed: () => setState(() {}), icon: const Icon(Icons.refresh))]), body: ListView(padding: const EdgeInsets.all(16), children: [
-      _HeroCard(), const SizedBox(height: 18), _SectionTitle(title: 'متاجري', icon: Icons.storefront_outlined), const SizedBox(height: 8), _stores(user.uid), const SizedBox(height: 18), _SectionTitle(title: 'إضافة متجر', icon: Icons.add_business_outlined), const SizedBox(height: 8), _storeForm(), const SizedBox(height: 18), _SectionTitle(title: 'إضافة صنف', icon: Icons.add_box_outlined), const SizedBox(height: 8), _productForm(), const SizedBox(height: 18), _SectionTitle(title: 'كتالوج الأصناف', icon: Icons.inventory_2_outlined), const SizedBox(height: 8), _products(user.uid)
+      _HeroCard(), const SizedBox(height: 18), _SectionTitle(title: 'متاجري', icon: Icons.storefront_outlined), const SizedBox(height: 8), _stores(user.id), const SizedBox(height: 18), _SectionTitle(title: 'إضافة متجر', icon: Icons.add_business_outlined), const SizedBox(height: 8), _storeForm(), const SizedBox(height: 18), _SectionTitle(title: 'إضافة صنف', icon: Icons.add_box_outlined), const SizedBox(height: 8), _productForm(), const SizedBox(height: 18), _SectionTitle(title: 'كتالوج الأصناف', icon: Icons.inventory_2_outlined), const SizedBox(height: 8), _products(user.id)
     ])));
   }
 
