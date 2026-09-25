@@ -1,5 +1,4 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -42,8 +41,7 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
   }
 
   Future<void> _initializeServices() async {
-    // Firebase must be initialized before Supabase because the Supabase
-    // access-token callback reads FirebaseAuth.currentUser.
+    // Supabase is the application authentication and data backend.
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -55,7 +53,6 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
     final prefs = await SharedPreferences.getInstance();
     const migrationKey = 'alfaeq_auth_migration_2026_09_22_2';
     if (prefs.getBool(migrationKey) != true) {
-      await FirebaseAuth.instance.signOut();
       try {
         if (SupabaseService.isInitialized) {
           await SupabaseService.client.auth.signOut();
