@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_core/firebase_core.dart';
 
 import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
 import 'auth_gate.dart';
 
 class MerchantInvitePage extends StatefulWidget {
@@ -30,9 +29,12 @@ class _MerchantInvitePageState extends State<MerchantInvitePage> {
   }
 
   Future<void> _redeemAfterSignIn() async {
-    final callable = FirebaseFunctions.instance.httpsCallable('redeemMerchantInvite');
-    await callable.call(<String, dynamic>{'token': widget.token});
-    await AuthService().auth.currentUser?.getIdToken(true);
+    final result = await SupabaseService.client.rpc(
+      'redeem_merchant_invite',
+      params: {'p_token': widget.token},
+    );
+    if (result != true) throw StateError('تعذر تفعيل دعوة التاجر.');
+    await SupabaseService.client.auth.refreshSession();
     if (!mounted) return;
     setState(() => _message = 'تم تفعيل حساب التاجر بنجاح. يمكنك الآن الدخول إلى مركز التاجر.');
     await Future<void>.delayed(const Duration(milliseconds: 800));
@@ -48,10 +50,10 @@ class _MerchantInvitePageState extends State<MerchantInvitePage> {
     try {
       await AuthService().register(name: _name.text.trim(), email: _email.text.trim(), password: _password.text);
       await _redeemAfterSignIn();
-    } on FirebaseFunctionsException catch (e) {
-      setState(() => _message = e.message ?? 'تعذر تفعيل دعوة التاجر.');
-    } on FirebaseException catch (e) {
-      setState(() => _message = e.message ?? 'تعذر إنشاء الحساب.');
+    } on PostgrestException catch (e) {
+      setState(() => _message = e.message.isNotEmpty ? e.message : 'تعذر تفعيل دعوة التاجر.');
+    } catch (e) {
+      setState(() => _message = 'تعذر إنشاء الحساب: $e');
     } catch (e) {
       setState(() => _message = 'تعذر إكمال التسجيل: $e');
     } finally {
@@ -68,10 +70,10 @@ class _MerchantInvitePageState extends State<MerchantInvitePage> {
         return;
       }
       await _redeemAfterSignIn();
-    } on FirebaseFunctionsException catch (e) {
-      setState(() => _message = e.message ?? 'تعذر تفعيل رابط التاجر.');
-    } on FirebaseException catch (e) {
-      setState(() => _message = e.message ?? 'تعذر تسجيل الدخول عبر Google.');
+    } on PostgrestException catch (e) {
+      setState(() => _message = e.message.isNotEmpty ? e.message : 'تعذر تفعيل رابط التاجر.');
+    } catch (e) {
+      setState(() => _message = 'تعذر تسجيل الدخول عبر Google: $e');
     } catch (e) {
       setState(() => _message = 'تعذر إكمال الدخول: $e');
     } finally {
