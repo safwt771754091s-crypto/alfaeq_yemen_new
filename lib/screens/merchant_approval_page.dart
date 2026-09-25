@@ -37,13 +37,13 @@ class _MerchantApprovalPageState extends State<MerchantApprovalPage> {
       final batch = FirebaseFirestore.instance.batch();
       batch.update(doc.reference, {
         'status': status,
-        'reviewedBy': user.uid,
+        'reviewedBy': user.id,
         'reviewedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
       final audit = FirebaseFirestore.instance.collection('auditLogs').doc();
       batch.set(audit, {
-        'actorUid': user.uid,
+        'actorUid': user.id,
         'email': user.email,
         'role': reviewerRole,
         'action': 'merchant_store_${status == 'approved' ? 'approved' : 'rejected'}',
