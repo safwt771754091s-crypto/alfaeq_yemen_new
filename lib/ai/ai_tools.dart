@@ -111,8 +111,8 @@ class AlfaeqAiToolRegistry {
 
   Future<Map<String, Object?>> _getMyAccountSummary() async {
     final user=_client.auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
-    if(SupabaseService.isInitialized){final rows=await SupabaseService.client.from('users').select().eq('uid',user.id).limit(1);final d=rows.isNotEmpty?Map<String,dynamic>.from(rows.first):<String,dynamic>{};return {'ok':true,'uid':user.id,'email':user.email,'displayName':d['name']??(user.userMetadata?['full_name'] ?? user.userMetadata?['name']),'role':d['role']??'customer','phoneVerified':user.phoneNumber!=null,'emailVerified':user.emailConfirmedAt != null};}
-    final snap=await _db.collection('users').doc(user.id).get();final d=snap.data()??<String,dynamic>{};return {'ok':true,'uid':user.id,'email':user.email,'displayName':d['name']??d['displayName']??(user.userMetadata?['full_name'] ?? user.userMetadata?['name']),'role':d['role'],'phoneVerified':user.phoneNumber!=null,'emailVerified':user.emailConfirmedAt != null};
+    if(SupabaseService.isInitialized){final rows=await SupabaseService.client.from('users').select().eq('uid',user.id).limit(1);final d=rows.isNotEmpty?Map<String,dynamic>.from(rows.first):<String,dynamic>{};return {'ok':true,'uid':user.id,'email':user.email,'displayName':d['name']??(user.userMetadata?['full_name'] ?? user.userMetadata?['name']),'role':d['role']??'customer','phoneVerified':user.phone!=null,'emailVerified':user.emailConfirmedAt != null};}
+    final snap=await _db.collection('users').doc(user.id).get();final d=snap.data()??<String,dynamic>{};return {'ok':true,'uid':user.id,'email':user.email,'displayName':d['name']??d['displayName']??(user.userMetadata?['full_name'] ?? user.userMetadata?['name']),'role':d['role'],'phoneVerified':user.phone!=null,'emailVerified':user.emailConfirmedAt != null};
   }
 
   Future<Map<String, Object?>> _getSecuritySummary({required Future<void> Function({required String action, required String result, Map<String, dynamic>? details}) audit}) async {
