@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:excel/excel.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -185,7 +185,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
   }
 
   Future<void> _import() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = SupabaseService.client.auth.currentUser;
     if (user == null || _preview.isEmpty) return;
     setState(() => _busy = true);
     try {
