@@ -44,7 +44,7 @@ void main() {
       final approval = File('lib/screens/merchant_approval_page.dart').readAsStringSync();
       final rules = File('firestore.rules').readAsStringSync();
       expect(merchant, contains("'status': 'pending'"));
-      expect(merchant, contains("'ownerId': user.uid"));
+      expect(merchant, contains("'ownerId': user.id"));
       expect(approval, contains('Future<bool> _isStaff()'));
       expect(approval, contains("where('status', isEqualTo: 'pending')"));
       expect(approval, contains("'reviewedBy': user.uid"));
@@ -88,7 +88,7 @@ void main() {
       expect(driver, contains("['driver','admin','owner','developer'].contains(role)"));
       expect(driver, contains("'current_location'"));
       expect(driver, contains("rpc('driver_update_location'"));
-      expect(driver, contains("eq('driver_id',user.uid)"));
+      expect(driver, contains("eq('driver_id',uid)"));
       expect(driver, contains("status=='assigned'"));
       expect(driver, contains("_setStatus(id,'delivered')"));
       expect(gate, contains("final role = roleSnapshot.data ?? 'customer';"));
@@ -107,7 +107,7 @@ void main() {
       final rules = File('firestore.rules').readAsStringSync();
 
       expect(auth, contains('dynamic location'));
-      expect(auth, contains('if (location != null)'));
+      expect(auth, contains('if (location is Map)'));
       expect(auth, contains('saveUserLocation'));
       expect(auth, contains("onConflict: 'uid'"));
       expect(auth, contains("profile['location'] = Map<String, dynamic>.from(location)"));
