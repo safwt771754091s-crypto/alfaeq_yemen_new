@@ -50,6 +50,9 @@ Deno.serve(async (req) => {
     temperature: typeof body.temperature === "number" ? body.temperature : 0.2,
     max_tokens: typeof body.max_tokens === "number" ? body.max_tokens : 1024,
     stream: body.stream === true,
+    ...(Array.isArray(body.tools) ? { tools: body.tools } : {}),
+    ...(body.tool_choice !== undefined ? { tool_choice: body.tool_choice } : {}),
+    ...(typeof body.top_p === "number" ? { top_p: body.top_p } : {}),
   };
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
