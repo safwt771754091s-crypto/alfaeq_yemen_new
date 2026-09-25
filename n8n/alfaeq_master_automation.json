@@ -434,7 +434,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\"ok\":true,\"source\":\"alfaeq_yemen_new\",\"eventId\":\"{{$json.eventId}}\",\"eventType\":\"{{$json.eventType}}\"}",
+        "responseBody": "={{ JSON.stringify({ ok: true, source: 'alfaeq_yemen_new', eventId: $json.eventId, eventType: $json.eventType }) }}",
         "options": {}
       },
       "id": "response",
@@ -577,7 +577,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "alfaeq-n8n-v6",
+  "versionId": "alfaeq-n8n-v7",
   "meta": {
     "templateCredsSetupCompleted": true
   }
