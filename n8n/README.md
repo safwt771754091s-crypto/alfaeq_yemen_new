@@ -1,10 +1,10 @@
 # أتمتة الفائق يمن عبر n8n
 
-هذا المجلد يضيف طبقة أتمتة خارجية قابلة للاستبدال فوق Firebase. التطبيق يبقى Flutter + Firebase، بينما n8n يتولى التنسيق بين الخدمات الخارجية.
+هذا المجلد يضيف طبقة أتمتة تشغيلية للمستودع `alfaeq_yemen_new`. التطبيق Flutter يستخدم Firebase وSupabase بحسب المسار، بينما n8n يتولى التنسيق مع الخدمات الخارجية.
 
 ## المسار
 
-Flutter/Firebase → Cloud Functions → n8n Webhook → Google Sheets / WhatsApp / Image Studio
+Flutter → Firebase/Cloud Functions → n8n Webhook → Google Sheets / WhatsApp / Image Studio / خدمات خارجية
 
 ## ما تم تجهيزه
 
@@ -21,7 +21,7 @@ Flutter/Firebase → Cloud Functions → n8n Webhook → Google Sheets / WhatsAp
 
 `platformIntegrations/n8n`
 
-بالحقول:
+بالحقول (في بيئة التشغيل فقط):
 
 ```
 enabled: true
@@ -63,3 +63,19 @@ ALFAEQ_WHATSAPP_AUTOMATION_URL
 ## ملاحظة تشغيلية
 
 إضافة هذه الطبقة لا تعني أن WhatsApp أو Google Sheets أو Image Studio أصبحت متصلة فعليًا حتى يتم إدخال بيانات الاعتماد/عناوين الخدمات في بيئة التشغيل. الكود يرفض الأسرار الناقصة ولا يضع بيانات حساسة في GitHub.
+
+## حالة التنفيذ
+
+تم تجهيز طبقة الأحداث لتدعم:
+
+- `order.created` و`order.updated`
+- `product.created` و`product.updated`
+- `store.created`
+- `whatsapp.product_import.created`
+- `merchant.invite.created`
+
+الـ workflow يتحقق من السر المشترك ومن الحقول الأساسية قبل تمرير الحدث. لا توضع مفاتيح Google أو WhatsApp أو Image Studio داخل المستودع.
+
+## تشغيل n8n
+
+استورد `alfaeq_master_automation.json` في نسخة n8n الخاصة بك، ثم عيّن متغيرات البيئة وCredentials المطلوبة. لا نعتبر التكامل "متصلًا" إلا بعد اختبار webhook فعلي وظهور تنفيذ ناجح في n8n.
