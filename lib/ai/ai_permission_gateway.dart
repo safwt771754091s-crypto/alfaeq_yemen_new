@@ -1,17 +1,15 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/supabase_service.dart';
 
 /// Central policy boundary for Alfaeq AI actions.
 /// Default-deny: every tool must be explicitly registered here.
 /// Read actions may run automatically when allowed; reversible/sensitive
 /// actions require explicit user confirmation.
 class AlfaeqAiPermissionGateway {
-  final FirebaseAuth _auth;
-  final FirebaseFirestore _db;
+  final SupabaseClient _client;
 
-  AlfaeqAiPermissionGateway({FirebaseAuth? auth, FirebaseFirestore? db})
-      : _auth = auth ?? FirebaseAuth.instance,
-        _db = db ?? FirebaseFirestore.instance;
+  AlfaeqAiPermissionGateway({SupabaseClient? client})
+      : _client = client ?? SupabaseService.client;
 
   static const Map<String, _AiActionPolicy> _policies = {
     'search_catalog': _AiActionPolicy(level: AiActionLevel.read, roles: <String>{'customer', 'merchant', 'driver', 'developer', 'admin', 'owner'}, requiresSignIn: false),
@@ -29,7 +27,7 @@ class AlfaeqAiPermissionGateway {
   Future<AiPermissionDecision> authorize(String action, {bool userConfirmed = false}) async {
     final policy = _policies[action];
     if (policy == null) return AiPermissionDecision.denied('هذه العملية غير مسجلة في بوابة صلاحيات الوكيل.');
-    final user = _auth.currentUser;
+    final user = _client.auth.currentUser;
     if (policy.requiresSignIn && user == null) return AiPermissionDecision.denied('يجب تسجيل الدخول أولاً.');
     if (user == null) return AiPermissionDecision.allowed(role: 'anonymous', level: policy.level);
     final role = await _resolveRole(user);
@@ -42,12 +40,18 @@ class AlfaeqAiPermissionGateway {
 
   Future<String> _resolveRole(User user) async {
     try {
-      final token = await user.getIdTokenResult(true);
-      final claimRole = token.claims?['role']?.toString().toLowerCase();
-      if (claimRole != null && claimRole.isNotEmpty) return claimRole;
-      final doc = await _db.collection('users').doc(user.uid).get();
-      final firestoreRole = doc.data()?['role']?.toString().toLowerCase();
-      return firestoreRole == null || firestoreRole.isEmpty ? 'customer' : firestoreRole;
+      final row = await _client
+          .from('users')
+          .select('role,admin,owner,developer')
+          .eq('uid', user.id)
+          .maybeSingle();
+      final data = row ?? const <String, dynamic>{};
+      final role = data['role']?.toString().toLowerCase() ?? '';
+      if (role.isNotEmpty) return role;
+      if (data['owner'] == true) return 'owner';
+      if (data['admin'] == true) return 'admin';
+      if (data['developer'] == true) return 'developer';
+      return 'customer';
     } catch (_) {
       return 'customer';
     }
