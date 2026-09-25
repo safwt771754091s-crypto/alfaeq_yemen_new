@@ -3,22 +3,32 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const WORKER_SECRET = Deno.env.get("ALFAEQ_AUTOMATION_WORKER_SECRET") ?? "";
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return Response.json({ ok: false, error: "method_not_allowed" }, { status: 405 });
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return Response.json({ ok: false, error: "server_configuration_missing" }, { status: 500 });
 
-  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!token) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
-
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { data: authData, error: authError } = await admin.auth.getUser(token);
-  if (authError || !authData.user) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const internalSecret = req.headers.get("x-alfaeq-worker-secret") ?? "";
+  let workerId = "automation-worker";
 
-  const uid = authData.user.id;
-  const { data: actor, error: actorError } = await admin.from("users").select("uid,admin,owner,developer").eq("uid", uid).maybeSingle();
-  if (actorError || !actor || !(actor.admin || actor.owner || actor.developer)) {
-    return Response.json({ ok: false, error: "automation_staff_required" }, { status: 403 });
+  if (WORKER_SECRET && internalSecret && internalSecret === WORKER_SECRET) {
+    workerId = "internal:n8n";
+  } else {
+    const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+    if (!token) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+
+    const { data: authData, error: authError } = await admin.auth.getUser(token);
+    if (authError || !authData.user) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+
+    const uid = authData.user.id;
+    const { data: actor, error: actorError } = await admin.from("users")
+      .select("uid,admin,owner,developer").eq("uid", uid).maybeSingle();
+    if (actorError || !actor || !(actor.admin || actor.owner || actor.developer)) {
+      return Response.json({ ok: false, error: "automation_staff_required" }, { status: 403 });
+    }
+    workerId = `edge:${uid}`;
   }
 
   const { data: endpoint, error: endpointError } = await admin.from("automation_endpoints")
@@ -33,7 +43,7 @@ Deno.serve(async (req: Request) => {
   const limit = Number.isFinite(requestedLimit) ? Math.min(10, Math.max(1, Math.floor(requestedLimit))) : 10;
 
   const { data: events, error: claimError } = await admin.rpc("claim_automation_events", {
-    p_limit: limit, p_worker_id: `edge:${uid}`,
+    p_limit: limit, p_worker_id: workerId,
   });
   if (claimError) return Response.json({ ok: false, error: "claim_failed", detail: claimError.message }, { status: 500 });
 
