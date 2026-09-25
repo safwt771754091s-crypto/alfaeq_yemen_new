@@ -230,12 +230,12 @@ class HomePage extends StatelessWidget {
             actions: [
               IconButton(tooltip: 'ذكاء الفائق', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage())), icon: const Icon(Icons.auto_awesome)),
               StreamBuilder<List<Map<String, dynamic>>>(
-                stream: FirebaseAuth.instance.currentUser == null || !SupabaseService.isInitialized
+                stream: SupabaseService.client.auth.currentUser == null || !SupabaseService.isInitialized
                     ? null
                     : SupabaseService.client
                         .from('carts')
                         .stream(primaryKey: ['uid'])
-                        .eq('uid', FirebaseAuth.instance.currentUser!.uid),
+                        .eq('uid', SupabaseService.client.auth.currentUser!.id),
                 builder: (context, snapshot) {
                   var count = 0;
                   final rows = snapshot.data ?? const <Map<String, dynamic>>[];
