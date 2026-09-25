@@ -42,10 +42,12 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
   }
 
   Future<void> _initializeServices() async {
-    await SupabaseService.initialize();
+    // Firebase must be initialized before Supabase because the Supabase
+    // access-token callback reads FirebaseAuth.currentUser.
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await SupabaseService.initialize();
 
     // One-time migration reset: the current release changed the auth/data
     // path. Clear any persisted legacy session so testing starts from a clean
