@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
@@ -30,7 +30,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     _storeName.dispose(); _phone.dispose(); _address.dispose(); _productName.dispose(); _price.dispose(); _stock.dispose(); super.dispose();
   }
 
-  User? get _user => FirebaseAuth.instance.currentUser;
+  User? get _user => SupabaseService.client.auth.currentUser;
 
   Future<void> _createStore() async {
     final user = _user;
