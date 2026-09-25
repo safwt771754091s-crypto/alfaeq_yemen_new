@@ -343,44 +343,6 @@
     },
     {
       "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "={{$vars.ALFAEQ_GOOGLE_SHEET_ID}}"
-        },
-        "sheetName": {
-          "__rl": true,
-          "mode": "name",
-          "value": "AutomationEvents"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "event_id": "={{$json.eventId}}",
-            "event_type": "={{$json.eventType}}",
-            "occurred_at": "={{$json.occurredAt}}",
-            "payload": "={{JSON.stringify($json.data)}}"
-          }
-        }
-      },
-      "id": "sheets",
-      "name": "Google Sheets — AutomationEvents",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
-      "position": [
-        20,
-        120
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "ALFAEQ_GOOGLE_SHEETS_CREDENTIAL",
-          "name": "Alfaeq Google Sheets"
-        }
-      }
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "={{$vars.ALFAEQ_IMAGE_STUDIO_URL}}",
         "sendHeaders": true,
@@ -512,17 +474,12 @@
       "main": [
         [
           {
-            "node": "Google Sheets — AutomationEvents",
+            "node": "Respond",
             "type": "main",
             "index": 0
           }
         ],
         [
-          {
-            "node": "Google Sheets — AutomationEvents",
-            "type": "main",
-            "index": 0
-          },
           {
             "node": "Image Studio — Product Asset",
             "type": "main",
@@ -530,88 +487,8 @@
           }
         ],
         [
-          {
-            "node": "Google Sheets — AutomationEvents",
-            "type": "main",
-            "index": 0
-          },
           {
             "node": "WhatsApp Automation",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Google Sheets — AutomationEvents",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Google Sheets — AutomationEvents",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Google Sheets — AutomationEvents",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Image Studio — Product Asset",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Google Sheets — AutomationEvents",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Google Sheets — AutomationEvents",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Google Sheets — AutomationEvents",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Google Sheets — AutomationEvents",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Google Sheets — AutomationEvents",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Google Sheets — AutomationEvents",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Google Sheets — AutomationEvents",
             "type": "main",
             "index": 0
           }
@@ -622,11 +499,70 @@
             "type": "main",
             "index": 0
           }
-        ]
-      ]
-    },
-    "Google Sheets — AutomationEvents": {
-      "main": [
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Image Studio — Product Asset",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Respond",
@@ -641,8 +577,8 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "alfaeq-n8n-v5",
+  "versionId": "alfaeq-n8n-v6",
   "meta": {
-    "templateCredsSetupCompleted": false
+    "templateCredsSetupCompleted": true
   }
 }
