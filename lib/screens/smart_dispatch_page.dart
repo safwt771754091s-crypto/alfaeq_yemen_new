@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
 
 class SmartDispatchPage extends StatefulWidget {
   const SmartDispatchPage({super.key});
@@ -38,7 +39,7 @@ class _SmartDispatchPageState extends State<SmartDispatchPage> {
     QueryDocumentSnapshot<Map<String, dynamic>> order,
     QueryDocumentSnapshot<Map<String, dynamic>> driver,
   ) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = SupabaseService.client.auth.currentUser;
     if (user == null || !await _staff()) return;
     setState(() => _busy = true);
     try {
