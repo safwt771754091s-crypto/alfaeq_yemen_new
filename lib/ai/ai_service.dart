@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../services/unsloth_ai_service.dart';
 import 'ai_permission_gateway.dart';
 import 'ai_tools.dart';
+import 'alfaeq_prompt_library.dart';
 
 /// Production AI orchestration for Alfaeq Yemen.
 ///
@@ -25,13 +26,15 @@ class AlfaeqAiService {
   })  : _tools = tools ?? AlfaeqAiToolRegistry(),
         _permissions = permissions ?? AlfaeqAiPermissionGateway(),
         _ai = ai ?? UnslothAiService() {
+    _resetSystemMessage();
+  }
+
+  void _resetSystemMessage() {
     _messages.add({
       'role': 'system',
       'content': '''
-أنت الوكيل الذكي الرسمي لمنصة الفائق يمن.
-تحدث بالعربية افتراضياً، وادعم اللغات الأخرى عند الطلب.
+${AlfaeqPromptLibrary.baseSystem}
 استخدم الأدوات للحصول على بيانات حقيقية ولا تخمّن بيانات تشغيلية.
-لا تدّعي تنفيذ عملية لم تنفذ فعلياً.
 لا تطلب أو تكشف كلمات المرور أو مفاتيح API أو الرموز السرية أو بيانات الدفع الحساسة.
 كل أداة تمر عبر بوابة الصلاحيات، والعمليات القابلة للتغيير تحتاج تأكيد المستخدم.
 بيانات المنتجات والسلة والطلبات الحالية تأتي من طبقة البيانات الحقيقية في المنصة.
@@ -290,15 +293,10 @@ create_order_draft ينشئ طلباً معلّقاً فقط ولا ينفذ أ�
   }
 
   void resetConversation() {
-    _messages
-      ..clear()
-      ..add({
-        'role': 'system',
-        'content': 'أنت الوكيل الذكي الرسمي لمنصة الفائق يمن. استخدم الأدوات عند الحاجة، ولا تخمّن بيانات المنصة، ولا تدّعي تنفيذ عملية لم تنفذ فعلياً.',
-      });
+    _messages.clear();
+    _resetSystemMessage();
     _pendingAction = null;
-  }
-}
+  }}
 
 class _PendingAiAction {
   final String name;
