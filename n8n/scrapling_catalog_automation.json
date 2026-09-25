@@ -1,0 +1,76 @@
+{
+  "name": "Alfaeq Yemen — Scrapling Catalog",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "alfaeq-scrapling",
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "id": "scrapling-webhook",
+      "name": "Scrapling Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-520, 0],
+      "webhookId": "alfaeq-scrapling"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first()?.json ?? {};\\nconst body = input.body && typeof input.body === 'object' ? input.body : input;\\nconst headers = Object.fromEntries(Object.entries(input.headers ?? {}).map(([k,v]) => [String(k).toLowerCase(), String(v ?? '')]));\\nconst expected = (typeof $vars !== 'undefined' && $vars) ? ($vars.ALFAEQ_N8N_SHARED_SECRET || '') : '';\\nconst supplied = headers['x-alfaeq-automation-secret'] || '';\\nif (!expected || supplied !== expected) throw new Error('Invalid Alfaeq automation secret');\\nif (!body.url || !body.store_id) throw new Error('url and store_id are required');\\nreturn [{json:{url:String(body.url),store_id:String(body.store_id),section_id:body.section_id ? String(body.section_id) : null,publish:body.publish === true,max_products:Math.min(250,Math.max(1,Number(body.max_products ?? 50)))}}];"
+      },
+      "id": "validate",
+      "name": "Validate Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-300, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.ALFAEQ_SCRAPLING_WORKER_URL}}/scrape",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name":"Content-Type","value":"application/json"},
+            {"name":"x-alfaeq-scrapling-secret","value":"={{$vars.ALFAEQ_SCRAPLING_WORKER_SECRET}}"}
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {"name":"url","value":"={{$json.url}}"},
+            {"name":"store_id","value":"={{$json.store_id}}"},
+            {"name":"section_id","value":"={{$json.section_id}}"},
+            {"name":"publish","value":"={{$json.publish}}"},
+            {"name":"max_products","value":"={{$json.max_products}}"}
+          ]
+        }
+      },
+      "id": "scrape",
+      "name": "Scrapling Worker",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-60, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "response",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [180, 0]
+    }
+  ],
+  "connections": {
+    "Scrapling Request": {"main":[[{"node":"Validate Request","type":"main","index":0}]]},
+    "Validate Request": {"main":[[{"node":"Scrapling Worker","type":"main","index":0}]]},
+    "Scrapling Worker": {"main":[[{"node":"Respond","type":"main","index":0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder":"v1"},
+  "versionId": "alfaeq-scrapling-v1"
+}
