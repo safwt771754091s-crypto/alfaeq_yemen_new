@@ -11,11 +11,11 @@ import '../services/firestore_service.dart';
 class AlfaeqAiToolRegistry {
   static const int _maxResults = 8;
   final FirebaseFirestore _db;
-  final FirebaseAuth _auth;
+  final SupabaseClient _client;
 
-  AlfaeqAiToolRegistry({FirebaseFirestore? db, FirebaseAuth? auth})
+  AlfaeqAiToolRegistry({FirebaseFirestore? db, SupabaseClient? client})
       : _db = db ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance;
+        _client = client ?? SupabaseService.client;
 
   List<FunctionDeclaration> get declarations => [
         FunctionDeclaration(
@@ -163,12 +163,12 @@ class AlfaeqAiToolRegistry {
   }
 
   Future<Map<String, Object?>> _getMyOrders(Map<String, Object?> args) async {
-    final user = _auth.currentUser;
+    final user = _client.auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
     final requestedStatus = (args['status'] ?? 'all').toString();
     final orders = <Map<String, Object?>>[];
     if (SupabaseService.isInitialized) {
-      final rows = await SupabaseService.client.from('orders').select().eq('customer_id', user.uid).order('created_at', ascending: false).limit(20);
+      final rows = await SupabaseService.client.from('orders').select().eq('customer_id', user.id).order('created_at', ascending: false).limit(20);
       for (final raw in rows) {
         final data = Map<String, dynamic>.from(raw);
         final status = (data['status'] ?? '').toString();
@@ -178,7 +178,7 @@ class AlfaeqAiToolRegistry {
       }
       return {'ok': true, 'orders': orders, 'resultCount': orders.length};
     }
-    final snap = await _db.collection('orders').where('customerId', isEqualTo: user.uid).limit(20).get();
+    final snap = await _db.collection('orders').where('customerId', isEqualTo: user.id).limit(20).get();
     for (final doc in snap.docs) {
       final data = doc.data();
       final status = (data['status'] ?? '').toString();
@@ -190,12 +190,12 @@ class AlfaeqAiToolRegistry {
   }
 
   Future<Map<String, Object?>> _getMyOrder(Map<String, Object?> args) async {
-    final user = _auth.currentUser;
+    final user = _client.auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
     final orderId = (args['orderId'] ?? '').toString().trim();
     if (orderId.isEmpty || orderId.length > 128) return {'ok': false, 'error': 'رقم الطلب غير صالح.'};
     if (SupabaseService.isInitialized) {
-      final rows = await SupabaseService.client.from('orders').select().eq('id', orderId).eq('customer_id', user.uid).limit(1);
+      final rows = await SupabaseService.client.from('orders').select().eq('id', orderId).eq('customer_id', user.id).limit(1);
       if (rows.isEmpty) return {'ok': false, 'error': 'الطلب غير موجود.'};
       final data = Map<String, dynamic>.from(rows.first);
       return {'ok': true, 'order': {'id': data['id'], 'status': data['status'], 'deliveryStatus': data['delivery_status'], 'itemCount': data['items'] is List ? (data['items'] as List).length : null, 'total': data['total'], 'currency': data['currency'] ?? 'YER', 'paymentMethod': data['payment_method'], 'createdAt': _safeDate(data['created_at']), 'updatedAt': _safeDate(data['updated_at'])}};
@@ -203,20 +203,20 @@ class AlfaeqAiToolRegistry {
     final doc = await _db.collection('orders').doc(orderId).get();
     if (!doc.exists) return {'ok': false, 'error': 'الطلب غير موجود.'};
     final data = doc.data()!;
-    if (data['customerId'] != user.uid) return {'ok': false, 'error': 'لا تملك صلاحية الوصول إلى هذا الطلب.'};
+    if (data['customerId'] != user.id) return {'ok': false, 'error': 'لا تملك صلاحية الوصول إلى هذا الطلب.'};
     return {'ok': true, 'order': {'id': doc.id, 'status': data['status'], 'deliveryStatus': data['deliveryStatus'], 'itemCount': data['items'] is List ? (data['items'] as List).length : null, 'total': data['total'], 'currency': data['currency'] ?? 'YER', 'paymentMethod': data['paymentMethod'], 'createdAt': _safeDate(data['createdAt']), 'updatedAt': _safeDate(data['updatedAt'])}};
   }
 
   Future<Map<String, Object?>> _getMyAccountSummary() async {
-    final user=_auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
-    if(SupabaseService.isInitialized){final rows=await SupabaseService.client.from('users').select().eq('uid',user.uid).limit(1);final d=rows.isNotEmpty?Map<String,dynamic>.from(rows.first):<String,dynamic>{};return {'ok':true,'uid':user.uid,'email':user.email,'displayName':d['name']??user.displayName,'role':d['role']??'customer','phoneVerified':user.phoneNumber!=null,'emailVerified':user.emailVerified};}
-    final snap=await _db.collection('users').doc(user.uid).get();final d=snap.data()??<String,dynamic>{};return {'ok':true,'uid':user.uid,'email':user.email,'displayName':d['name']??d['displayName']??user.displayName,'role':d['role'],'phoneVerified':user.phoneNumber!=null,'emailVerified':user.emailVerified};
+    final user=_client.auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
+    if(SupabaseService.isInitialized){final rows=await SupabaseService.client.from('users').select().eq('uid',user.id).limit(1);final d=rows.isNotEmpty?Map<String,dynamic>.from(rows.first):<String,dynamic>{};return {'ok':true,'uid':user.id,'email':user.email,'displayName':d['name']??(user.userMetadata?['full_name'] ?? user.userMetadata?['name']),'role':d['role']??'customer','phoneVerified':user.phoneNumber!=null,'emailVerified':user.emailConfirmedAt != null};}
+    final snap=await _db.collection('users').doc(user.id).get();final d=snap.data()??<String,dynamic>{};return {'ok':true,'uid':user.id,'email':user.email,'displayName':d['name']??d['displayName']??(user.userMetadata?['full_name'] ?? user.userMetadata?['name']),'role':d['role'],'phoneVerified':user.phoneNumber!=null,'emailVerified':user.emailConfirmedAt != null};
   }
 
   Future<Map<String, Object?>> _getSecuritySummary({required Future<void> Function({required String action, required String result, Map<String, dynamic>? details}) audit}) async {
-    final user = _auth.currentUser;
+    final user = _client.auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
-    final userSnap = await _db.collection('users').doc(user.uid).get();
+    final userSnap = await _db.collection('users').doc(user.id).get();
     final role = (userSnap.data()?['role'] ?? '').toString().toLowerCase();
     const allowedRoles = {'owner', 'admin', 'developer'};
     if (!allowedRoles.contains(role)) {
@@ -231,9 +231,9 @@ class AlfaeqAiToolRegistry {
   }
 
   Future<Map<String, Object?>> _getMyCart() async {
-    final user=_auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
-    if(SupabaseService.isInitialized){final rows=await SupabaseService.client.from('carts').select().eq('uid',user.uid).limit(1);if(rows.isNotEmpty){final d=Map<String,dynamic>.from(rows.first);final items=_normalizeCartItems(d['items']);if(items.isNotEmpty)return {'ok':true,'items':items,'itemCount':items.length,'total':_cartTotal(items),'currency':d['metadata'] is Map?((d['metadata'] as Map)['currency']??'YER'):'YER'};}}
-    final snap=await _db.collection('carts').doc(user.uid).get();if(!snap.exists)return {'ok':true,'items':<Map<String,Object?>>[],'itemCount':0,'total':0,'currency':'YER'};final d=snap.data()??<String,dynamic>{};final items=_normalizeCartItems(d['items']);return {'ok':true,'items':items,'itemCount':items.length,'total':_cartTotal(items),'currency':d['currency']??'YER'};
+    final user=_client.auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
+    if(SupabaseService.isInitialized){final rows=await SupabaseService.client.from('carts').select().eq('uid',user.id).limit(1);if(rows.isNotEmpty){final d=Map<String,dynamic>.from(rows.first);final items=_normalizeCartItems(d['items']);if(items.isNotEmpty)return {'ok':true,'items':items,'itemCount':items.length,'total':_cartTotal(items),'currency':d['metadata'] is Map?((d['metadata'] as Map)['currency']??'YER'):'YER'};}}
+    final snap=await _db.collection('carts').doc(user.id).get();if(!snap.exists)return {'ok':true,'items':<Map<String,Object?>>[],'itemCount':0,'total':0,'currency':'YER'};final d=snap.data()??<String,dynamic>{};final items=_normalizeCartItems(d['items']);return {'ok':true,'items':items,'itemCount':items.length,'total':_cartTotal(items),'currency':d['currency']??'YER'};
   }
 
   Future<void> _saveSupabaseCart(String uid,List<Map<String,Object?>> items,{String currency='YER'}) async {
@@ -243,7 +243,7 @@ class AlfaeqAiToolRegistry {
   Future<Map<String, Object?>> _addToCart(Map<String, Object?> args, {required bool userConfirmed}) async {
     if(SupabaseService.isInitialized){
       if(!userConfirmed)return {'ok':false,'error':'ينتظر تأكيد المستخدم.','permission':'confirmation_required'};
-      final user=_auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
+      final user=_client.auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
       final productId=(args['productId']??'').toString().trim();final quantity=(args['quantity'] as num?)?.toInt()??0;
       if(productId.isEmpty||quantity<1||quantity>100)return {'ok':false,'error':'بيانات السلة غير صالحة.'};
       final rows=await SupabaseService.client.from('products').select().eq('id',productId).eq('status','active').limit(1);
@@ -254,11 +254,11 @@ class AlfaeqAiToolRegistry {
       if(next>100||next>stock)return {'ok':false,'error':'الكمية المطلوبة تتجاوز المخزون أو الحد المسموح.'};
       final item={'productId':productId,'name':p['name']??'منتج','quantity':next,'price':p['price'],'currency':p['currency']??'YER','storeId':p['store_id']};
       if(i<0)items.add(Map<String,Object?>.from(item));else items[i]=Map<String,Object?>.from(item);
-      await _saveSupabaseCart(user.uid,items,currency:(p['currency']??'YER').toString());
+      await _saveSupabaseCart(user.id,items,currency:(p['currency']??'YER').toString());
       return {'ok':true,'action':'added','productId':productId,'quantity':next,'total':_cartTotal(items)};
     }
     if (!userConfirmed) return {'ok': false, 'error': 'ينتظر تأكيد المستخدم.', 'permission': 'confirmation_required'};
-    final user = _auth.currentUser;
+    final user = _client.auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
     final productId = (args['productId'] ?? '').toString().trim();
     final quantity = (args['quantity'] as num?)?.toInt() ?? 0;
@@ -276,7 +276,7 @@ class AlfaeqAiToolRegistry {
     if (name.isEmpty || name.length > 160) return {'ok': false, 'error': 'اسم المنتج غير صالح.'};
     final storeId = (product['storeId'] ?? product['storeID'] ?? product['ownerId'] ?? '').toString();
 
-    final ref = _db.collection('carts').doc(user.uid);
+    final ref = _db.collection('carts').doc(user.id);
     final current = await ref.get();
     final data = current.data() ?? <String, dynamic>{};
     final items = _normalizeCartItems(data['items']);
@@ -290,55 +290,55 @@ class AlfaeqAiToolRegistry {
     } else {
       items[index] = item;
     }
-    await ref.set({'ownerId': user.uid, 'items': items, 'currency': product['currency'] ?? 'YER', 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+    await ref.set({'ownerId': user.id, 'items': items, 'currency': product['currency'] ?? 'YER', 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
     return {'ok': true, 'action': 'added', 'productId': productId, 'quantity': newQuantity, 'total': _cartTotal(items)};
   }
 
   Future<Map<String, Object?>> _updateCartItem(Map<String, Object?> args, {required bool userConfirmed}) async {
     if(SupabaseService.isInitialized){
       if(!userConfirmed)return {'ok':false,'error':'ينتظر تأكيد المستخدم.','permission':'confirmation_required'};
-      final user=_auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
+      final user=_client.auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
       final id=(args['productId']??'').toString();final qty=(args['quantity'] as num?)?.toInt()??0;
       if(id.isEmpty||qty<1||qty>100)return {'ok':false,'error':'بيانات السلة غير صالحة.'};
       final cart=await _getMyCart();final items=List<Map<String,Object?>>.from((cart['items'] as List? ?? const []).map((e)=>Map<String,Object?>.from(e as Map)));final i=items.indexWhere((e)=>e['productId']==id);
       if(i<0)return {'ok':false,'error':'المنتج غير موجود في السلة.'};
-      items[i]['quantity']=qty;await _saveSupabaseCart(user.uid,items,currency:(cart['currency']??'YER').toString());return {'ok':true,'action':'updated','productId':id,'quantity':qty,'total':_cartTotal(items)};
+      items[i]['quantity']=qty;await _saveSupabaseCart(user.id,items,currency:(cart['currency']??'YER').toString());return {'ok':true,'action':'updated','productId':id,'quantity':qty,'total':_cartTotal(items)};
     }
     if (!userConfirmed) return {'ok': false, 'error': 'ينتظر تأكيد المستخدم.', 'permission': 'confirmation_required'};
-    final user = _auth.currentUser;
+    final user = _client.auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
     final productId = (args['productId'] ?? '').toString().trim();
     final quantity = (args['quantity'] as num?)?.toInt() ?? 0;
     if (productId.isEmpty || quantity < 1 || quantity > 100) return {'ok': false, 'error': 'بيانات السلة غير صالحة.'};
-    final ref = _db.collection('carts').doc(user.uid);
+    final ref = _db.collection('carts').doc(user.id);
     final snap = await ref.get();
     final items = _normalizeCartItems(snap.data()?['items']);
     final index = items.indexWhere((item) => item['productId'] == productId);
     if (index == -1) return {'ok': false, 'error': 'المنتج غير موجود في السلة.'};
     items[index]['quantity'] = quantity;
-    await ref.set({'ownerId': user.uid, 'items': items, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+    await ref.set({'ownerId': user.id, 'items': items, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
     return {'ok': true, 'action': 'updated', 'productId': productId, 'quantity': quantity, 'total': _cartTotal(items)};
   }
 
   Future<Map<String, Object?>> _removeFromCart(Map<String, Object?> args, {required bool userConfirmed}) async {
     if(SupabaseService.isInitialized){
       if(!userConfirmed)return {'ok':false,'error':'ينتظر تأكيد المستخدم.','permission':'confirmation_required'};
-      final user=_auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};final id=(args['productId']??'').toString();
+      final user=_client.auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};final id=(args['productId']??'').toString();
       final cart=await _getMyCart();final items=List<Map<String,Object?>>.from((cart['items'] as List? ?? const []).map((e)=>Map<String,Object?>.from(e as Map)));final before=items.length;items.removeWhere((e)=>e['productId']==id);
-      if(before==items.length)return {'ok':false,'error':'المنتج غير موجود في السلة.'};await _saveSupabaseCart(user.uid,items,currency:(cart['currency']??'YER').toString());return {'ok':true,'action':'removed','productId':id,'itemCount':items.length,'total':_cartTotal(items)};
+      if(before==items.length)return {'ok':false,'error':'المنتج غير موجود في السلة.'};await _saveSupabaseCart(user.id,items,currency:(cart['currency']??'YER').toString());return {'ok':true,'action':'removed','productId':id,'itemCount':items.length,'total':_cartTotal(items)};
     }
     if (!userConfirmed) return {'ok': false, 'error': 'ينتظر تأكيد المستخدم.', 'permission': 'confirmation_required'};
-    final user = _auth.currentUser;
+    final user = _client.auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
     final productId = (args['productId'] ?? '').toString().trim();
     if (productId.isEmpty) return {'ok': false, 'error': 'رقم المنتج غير صالح.'};
-    final ref = _db.collection('carts').doc(user.uid);
+    final ref = _db.collection('carts').doc(user.id);
     final snap = await ref.get();
     final items = _normalizeCartItems(snap.data()?['items']);
     final before = items.length;
     items.removeWhere((item) => item['productId'] == productId);
     if (items.length == before) return {'ok': false, 'error': 'المنتج غير موجود في السلة.'};
-    await ref.set({'ownerId': user.uid, 'items': items, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+    await ref.set({'ownerId': user.id, 'items': items, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
     return {'ok': true, 'action': 'removed', 'productId': productId, 'itemCount': items.length, 'total': _cartTotal(items)};
   }
 
@@ -369,16 +369,16 @@ class AlfaeqAiToolRegistry {
 
   Future<Map<String, Object?>> _createOrderDraft(Map<String, Object?> args, {required bool userConfirmed}) async {
     if(SupabaseService.isInitialized){
-      final user=_auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
+      final user=_client.auth.currentUser;if(user==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
       if(!userConfirmed)return {'ok':false,'error':'ينتظر تأكيد المستخدم.','permission':'confirmation_required'};
       final raw=args['items'];final address=(args['address']??'').toString().trim();final payment=(args['paymentMethod']??'').toString();
       if(raw is! List||raw.isEmpty||raw.length>20||address.isEmpty)return {'ok':false,'error':'بيانات الطلب غير مكتملة.'};
       final items=raw.whereType<Map>().map((x)=>Map<String,dynamic>.from(x)).toList();
-      final orderId=await FirestoreService(preferSupabase:true).createOrder(customerId:user.uid,items:items,address:address,paymentMethod:payment);
-      await FirestoreService(preferSupabase:true).clearCart(user.uid);
+      final orderId=await FirestoreService(preferSupabase:true).createOrder(customerId:user.id,items:items,address:address,paymentMethod:payment);
+      await FirestoreService(preferSupabase:true).clearCart(user.id);
       return {'ok':true,'message':'تم إنشاء الطلب بنجاح.','orderId':orderId,'status':'pending'};
     }
-    final user = _auth.currentUser;
+    final user = _client.auth.currentUser;
     if (user == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
     if (!userConfirmed) return {'ok': false, 'error': 'ينتظر تأكيد المستخدم.', 'permission': 'confirmation_required'};
     final rawItems = args['items'];
@@ -412,10 +412,10 @@ class AlfaeqAiToolRegistry {
     if (SupabaseService.isInitialized) {
       final rpcItems = items.map((item) => {'product_id': item['productId'], 'quantity': item['quantity']}).toList();
       final orderId = await SupabaseService.client.rpc('create_order', params: {'p_items': rpcItems, 'p_address': address, 'p_payment_method': paymentMethod});
-      await FirestoreService(preferSupabase: true).clearCart(user.uid);
+      await FirestoreService(preferSupabase: true).clearCart(user.id);
       return {'ok': true, 'orderId': orderId.toString(), 'status': 'pending', 'total': total, 'currency': 'YER', 'paymentProcessed': false, 'message': 'تم إنشاء الطلب المعلّق بعد التحقق من المخزون والسعر من الخادم. لم تتم أي عملية دفع.'};
     }
-    final ref = await _db.collection('orders').add({'customerId': user.uid, 'items': items, 'total': total, 'currency': 'YER', 'address': address, 'paymentMethod': paymentMethod, 'status': 'pending', 'deliveryStatus': 'awaiting_assignment', 'source': 'ai_confirmed', 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp()});
+    final ref = await _db.collection('orders').add({'customerId': user.id, 'items': items, 'total': total, 'currency': 'YER', 'address': address, 'paymentMethod': paymentMethod, 'status': 'pending', 'deliveryStatus': 'awaiting_assignment', 'source': 'ai_confirmed', 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp()});
     return {'ok': true, 'orderId': ref.id, 'status': 'pending', 'total': total, 'currency': 'YER', 'paymentProcessed': false, 'message': 'تم إنشاء الطلب المعلّق بعد تأكيدك. لم تتم أي عملية دفع.'};
   }
 
