@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
@@ -13,7 +12,7 @@ class DeveloperPage extends StatefulWidget {
 class _DeveloperPageState extends State<DeveloperPage> {
   final _auth = AuthService();
   bool _allowed = false, _loading = true, _scanning = false;
-  String _role = '', _appCheckStatus = 'غير مفحوص';
+  String _role = '';
   Map<String, dynamic> _profile = {};
   Map<String, int> _counts = {};
   List<String> _findings = [];
@@ -55,16 +54,8 @@ class _DeveloperPageState extends State<DeveloperPage> {
       final role = await _auth.role();
       final allowed = await _auth.canOpenDeveloperCenter();
       if (mounted) setState(() { _role = role; _profile = data; _allowed = allowed; _loading = false; });
-      if (allowed) { await _checkAppIntegrity(); await _writeAudit(action: 'developer_center_access', result: 'success'); }
+      if (allowed) { await _writeAudit(action: 'developer_center_access', result: 'success'); }
     } catch (_) { if (mounted) setState(() => _loading = false); }
-  }
-
-  Future<void> _checkAppIntegrity() async {
-    try {
-      final token = await FirebaseAppCheck.instance.getToken();
-      if (!mounted) return;
-      setState(() => _appCheckStatus = token == null ? 'غير نشط — يلزم إعداد مزود App Check' : 'نشط ومصادق عليه');
-    } catch (_) { if (mounted) setState(() => _appCheckStatus = 'تعذر التحقق من App Check'); }
   }
 
   Future<void> _runSecurityScan() async {
