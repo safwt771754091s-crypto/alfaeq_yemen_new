@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/supabase_service.dart';
@@ -10,7 +10,7 @@ class DeliveryTracking extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final currentUid = SupabaseService.client.auth.currentUser?.uid;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
