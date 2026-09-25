@@ -416,13 +416,13 @@ class _StoreCatalogCard extends StatelessWidget {
   const _StoreCatalogCard({required this.store});
 
   Future<void> _addToCart(BuildContext context, CatalogDocument product) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = SupabaseService.client.auth.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول أولاً.')));
       return;
     }
     try {
-      await const CatalogService().addToCart(user.uid, product);
+      await const CatalogService().addToCart(user.id, product);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
