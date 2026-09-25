@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $json.body || $json;\nconst headers = $json.headers || {};\nconst secret = headers['x-alfaeq-automation-secret'] || headers['X-Alfaeq-Automation-Secret'] || '';\nif (secret !== $vars.ALFAEQ_N8N_SHARED_SECRET) throw new Error('Invalid Alfaeq automation secret');\nconst required = ['eventId','eventType','occurredAt'];\nfor (const key of required) if (!body[key]) throw new Error('Missing event field: ' + key);\nreturn [{json:{source: body.source || 'alfaeq_yemen_new', version: body.version || 1, eventId: body.eventId, eventType: body.eventType, occurredAt: body.occurredAt, data: body.data ?? body.payload ?? {}}}];"
+        "jsCode": "const input = $json ?? {};\nconst body = input.body && typeof input.body === 'object' ? input.body : input;\nconst rawHeaders = input.headers && typeof input.headers === 'object' ? input.headers : {};\nconst headers = Object.fromEntries(Object.entries(rawHeaders).map(([k,v]) => [String(k).toLowerCase(), String(v ?? '')]));\nconst secret = headers['x-alfaeq-automation-secret'] || '';\nconst expected = (typeof $vars !== 'undefined' && $vars) ? ($vars.ALFAEQ_N8N_SHARED_SECRET || '') : '';\nif (!expected) throw new Error('ALFAEQ_N8N_SHARED_SECRET variable is missing');\nif (!secret || secret !== expected) throw new Error('Invalid Alfaeq automation secret');\nfor (const key of ['eventId','eventType','occurredAt']) {\n  if (!body[key]) throw new Error('Missing event field: ' + key);\n}\nreturn [{json:{\n  source: body.source || 'alfaeq_yemen_new',\n  version: body.version || 1,\n  eventId: String(body.eventId),\n  eventType: String(body.eventType),\n  occurredAt: body.occurredAt,\n  data: body.data ?? body.payload ?? {}\n}}];"
       },
       "id": "normalize",
       "name": "Validate & Normalize",
@@ -641,7 +641,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "alfaeq-n8n-v3",
+  "versionId": "alfaeq-n8n-v4",
   "meta": {
     "templateCredsSetupCompleted": false
   }
