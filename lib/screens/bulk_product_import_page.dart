@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
+import '../services/supabase_service.dart';
 
 class BulkProductImportPage extends StatefulWidget {
   const BulkProductImportPage({super.key});
