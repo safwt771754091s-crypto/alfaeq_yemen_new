@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../services/unsloth_ai_service.dart';
 import 'ai_permission_gateway.dart';
 import 'ai_tools.dart';
