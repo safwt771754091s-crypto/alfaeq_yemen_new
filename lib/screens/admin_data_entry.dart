@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../core/app_sections.dart';
 import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
 import 'bulk_product_import_page.dart';
 import 'location_picker_page.dart';
 import '../core/product_units.dart';
