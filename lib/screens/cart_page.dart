@@ -19,7 +19,7 @@ class _CartPageState extends State<CartPage> {
   String? _error;
   List<Map<String, dynamic>> _items = [];
   String _currency = 'YER';
-  String get _uid => SupabaseService.client.auth.currentUser?.uid ?? '';
+  String get _uid => SupabaseService.client.auth.currentUser?.id ?? '';
 
   @override
   void initState() { super.initState(); _loadCart(); }
