@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 
@@ -18,7 +18,7 @@ class _MerchantOrdersPageState extends State<MerchantOrdersPage>{
     return List<Map<String,dynamic>>.from(rows);
   }
   Future<void> _setStatus(Map<String,dynamic> o,String status) async {
-    if(FirebaseAuth.instance.currentUser==null||!await _allowed())return;
+    if(SupabaseService.client.auth.currentUser==null||!await _allowed())return;
     setState(()=>_busy=true);
     try{
       await SupabaseService.client.rpc('transition_order',params:{'p_order_id':'${o['id']}','p_status':status,'p_delivery_status':status=='ready_for_pickup'?'awaiting_assignment':null});
@@ -29,7 +29,7 @@ class _MerchantOrdersPageState extends State<MerchantOrdersPage>{
     future:_allowed(),builder:(context,a){
       if(a.connectionState==ConnectionState.waiting)return const Scaffold(body:Center(child:CircularProgressIndicator()));
       if(a.data!=true)return const Scaffold(body:Center(child:Text('مركز الطلبات مخصص للحسابات التجارية المعتمدة.')));
-      final u=FirebaseAuth.instance.currentUser;if(u==null)return const Scaffold(body:Center(child:Text('يجب تسجيل الدخول.')));
+      final u=SupabaseService.client.auth.currentUser;if(u==null)return const Scaffold(body:Center(child:Text('يجب تسجيل الدخول.')));
       return Scaffold(appBar:AppBar(title:const Text('طلبات التاجر')),body:FutureBuilder<List<Map<String,dynamic>>>(
         future:_orders(u.uid),builder:(context,s){
           if(s.hasError)return Center(child:Text('تعذر تحميل الطلبات.\n${s.error}'));
