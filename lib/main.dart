@@ -1,8 +1,10 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/app_sections.dart';
+import 'firebase_options.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/ai_assistant_page.dart';
 import 'screens/auth_gate.dart';
@@ -38,7 +40,12 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
   }
 
   Future<void> _initializeServices() async {
-    // Supabase is the application authentication and data backend.
+    // Supabase owns authentication and application data. Firebase is kept
+    // initialized only for the remaining legacy Firestore/Cloud Functions
+    // paths until those services are migrated; no new features use Firebase.
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     await SupabaseService.initialize();
 
     // One-time migration reset: the current release changed the auth/data
