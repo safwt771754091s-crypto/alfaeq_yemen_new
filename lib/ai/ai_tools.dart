@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_ai/firebase_ai.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../services/firestore_service.dart';
@@ -16,103 +15,6 @@ class AlfaeqAiToolRegistry {
   AlfaeqAiToolRegistry({FirebaseFirestore? db, SupabaseClient? client})
       : _db = db ?? FirebaseFirestore.instance,
         _client = client ?? SupabaseService.client;
-
-  List<FunctionDeclaration> get declarations => [
-        FunctionDeclaration(
-          'search_catalog',
-          'Search Alfaeq Yemen products and stores. Read-only; never return passwords, payment secrets, private addresses, or credentials.',
-          parameters: {
-            'query': Schema.string(description: 'Arabic or English search phrase.'),
-            'type': Schema.enumString(
-              enumValues: ['products', 'stores', 'both'],
-              description: 'Search target.',
-            ),
-          },
-          optionalParameters: const ['type'],
-        ),
-        FunctionDeclaration(
-          'get_my_orders',
-          'Read the signed-in user own orders only. Never access another user order.',
-          parameters: {
-            'status': Schema.enumString(
-              enumValues: ['all', 'pending', 'confirmed', 'preparing', 'shipped', 'delivered', 'cancelled'],
-              description: 'Optional order status.',
-            ),
-          },
-          optionalParameters: const ['status'],
-        ),
-        FunctionDeclaration(
-          'get_my_order',
-          'Read one signed-in user order by ID. Access is still enforced by Firestore rules; never access another user order.',
-          parameters: {
-            'orderId': Schema.string(description: 'Order document ID.'),
-          },
-        ),
-        FunctionDeclaration(
-          'get_my_account_summary',
-          'Read a safe summary of the signed-in account. Never return authentication secrets.',
-          parameters: {},
-        ),
-        FunctionDeclaration(
-          'get_security_summary',
-          'For owner/admin/developer only: return non-sensitive security aggregates. Read-only.',
-          parameters: {},
-        ),
-        FunctionDeclaration(
-          'get_my_cart',
-          'Read the signed-in user shopping cart and calculate its current snapshot total. Read-only.',
-          parameters: {},
-        ),
-        FunctionDeclaration(
-          'add_to_cart',
-          'Add an active catalog product to the signed-in user cart. The product name, store and price are read from Firestore, not trusted from AI input.',
-          parameters: {
-            'productId': Schema.string(description: 'Active product document ID.'),
-            'quantity': Schema.integer(description: 'Quantity to add, from 1 to 100.', minimum: 1, maximum: 100),
-          },
-        ),
-        FunctionDeclaration(
-          'update_cart_item',
-          'Set a cart item quantity for the signed-in user. Use quantity 1-100; use remove_from_cart to delete it.',
-          parameters: {
-            'productId': Schema.string(description: 'Product document ID already in the cart.'),
-            'quantity': Schema.integer(description: 'New quantity from 1 to 100.', minimum: 1, maximum: 100),
-          },
-        ),
-        FunctionDeclaration(
-          'remove_from_cart',
-          'Remove one product from the signed-in user cart.',
-          parameters: {
-            'productId': Schema.string(description: 'Product document ID in the cart.'),
-          },
-        ),
-        FunctionDeclaration(
-          'create_order_draft',
-          'Create a pending order after the user explicitly confirms. Never process payment. Use only the signed-in user as customerId.',
-          parameters: {
-            'items': Schema.array(
-              description: 'Order items. Each item contains productId, name, quantity, and optional price/storeId.',
-              minItems: 1,
-              maxItems: 20,
-              items: Schema.object(
-                properties: {
-                  'productId': Schema.string(description: 'Product document ID.'),
-                  'name': Schema.string(description: 'Product name.'),
-                  'quantity': Schema.integer(description: 'Quantity from 1 to 100.', minimum: 1, maximum: 100),
-                  'price': Schema.number(description: 'Optional product price snapshot.'),
-                  'storeId': Schema.string(description: 'Optional store document ID.'),
-                },
-                optionalProperties: const ['price', 'storeId'],
-              ),
-            ),
-            'address': Schema.string(description: 'Delivery address supplied by the signed-in user.'),
-            'paymentMethod': Schema.enumString(
-              enumValues: ['cash_on_delivery', 'al_kuraimi', 'cash_wallet', 'jeeb_wallet'],
-              description: 'Selected payment method. Selecting it does not charge the user.',
-            ),
-          },
-        ),
-      ];
 
   Future<Map<String, Object?>> execute(
     String name,
