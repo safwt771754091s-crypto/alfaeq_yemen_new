@@ -1,6 +1,8 @@
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
 import 'admin_user_management_page.dart';
 
 /// مركز تشغيل المنصة.
@@ -15,7 +17,7 @@ class PlatformControlPage extends StatefulWidget {
 }
 
 class _PlatformControlPageState extends State<PlatformControlPage> {
-  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+  final AuthService _auth = AuthService();
   bool _checkingOwner = true;
   bool _isOwner = false;
 
@@ -32,11 +34,10 @@ class _PlatformControlPageState extends State<PlatformControlPage> {
 
   Future<void> _checkOwner() async {
     try {
-      final result = await _functions.httpsCallable('listManagedUsers').call();
+      await SupabaseService.client.functions.invoke('admin-users', body: const {'action': 'list'});
       // listManagedUsers is owner/admin gated; the backend remains the source of truth.
-      final data = Map<String, dynamic>.from(result.data as Map);
-      final current = data['currentUser'] is Map ? Map<String, dynamic>.from(data['currentUser'] as Map) : <String, dynamic>{};
-      final role = current['role'];
+      final data = <String, dynamic>{};
+      final role = await _auth.role();
       if (!mounted) return;
       setState(() {
         _isOwner = role == 'owner';
@@ -52,8 +53,9 @@ class _PlatformControlPageState extends State<PlatformControlPage> {
   }
 
   Future<List<Map<String, dynamic>>> _loadUsers() async {
-    final result = await _functions.httpsCallable('listManagedUsers').call();
-    final data = Map<String, dynamic>.from(result.data as Map);
+    final response = await SupabaseService.client.functions.invoke('admin-users', body: const {'action': 'list'});
+    final data = response.data is Map ? Map<String, dynamic>.from(response.data as Map) : <String, dynamic>{};
+    if (data['error'] != null) throw StateError(data['error'].toString());
     final raw = data['users'] as List? ?? const [];
     return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
@@ -114,7 +116,7 @@ class _PlatformControlPageState extends State<PlatformControlPage> {
                           ),
                           const SizedBox(height: 12),
                           const Text(
-                            'بعد التعيين تُحفظ الصلاحيات الحقيقية على Firebase Custom Claims. يمكنك تحديد الصلاحيات التفصيلية مباشرة من إدارة الحسابات.',
+                            'بعد التعيين تُحفظ الصلاحيات الحقيقية على Supabase. يمكنك تحديد الصلاحيات التفصيلية مباشرة من إدارة الحسابات.',
                             style: TextStyle(fontSize: 12),
                           ),
                         ],
@@ -138,14 +140,15 @@ class _PlatformControlPageState extends State<PlatformControlPage> {
       if (result != true || selectedUser == null) return;
       final uid = selectedUser!['uid']?.toString();
       if (uid == null || uid.isEmpty) return;
-      await _functions.httpsCallable('setManagedUserRole').call({'uid': uid, 'role': selectedRole});
+      final response = await SupabaseService.client.functions.invoke('admin-users', body: {'action': 'set_role', 'uid': uid, 'role': selectedRole});
+      if (response.data is Map && (response.data as Map)['error'] != null) throw StateError((response.data as Map)['error'].toString());
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تم تعيين الحساب كـ ${_roleLabels[selectedRole]} بنجاح.')),
       );
       await _checkOwner();
-    } on FirebaseFunctionsException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? e.code)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تنفيذ العملية: $e')));
     }
