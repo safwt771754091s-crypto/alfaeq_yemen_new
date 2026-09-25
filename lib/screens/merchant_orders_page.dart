@@ -31,7 +31,7 @@ class _MerchantOrdersPageState extends State<MerchantOrdersPage>{
       if(a.data!=true)return const Scaffold(body:Center(child:Text('مركز الطلبات مخصص للحسابات التجارية المعتمدة.')));
       final u=SupabaseService.client.auth.currentUser;if(u==null)return const Scaffold(body:Center(child:Text('يجب تسجيل الدخول.')));
       return Scaffold(appBar:AppBar(title:const Text('طلبات التاجر')),body:FutureBuilder<List<Map<String,dynamic>>>(
-        future:_orders(u.uid),builder:(context,s){
+        future:_orders(u.id),builder:(context,s){
           if(s.hasError)return Center(child:Text('تعذر تحميل الطلبات.\n${s.error}'));
           if(s.connectionState==ConnectionState.waiting)return const Center(child:CircularProgressIndicator());
           final os=s.data??const <Map<String,dynamic>>[];if(os.isEmpty)return const Center(child:Text('لا توجد طلبات مرتبطة بمتجرك حالياً.'));
