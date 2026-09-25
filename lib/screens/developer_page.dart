@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 
@@ -30,7 +30,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
   void dispose() { _auditSearchController.dispose(); super.dispose(); }
 
   Future<void> _writeAudit({required String action, required String result, Map<String, dynamic>? details}) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = SupabaseService.client.auth.currentUser;
     if (user == null) return;
     try {
       await FirebaseFirestore.instance.collection('auditLogs').add({
@@ -47,7 +47,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
   }
 
   Future<void> _load() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = SupabaseService.client.auth.currentUser;
     if (user == null) { if (mounted) setState(() => _loading = false); return; }
     try {
       final snap = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
@@ -91,7 +91,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
       if (usersWithoutRole > 0) findings.add('يوجد $usersWithoutRole مستخدم بلا role واضح في البيانات المفحوصة.');
       if (_appCheckStatus != 'نشط ومصادق عليه') findings.add('App Check غير نشط بالكامل لهذه البيئة؛ لا نعتبر الحماية مكتملة حتى تفعيل المزود في Firebase.');
       if (findings.isEmpty) findings.add('لم يظهر خلل حرج في العينة المفحوصة. الفحص الحالي حدّه 200 سجل لكل مجموعة.');
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = SupabaseService.client.auth.currentUser?.uid;
       if (uid != null) {
         await FirebaseFirestore.instance.collection('securityReports').add({'actorUid': uid, 'role': _role, 'findings': findings, 'counts': counts, 'appCheck': _appCheckStatus, 'createdAt': FieldValue.serverTimestamp(), 'type': 'automated_security_scan'});
         await _writeAudit(action: 'security_scan', result: 'success', details: {'findingsCount': findings.length, 'counts': counts, 'appCheck': _appCheckStatus});
@@ -124,7 +124,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
         const _DevCard(icon: Icons.storage, title: 'فحص البيانات', subtitle: 'يبحث عن ملكيات قديمة، أدوار ناقصة، ومؤشرات غير طبيعية في البيانات الحقيقية ضمن عينة محددة.'),
         const _DevCard(icon: Icons.auto_awesome, title: 'مساعد التطوير والأتمتة', subtitle: 'اختصاصه: الأمن، اكتشاف المخاطر، أتمتة الفحوصات، ومتابعة جودة النظام قبل أي إطلاق.'),
         const SizedBox(height: 14), _sectionTitle('👤 الحساب الحالي'),
-        _DevCard(icon: Icons.person, title: _profile['name']?.toString() ?? 'حساب المستخدم', subtitle: 'UID: ${FirebaseAuth.instance.currentUser?.uid ?? '-'}\nالبريد: ${FirebaseAuth.instance.currentUser?.email ?? '-'}\nالدور: $_role'),
+        _DevCard(icon: Icons.person, title: _profile['name']?.toString() ?? 'حساب المستخدم', subtitle: 'UID: ${SupabaseService.client.auth.currentUser?.uid ?? '-'}\nالبريد: ${SupabaseService.client.auth.currentUser?.email ?? '-'}\nالدور: $_role'),
       ]),
     ));
   }
