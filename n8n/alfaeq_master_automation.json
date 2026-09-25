@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $json.body || $json;\nconst secret = $headers['x-alfaeq-automation-secret'] || '';\nif (secret !== $vars.ALFAEQ_N8N_SHARED_SECRET) throw new Error('Invalid Alfaeq automation secret');\nconst required = ['eventId','eventType','occurredAt'];\nfor (const key of required) if (!body[key]) throw new Error('Missing event field: ' + key);\nreturn [{json:{source: body.source || 'alfaeq_yemen_new', version: body.version || 1, eventId: body.eventId, eventType: body.eventType, occurredAt: body.occurredAt, data: body.data ?? body.payload ?? {}}}];"
+        "jsCode": "const body = $json.body || $json;\nconst headers = $json.headers || {};\nconst secret = headers['x-alfaeq-automation-secret'] || headers['X-Alfaeq-Automation-Secret'] || '';\nif (secret !== $vars.ALFAEQ_N8N_SHARED_SECRET) throw new Error('Invalid Alfaeq automation secret');\nconst required = ['eventId','eventType','occurredAt'];\nfor (const key of required) if (!body[key]) throw new Error('Missing event field: ' + key);\nreturn [{json:{source: body.source || 'alfaeq_yemen_new', version: body.version || 1, eventId: body.eventId, eventType: body.eventType, occurredAt: body.occurredAt, data: body.data ?? body.payload ?? {}}}];"
       },
       "id": "normalize",
       "name": "Validate & Normalize",
