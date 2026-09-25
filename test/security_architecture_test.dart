@@ -47,7 +47,7 @@ void main() {
       expect(merchant, contains("'ownerId': user.id"));
       expect(approval, contains('Future<bool> _isStaff()'));
       expect(approval, contains("where('status', isEqualTo: 'pending')"));
-      expect(approval, contains("'reviewedBy': user.uid"));
+      expect(approval, contains("'reviewedBy': user.id"));
       expect(approval, contains("collection('auditLogs')"));
       expect(approval, contains("'source': 'admin_merchant_approval'"));
       expect(rules, contains("(merchant() && request.resource.data.ownerId == request.auth.uid)"));
