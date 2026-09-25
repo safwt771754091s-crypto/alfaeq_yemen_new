@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import '../services/firestore_service.dart';
 import '../services/supabase_service.dart';
@@ -10,7 +10,7 @@ class MyOrdersPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = SupabaseService.client.auth.currentUser;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
