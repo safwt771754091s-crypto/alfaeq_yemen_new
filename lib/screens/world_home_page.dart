@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
@@ -481,7 +481,7 @@ class _OffersPage extends StatelessWidget {
 }
 
 Future<void> _addProductToCart(BuildContext context, CatalogDocument product) async {
-  final user = FirebaseAuth.instance.currentUser;
+  final user = SupabaseService.client.auth.currentUser;
   if (user == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول أولاً.'))); return; }
   final name = (product.data['name'] ?? product.data['title'] ?? 'صنف').toString();
   try {
@@ -775,7 +775,7 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = SupabaseService.client.auth.currentUser;
     if (user == null) return const Scaffold(body: Center(child: Text('يجب تسجيل الدخول أولاً.')));
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -838,7 +838,7 @@ class _AccountTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = SupabaseService.client.auth.currentUser;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 22, 16, 28),
       children: [
