@@ -1,10 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 /// Central Supabase bootstrap and configuration.
 ///
-/// The publishable key is supplied at build time; no service-role key is ever
-/// embedded in the Flutter application.
+/// Supabase is the application backend. Authentication tokens are supplied
+/// by Supabase Auth; no Firebase credential is injected into the client.
 class SupabaseService {
   static bool _initialized = false;
 
@@ -15,21 +14,17 @@ class SupabaseService {
     defaultValue: 'https://esvljorjykzgrpnrxnma.supabase.co',
   );
 
-  // Supabase publishable keys are designed for public clients. Keep this as a
-  // build-safe fallback so the web app cannot silently disable its real backend
-  // when CI does not inject SUPABASE_PUBLISHABLE_KEY.
   static const publishableKey = String.fromEnvironment(
     'SUPABASE_PUBLISHABLE_KEY',
     defaultValue: 'sb_publishable_xJfLBgrqWM8yEa3FM9qfig_FwnfTKue',
   );
 
   static Future<void> initialize() async {
-    if (publishableKey.isEmpty) return;
+    if (_initialized || publishableKey.isEmpty) return;
     await Supabase.initialize(
       url: projectUrl,
       publishableKey: publishableKey,
       debug: false,
-      accessToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
     );
     _initialized = true;
   }
