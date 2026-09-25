@@ -106,11 +106,11 @@ void main() {
       final merchant = File('lib/screens/merchant_center_page.dart').readAsStringSync();
       final rules = File('firestore.rules').readAsStringSync();
 
-      expect(auth, contains('GeoPoint? location'));
+      expect(auth, contains('dynamic location'));
       expect(auth, contains('if (location != null)'));
       expect(auth, contains('saveUserLocation'));
-      expect(auth, contains('SetOptions(merge: true)'));
-      expect(auth, contains("'location': location"));
+      expect(auth, contains("onConflict: 'uid'"));
+      expect(auth, contains("profile['location'] = Map<String, dynamic>.from(location)"));
       expect(gate, isNot(contains('hasRequiredLocation()')));
       expect(gate, isNot(contains('LocationRequiredPage')));
       expect(login, isNot(contains('_pendingLocation')));
