@@ -11,7 +11,7 @@ class LiveTrackingMapPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uid = SupabaseService.client.auth.currentUser?.uid;
+    final uid = SupabaseService.client.auth.currentUser?.id;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
