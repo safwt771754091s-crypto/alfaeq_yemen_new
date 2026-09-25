@@ -18,8 +18,8 @@ class MyOrdersPage extends StatelessWidget {
         body: user == null
             ? const Center(child: Text('يجب تسجيل الدخول لعرض طلباتك.'))
             : SupabaseService.isInitialized
-                ? _SupabaseOrders(userId: user.uid)
-                : _FirebaseOrders(userId: user.uid),
+                ? _SupabaseOrders(userId: user.id)
+                : _FirebaseOrders(userId: user.id),
       ),
     );
   }
