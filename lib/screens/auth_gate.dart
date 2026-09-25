@@ -1,7 +1,8 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../services/auth_service.dart';
 import '../services/super_alfaeq_catalog_importer.dart';
 import 'admin_dashboard.dart';
@@ -34,6 +35,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       } else {
         _auth.stopPresence();
       }
+      if (mounted) setState(() {});
     });
   }
 
@@ -47,52 +49,47 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final user = _auth.auth.currentUser;
-    if (user == null) return;
+    if (_auth.currentUser == null) return;
     if (state == AppLifecycleState.resumed) {
       _auth.startPresence();
-    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
       _auth.stopPresence();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: _auth.authStateChanges,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    final user = _auth.currentUser;
+    if (user == null) return const LoginPage();
+
+    return FutureBuilder<String>(
+      future: _auth.role(),
+      builder: (context, roleSnapshot) {
+        if (roleSnapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
-        if (snapshot.data == null) return const LoginPage();
 
-        return FutureBuilder<String>(
-          future: _auth.role(),
-          builder: (context, roleSnapshot) {
-            if (roleSnapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(body: Center(child: CircularProgressIndicator()));
-            }
-
-            final role = roleSnapshot.data ?? 'customer';
-            switch (role) {
-              case 'owner':
-              case 'admin':
-                SuperAlfaeqCatalogImporter().importIfNeeded().catchError((_) => 0);
-                return const AdminDashboard();
-              case 'developer':
-                return const DeveloperPage();
-              case 'merchant':
-                return const MerchantPortalPage();
-              case 'driver':
-                return const DriverCenterPage();
-              case 'customer':
-              case 'finance':
-              case 'support':
-              default:
-                return const CustomerSessionShell(child: WorldHomePage());
-            }
-          },
-        );
+        final role = roleSnapshot.data ?? 'customer';
+        switch (role) {
+          case 'owner':
+          case 'admin':
+            SuperAlfaeqCatalogImporter().importIfNeeded().catchError((_) => 0);
+            return const AdminDashboard();
+          case 'developer':
+            return const DeveloperPage();
+          case 'merchant':
+            return const MerchantPortalPage();
+          case 'driver':
+            return const DriverCenterPage();
+          case 'customer':
+          case 'finance':
+          case 'support':
+          default:
+            return const CustomerSessionShell(child: WorldHomePage());
+        }
       },
     );
   }
