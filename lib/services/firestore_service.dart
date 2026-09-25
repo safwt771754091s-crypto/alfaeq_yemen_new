@@ -2,8 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 
-/// Compatibility data layer.
-/// Supabase is the primary path when enabled; Firebase remains the migration fallback.
+/// Application data compatibility layer backed by Supabase.
 class FirestoreService {
   final FirebaseFirestore db;
   final SupabaseClient? supabase;
@@ -12,7 +11,7 @@ class FirestoreService {
   FirestoreService({
     FirebaseFirestore? firestore,
     SupabaseClient? client,
-    this.preferSupabase = false,
+    this.preferSupabase = true,
   })  : db = firestore ?? FirebaseFirestore.instance,
         supabase = client ?? (SupabaseService.isInitialized ? Supabase.instance.client : null);
 
