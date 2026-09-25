@@ -6,7 +6,6 @@ import '../services/auth_service.dart';
 import '../services/catalog_service.dart';
 import '../services/supabase_service.dart';
 import '../services/public_content_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'ai_assistant_page.dart';
 import 'cart_page.dart';
 import 'location_picker_page.dart';
