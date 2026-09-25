@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'supabase_service.dart';
 
 /// Secure routing policy for the developer AI layer.
 ///
@@ -26,7 +27,7 @@ class AiProviderRouter {
     if (preferred != null && supportedProviders.contains(preferred)) {
       return preferred;
     }
-    return production ? 'unsloth' : 'unsloth';
+    return 'unsloth';
   }
 
   List<String> fallbackChain({String? preferredProvider}) {
@@ -80,9 +81,4 @@ class AiProviderRouter {
         'credentials': 'server_only',
         'customerDataForwarding': false,
       };
-}
-
-/// Local alias kept here so the router has no Firebase dependency.
-class SupabaseService {
-  static SupabaseClient get client => Supabase.instance.client;
 }
