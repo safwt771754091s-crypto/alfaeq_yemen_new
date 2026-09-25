@@ -1,4 +1,5 @@
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/supabase_service.dart';
 import 'package:flutter/material.dart';
 
 class AdminUserManagementPage extends StatefulWidget {
@@ -8,7 +9,6 @@ class AdminUserManagementPage extends StatefulWidget {
 }
 
 class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
-  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(region: 'us-central1');
   List<Map<String, dynamic>> _users = [];
   bool _loading = true;
   String _filter = '';
@@ -33,18 +33,26 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
   @override
   void initState() { super.initState(); _loadUsers(); }
 
+  Future<Map<String, dynamic>> _adminUsers(String action, [Map<String, dynamic> payload = const {}]) async {
+    final response = await SupabaseService.client.functions.invoke(
+      'admin-users',
+      body: {'action': action, ...payload},
+    );
+    final data = response.data;
+    if (data is Map && data['error'] != null) {
+      throw StateError(data['error'].toString());
+    }
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
   Future<void> _loadUsers() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final result = await _functions.httpsCallable('listManagedUsers').call();
-      final data = Map<String, dynamic>.from(result.data as Map);
+      final data = await _adminUsers('list');
       final raw = (data['users'] as List? ?? const []);
       final users = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       if (!mounted) return;
       setState(() { _users = users; _loading = false; });
-    } on FirebaseFunctionsException catch (e) {
-      if (!mounted) return;
-      setState(() { _loading = false; _error = e.message ?? e.code; });
     } catch (e) {
       if (!mounted) return;
       setState(() { _loading = false; _error = e.toString(); });
@@ -54,12 +62,12 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
   Future<void> _setRole(Map<String, dynamic> user, String role) async {
     final uid = user['uid'] as String?; if (uid == null) return;
     try {
-      await _functions.httpsCallable('setManagedUserRole').call({'uid': uid, 'role': role});
+      await _adminUsers('set_role', {'uid': uid, 'role': role});
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم تغيير الدور إلى ${roles[role]}')));
       await _loadUsers();
-    } on FirebaseFunctionsException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? e.code)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -82,24 +90,24 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
     );
     if (result == null) return;
     try {
-      await _functions.httpsCallable('setManagedUserPermissions').call({'uid': uid, 'permissions': result.toList()});
+      await _adminUsers('set_permissions', {'uid': uid, 'permissions': result.toList()});
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ صلاحيات الحساب على الخادم.')));
       await _loadUsers();
-    } on FirebaseFunctionsException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? e.code)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
   Future<void> _setDisabled(Map<String, dynamic> user, bool disabled) async {
     final uid = user['uid'] as String?; if (uid == null) return;
-    try { await _functions.httpsCallable('setManagedUserDisabled').call({'uid': uid, 'disabled': disabled}); await _loadUsers(); }
-    on FirebaseFunctionsException catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? e.code))); }
+    try { await _adminUsers('set_disabled', {'uid': uid, 'disabled': disabled}); await _loadUsers(); }
+    catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
   }
 
   Future<void> _revokeSessions(Map<String, dynamic> user) async {
     final uid = user['uid'] as String?; if (uid == null) return;
-    try { await _functions.httpsCallable('revokeManagedUserSessions').call({'uid': uid}); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إلغاء الجلسات الحالية.'))); }
+    try { await _adminUsers('revoke_sessions', {'uid': uid}); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إلغاء الجلسات الحالية.'))); }
     on FirebaseFunctionsException catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? e.code))); }
   }
 
