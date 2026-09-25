@@ -1,367 +1,296 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'supabase_service.dart';
 
 class AuthService {
-  final FirebaseAuth? _auth;
-  final FirebaseFirestore? _db;
-  final FirebaseFunctions? _functions;
-  late final FirebaseAuth auth = _auth ?? FirebaseAuth.instance;
-  late final FirebaseFirestore db = _db ?? FirebaseFirestore.instance;
-  late final FirebaseFunctions functions = _functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
-  Timer? _presenceTimer;
+  GoTrueClient get auth => SupabaseService.client.auth;
 
-  AuthService({
-    FirebaseAuth? auth,
-    FirebaseFirestore? firestore,
-    FirebaseFunctions? functions,
-  })  : _auth = auth,
-        _db = firestore,
-        _functions = functions;
+  User? get currentUser => auth.currentUser;
 
-  Stream<User?> get authStateChanges => auth.authStateChanges();
+  Stream<User?> get authStateChanges =>
+      auth.onAuthStateChange.map((event) => event.session?.user);
 
-  Future<UserCredential> signIn({required String email, required String password}) async {
-    final credential = await auth.signInWithEmailAndPassword(email: email.trim(), password: password);
-    final user = credential.user;
+  Future<AuthResponse> signIn({
+    required String email,
+    required String password,
+  }) async {
+    final response = await auth.signInWithPassword(
+      email: email.trim(),
+      password: password,
+    );
+    final user = response.user;
     if (user != null) {
-      await _ensureUserProfile(user);
-      await _syncSupabaseProfile(user);
-      await startPresence();
+      await _ensureUserProfile(user, provider: 'password');
       await _recordLoginEvent(user, provider: 'password');
+      await startPresence();
     }
-    return credential;
+    return response;
   }
 
-  Future<UserCredential?> signInWithGoogle() async {
-    UserCredential credential;
-    if (kIsWeb) {
-      final provider = GoogleAuthProvider();
-      provider.setCustomParameters({'prompt': 'select_account'});
-      credential = await auth.signInWithPopup(provider);
-    } else {
-      final google = GoogleSignIn();
-      final account = await google.signIn();
-      if (account == null) return null;
-      final googleAuth = await account.authentication;
-      final oauth = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      credential = await auth.signInWithCredential(oauth);
+  Future<AuthResponse?> signInWithGoogle() async {
+    final google = GoogleSignIn();
+    final account = await google.signIn();
+    if (account == null) return null;
+
+    final googleAuth = await account.authentication;
+    final idToken = googleAuth.idToken;
+    if (idToken == null || idToken.isEmpty) {
+      throw StateError('لم يتم استلام رمز Google المطلوب لتسجيل الدخول.');
     }
 
-    final user = credential.user;
-    if (user == null) return credential;
-    await _ensureUserProfile(user);
-    await startPresence();
+    final response = await auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: googleAuth.accessToken,
+    );
+    final user = response.user;
+    if (user == null) return response;
+
+    await _ensureUserProfile(user, provider: 'google');
     await _recordLoginEvent(user, provider: 'google');
-    if ((user.email ?? '').trim().toLowerCase() == 'albyysks@gmail.com') {
-      await bootstrapPrimaryAdminIfEligible();
-    }
-    await _syncSupabaseProfile(user);
-    return credential;
+    await startPresence();
+    return response;
   }
 
-  Future<void> _ensureUserProfile(User user) async {
-    final ref = db.collection('users').doc(user.uid);
-    final snapshot = await ref.get();
-    if (snapshot.exists) {
-      await ref.set({
-        'email': user.email,
-        'name': (user.displayName ?? '').trim(),
-        'photoUrl': user.photoURL,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      return;
-    }
-    await ref.set({
-      'uid': user.uid,
-      'name': (user.displayName ?? '').trim(),
+  Future<void> _ensureUserProfile(
+    User user, {
+    required String provider,
+  }) async {
+    final existing = await SupabaseService.client
+        .from('users')
+        .select('uid')
+        .eq('uid', user.id)
+        .maybeSingle();
+
+    final metadata = <String, dynamic>{
+      ...user.userMetadata ?? const <String, dynamic>{},
+      'provider': provider,
+    };
+
+    await SupabaseService.client.from('users').upsert({
+      'uid': user.id,
       'email': user.email,
-      'photoUrl': user.photoURL,
-      'role': 'customer',
-      'provider': 'google',
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+      'name': (user.userMetadata?['full_name'] ??
+              user.userMetadata?['name'] ??
+              '')
+          .toString()
+          .trim(),
+      if (existing == null) 'role': 'customer',
+      'metadata': metadata,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'uid');
   }
 
   Future<void> bootstrapPrimaryAdminIfEligible() async {
-    final user = auth.currentUser;
-    if (user == null) return;
-    final email = (user.email ?? '').trim().toLowerCase();
-    if (email != 'albyysks@gmail.com') return;
-    final callable = functions.httpsCallable('bootstrapPrimaryAdmin');
-    await callable.call(<String, dynamic>{});
-    await user.getIdToken(true);
-    await user.reload();
+    // Administrative roles are provisioned server-side in Supabase.
+    // Never grant owner/admin privileges from a client-side email check.
   }
 
-  Future<void> sendPasswordReset({required String email}) {
-    return auth.sendPasswordResetEmail(email: email.trim());
+  Future<void> sendPasswordReset({required String email}) async {
+    await auth.resetPasswordForEmail(email.trim());
   }
 
-  Future<UserCredential> register({
+  Future<AuthResponse> register({
     required String name,
     required String email,
     required String password,
-    GeoPoint? location,
+    dynamic location,
     String locationSource = 'device',
   }) async {
-    final credential = await auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
-    final user = credential.user!;
-    await user.updateDisplayName(name.trim());
-    try {
-      final profile = <String, dynamic>{
-        'uid': user.uid,
+    final response = await auth.signUp(
+      email: email.trim(),
+      password: password,
+      data: {
         'name': name.trim(),
-        'email': user.email,
-        'role': 'customer',
-        'provider': 'password',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-      if (location != null) {
-        profile.addAll({
-          'location': location,
-          'latitude': location.latitude,
-          'longitude': location.longitude,
-          'locationSource': locationSource,
-          'locationUpdatedAt': FieldValue.serverTimestamp(),
-        });
-      }
-      await db.collection('users').doc(user.uid).set(profile);
-    } catch (_) {
-      await user.delete();
-      rethrow;
-    }
-    await user.reload();
-    await _syncSupabaseProfile(user);
-    await startPresence();
-    await _recordLoginEvent(user, provider: 'password', action: 'register');
-    return credential;
-  }
+        'full_name': name.trim(),
+      },
+    );
 
-  Future<void> _syncSupabaseProfile(User user) async {
-    if (!SupabaseService.isInitialized) return;
-    try {
-      final token = await user.getIdTokenResult(true);
-      final claims = token.claims ?? const <String, dynamic>{};
-      final role = (claims['app_role'] ?? claims['role'] ?? 'customer').toString();
-      await SupabaseService.client.from('users').upsert({
-        'uid': user.uid,
-        'email': user.email,
-        'name': (user.displayName ?? '').trim(),
-        'role': role,
-        'admin': claims['admin'] == true,
-        'owner': claims['owner'] == true,
-        'developer': claims['developer'] == true,
-        'access_level': (claims['accessLevel'] as num?)?.toInt() ?? 0,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'uid');
-    } catch (_) {}
-  }
-
-  Future<void> _recordLoginEvent(User user, {required String provider, String action = 'login'}) async {
-    // Keep telemetry sinks independent so a Firestore outage cannot prevent
-    // the production Supabase login_events -> email notification pipeline.
-    if (SupabaseService.isInitialized) {
-      try {
-        await SupabaseService.client.from('login_events').insert({
-          'uid': user.uid,
-          'email': user.email,
-          'provider': provider,
-          'action': action,
-          'login_at': DateTime.now().toUtc().toIso8601String(),
-        });
-      } catch (e) {
-        debugPrint('Supabase login event failed: $e');
-      }
+    final user = response.user;
+    if (user == null) {
+      throw StateError('تعذر إنشاء حساب المستخدم.');
     }
 
-    try {
-      await db.collection('loginEvents').add({
-        'uid': user.uid,
-        'email': user.email,
-        'provider': provider,
-        'action': action,
-        'loginAt': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      debugPrint('Firestore login event failed: $e');
-    }
-
-    try {
-      await db.collection('users').doc(user.uid).set({
-        'lastLoginAt': FieldValue.serverTimestamp(),
-        'lastSeen': FieldValue.serverTimestamp(),
-        'isOnline': true,
-      }, SetOptions(merge: true));
-    } catch (e) {
-      debugPrint('Login presence update failed: $e');
-    }
-  }
-
-  Future<void> saveUserLocation({required GeoPoint location, String source = 'device'}) async {
-    final user = auth.currentUser;
-    if (user == null) throw StateError('User is not signed in.');
-    final ref = db.collection('users').doc(user.uid);
-    final snapshot = await ref.get();
-    final existing = snapshot.data();
-    final update = <String, dynamic>{
-      'uid': user.uid,
-      'location': location,
-      'latitude': location.latitude,
-      'longitude': location.longitude,
-      'locationSource': source,
-      'locationUpdatedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'name': (user.displayName ?? '').trim(),
+    final profile = <String, dynamic>{
+      'uid': user.id,
+      'name': name.trim(),
       'email': user.email,
+      'role': 'customer',
+      'metadata': {
+        'provider': 'password',
+        'location_source': locationSource,
+      },
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
-    if (!snapshot.exists) {
-      update['role'] = 'customer';
-      update['createdAt'] = FieldValue.serverTimestamp();
-    } else if (existing?['role'] == null) {
-      update['role'] = 'customer';
+
+    if (location is Map) {
+      profile['location'] = Map<String, dynamic>.from(location);
     }
-    await ref.set(update, SetOptions(merge: true));
+
+    try {
+      await SupabaseService.client.from('users').upsert(
+            profile,
+            onConflict: 'uid',
+          );
+    } catch (_) {
+      // The auth account is authoritative; profile creation can be retried
+      // after email confirmation or on the next authenticated request.
+    }
+
+    await _recordLoginEvent(user, provider: 'password', action: 'register');
+    return response;
+  }
+
+  Future<void> saveUserLocation({
+    required double latitude,
+    required double longitude,
+    String source = 'device',
+  }) async {
+    final user = currentUser;
+    if (user == null) throw StateError('User is not signed in.');
+
+    await SupabaseService.client.from('users').upsert({
+      'uid': user.id,
+      'email': user.email,
+      'location': {
+        'latitude': latitude,
+        'longitude': longitude,
+        'source': source,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'uid');
   }
 
   Future<bool> hasRequiredLocation() async {
-    final user = auth.currentUser;
+    final user = currentUser;
     if (user == null) return false;
-    final snap = await db.collection('users').doc(user.uid).get();
-    final data = snap.data();
-    final location = data?['location'];
-    return location is GeoPoint && (data?['latitude'] is num) && (data?['longitude'] is num);
+
+    final row = await SupabaseService.client
+        .from('users')
+        .select('location')
+        .eq('uid', user.id)
+        .maybeSingle();
+    final location = row?['location'];
+    return location is Map &&
+        location['latitude'] is num &&
+        location['longitude'] is num;
   }
 
   Future<void> startPresence() async {
-    final user = auth.currentUser;
+    final user = currentUser;
     if (user == null) return;
-    _presenceTimer?.cancel();
     await _touchPresence(user);
-    _presenceTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      final current = auth.currentUser;
-      if (current != null) _touchPresence(current);
-    });
   }
 
   Future<void> _touchPresence(User user) async {
     try {
-      await db.collection('users').doc(user.uid).set({
-        'lastSeen': FieldValue.serverTimestamp(),
-        'isOnline': true,
-      }, SetOptions(merge: true));
-    } catch (_) {
-      // Presence must never prevent login or navigation.
-    }
-  }
-
-  Future<void> stopPresence() async {
-    _presenceTimer?.cancel();
-    _presenceTimer = null;
-    final user = auth.currentUser;
-    if (user == null) return;
-    try {
-      await db.collection('users').doc(user.uid).set({
-        'isOnline': false,
-        'lastSeen': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      await SupabaseService.client.from('users').update({
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('uid', user.id);
     } catch (_) {}
   }
+
+  Future<void> stopPresence() async {}
 
   Future<void> signOut() async {
-    // Logout must never be blocked by presence/telemetry/network failures.
-    final user = auth.currentUser;
-    _presenceTimer?.cancel();
-    _presenceTimer = null;
-
-    // Mark the captured Firebase user offline on a best-effort basis, but do
-    // not wait indefinitely for Firestore before clearing the auth session.
-    if (user != null) {
-      try {
-        await db.collection('users').doc(user.uid).set({
-          'isOnline': false,
-          'lastSeen': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true)).timeout(const Duration(seconds: 2));
-      } catch (_) {}
-    }
-
-    // Clear both authentication layers. Firebase is the AuthGate source of
-    // truth, while Supabase must also lose its session after migration.
     try {
-      await auth.signOut().timeout(const Duration(seconds: 5));
-    } catch (_) {}
-
-    if (SupabaseService.isInitialized) {
-      try {
-        await SupabaseService.client.auth.signOut().timeout(const Duration(seconds: 5));
-      } catch (_) {}
-    }
-
-    if (!kIsWeb) {
-      try {
-        await GoogleSignIn().signOut().timeout(const Duration(seconds: 3));
-      } catch (_) {}
+      await auth.signOut();
+    } finally {
+      if (!kIsWeb) {
+        try {
+          await GoogleSignIn().signOut().timeout(const Duration(seconds: 3));
+        } catch (_) {}
+      }
     }
   }
 
   Future<Map<String, dynamic>> claims({bool forceRefresh = true}) async {
-    final user = auth.currentUser;
+    final user = currentUser;
     if (user == null) return const {};
-    final token = await user.getIdTokenResult(forceRefresh);
-    return Map<String, dynamic>.from(token.claims ?? const {});
+
+    final profile = await SupabaseService.client
+        .from('users')
+        .select('role,admin,owner,developer,access_level,metadata')
+        .eq('uid', user.id)
+        .maybeSingle();
+
+    return {
+      'sub': user.id,
+      'email': user.email,
+      ...Map<String, dynamic>.from(profile ?? const {}),
+    };
   }
 
   Future<String> role() async {
-    final user = auth.currentUser;
+    final user = currentUser;
     if (user == null) return 'guest';
-    final tokenClaims = await claims();
-    final claimRole = tokenClaims['app_role'] ?? tokenClaims['role'];
-    if (claimRole is String && claimRole.isNotEmpty) return claimRole;
-    if (tokenClaims['admin'] == true) return 'admin';
-    final snap = await db.collection('users').doc(user.uid).get();
-    return (snap.data()?['role'] as String?) ?? 'customer';
+
+    final row = await SupabaseService.client
+        .from('users')
+        .select('role,admin,owner,developer')
+        .eq('uid', user.id)
+        .maybeSingle();
+
+    final data = row ?? const <String, dynamic>{};
+    final role = (data['role'] ?? '').toString();
+    if (role.isNotEmpty) return role;
+    if (data['owner'] == true) return 'owner';
+    if (data['admin'] == true) return 'admin';
+    if (data['developer'] == true) return 'developer';
+    return 'customer';
   }
 
   Future<bool> hasAdminClaim() async {
-    final tokenClaims = await claims();
-    return tokenClaims['admin'] == true || tokenClaims['app_role'] == 'admin' || tokenClaims['app_role'] == 'owner' || tokenClaims['role'] == 'admin' || tokenClaims['role'] == 'owner';
+    final c = await claims();
+    return c['admin'] == true ||
+        c['owner'] == true ||
+        c['role'] == 'admin' ||
+        c['role'] == 'owner';
   }
 
   Future<bool> hasOwnerClaim() async {
-    final tokenClaims = await claims();
-    return tokenClaims['owner'] == true || tokenClaims['app_role'] == 'owner' || tokenClaims['role'] == 'owner';
+    final c = await claims();
+    return c['owner'] == true || c['role'] == 'owner';
   }
 
   Future<bool> isDeveloper() async {
-    final tokenClaims = await claims();
-    if (tokenClaims['developer'] == true || tokenClaims['app_role'] == 'developer' || tokenClaims['role'] == 'developer') return true;
-    final user = auth.currentUser;
-    if (user == null) return false;
-    final snap = await db.collection('users').doc(user.uid).get();
-    return snap.data()?['developer'] == true || snap.data()?['role'] == 'developer';
+    final c = await claims();
+    return c['developer'] == true || c['role'] == 'developer';
   }
 
   Future<bool> canOpenDeveloperCenter() async {
-    final tokenClaims = await claims();
-    return tokenClaims['owner'] == true ||
-        tokenClaims['admin'] == true ||
-        tokenClaims['developer'] == true ||
-        tokenClaims['app_role'] == 'owner' ||
-        tokenClaims['app_role'] == 'admin' ||
-        tokenClaims['app_role'] == 'developer' ||
-        tokenClaims['role'] == 'owner' ||
-        tokenClaims['role'] == 'admin' ||
-        tokenClaims['role'] == 'developer';
+    final c = await claims();
+    return c['owner'] == true ||
+        c['admin'] == true ||
+        c['developer'] == true ||
+        c['role'] == 'owner' ||
+        c['role'] == 'admin' ||
+        c['role'] == 'developer';
+  }
+
+  Future<void> _recordLoginEvent(
+    User user, {
+    required String provider,
+    String action = 'login',
+  }) async {
+    try {
+      await SupabaseService.client.from('login_events').insert({
+        'uid': user.id,
+        'email': user.email,
+        'provider': provider,
+        'action': action,
+        'login_at': DateTime.now().toUtc().toIso8601String(),
+        'metadata': {
+          'platform': defaultTargetPlatform.name,
+        },
+      });
+    } catch (e) {
+      debugPrint('Supabase login event failed: $e');
+    }
   }
 }
