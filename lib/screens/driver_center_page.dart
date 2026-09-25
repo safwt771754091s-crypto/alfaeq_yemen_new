@@ -24,11 +24,11 @@ class _DriverCenterPageState extends State<DriverCenterPage>{
     final user=SupabaseService.client.auth.currentUser;if(user==null)return;
     setState(()=>_busy=true);
     try{
-      await _ensureProfile(user.uid);
+      await _ensureProfile(user.id);
       if(SupabaseService.isInitialized){
-        await SupabaseService.client.from('drivers').update({'is_online':value,'last_seen_at':DateTime.now().toUtc().toIso8601String(),'updated_at':DateTime.now().toUtc().toIso8601String()}).eq('uid',user.uid);
+        await SupabaseService.client.from('drivers').update({'is_online':value,'last_seen_at':DateTime.now().toUtc().toIso8601String(),'updated_at':DateTime.now().toUtc().toIso8601String()}).eq('uid',user.id);
       }
-      if(value)await _startLiveLocation(user.uid);else await _stopLiveLocation();
+      if(value)await _startLiveLocation(user.id);else await _stopLiveLocation();
     }catch(e){_message('تعذر تحديث حالة المندوب: $e');}finally{if(mounted)setState(()=>_busy=false);}
   }
   Future<void> _startLiveLocation(String uid) async {
@@ -80,7 +80,7 @@ class _DriverCenterPageState extends State<DriverCenterPage>{
         if(access.data!=true||user==null)return const Scaffold(body:Center(child:Text('مركز المندوب محمي للحسابات المعتمدة.')));
         if(!SupabaseService.isInitialized)return const Scaffold(body:Center(child:Text('مركز المندوب يتطلب اتصال قاعدة المنصة الجديدة.')));
         return StreamBuilder<List<Map<String,dynamic>>>(
-          stream:SupabaseService.client.from('drivers').stream(primaryKey:['uid']).eq('uid',user.uid).limit(1),
+          stream:SupabaseService.client.from('drivers').stream(primaryKey:['uid']).eq('uid',user.id).limit(1),
           builder:(context,profile){
             final d=profile.data?.isNotEmpty==true?profile.data!.first:<String,dynamic>{};
             final approved=d['approved']==true, online=d['is_online']==true;
@@ -99,7 +99,7 @@ class _DriverCenterPageState extends State<DriverCenterPage>{
                 Card(child:ListTile(leading:const Icon(Icons.my_location),title:const Text('موقع المندوب'),subtitle:Text(d['current_location'] is Map?'الموقع مسجل ويُحدّث عند الاتصال.':'لم يتم تسجيل موقع بعد.'),onTap:approved?_updateLocation:null)),
                 const SizedBox(height:12),
                 StreamBuilder<List<Map<String,dynamic>>>(
-                  stream:SupabaseService.client.from('orders').stream(primaryKey:['id']).eq('driver_id',user.uid).order('created_at',ascending:false).limit(50),
+                  stream:SupabaseService.client.from('orders').stream(primaryKey:['id']).eq('driver_id',user.id).order('created_at',ascending:false).limit(50),
                   builder:(context,orders){
                     if(orders.hasError)return Text('تعذر تحميل المهام: ${orders.error}');
                     final docs=orders.data??const <Map<String,dynamic>>[];
