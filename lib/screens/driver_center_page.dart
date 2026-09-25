@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
 import '../services/supabase_service.dart';
@@ -21,7 +21,7 @@ class _DriverCenterPageState extends State<DriverCenterPage>{
     if(SupabaseService.isInitialized){await SupabaseService.client.rpc('ensure_driver_profile');return;}
   }
   Future<void> _toggleOnline(bool value) async {
-    final user=FirebaseAuth.instance.currentUser;if(user==null)return;
+    final user=SupabaseService.client.auth.currentUser;if(user==null)return;
     setState(()=>_busy=true);
     try{
       await _ensureProfile(user.uid);
@@ -55,7 +55,7 @@ class _DriverCenterPageState extends State<DriverCenterPage>{
     }
   }
   Future<void> _setStatus(String orderId,String status) async {
-    final user=FirebaseAuth.instance.currentUser;if(user==null)return;
+    final user=SupabaseService.client.auth.currentUser;if(user==null)return;
     setState(()=>_busy=true);
     try{
       Position? p;
@@ -72,7 +72,7 @@ class _DriverCenterPageState extends State<DriverCenterPage>{
   @override void dispose(){_stopLiveLocation();super.dispose();}
 
   @override Widget build(BuildContext context){
-    final user=FirebaseAuth.instance.currentUser;
+    final user=SupabaseService.client.auth.currentUser;
     return Directionality(textDirection:TextDirection.rtl,child:FutureBuilder<bool>(
       future:_allowed(),
       builder:(context,access){
