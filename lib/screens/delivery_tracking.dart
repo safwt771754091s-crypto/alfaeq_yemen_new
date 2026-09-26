@@ -10,7 +10,7 @@ class DeliveryTracking extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentUid = SupabaseService.client.auth.currentUser?.uid;
+    final currentUid = SupabaseService.client.auth.currentUser?.id;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
