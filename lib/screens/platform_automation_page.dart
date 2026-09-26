@@ -1,14 +1,14 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/supabase_service.dart';
 import 'package:flutter/material.dart';
 
 class PlatformAutomationPage extends StatelessWidget {
   const PlatformAutomationPage({super.key});
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> _stream() => FirebaseFirestore.instance
-      .collection('platformAutomation')
-      .orderBy('updatedAt', descending: true)
-      .limit(200)
-      .snapshots();
+  Stream<List<Map<String, dynamic>>> _stream() => SupabaseService.client
+      .from('platform_automation')
+      .stream(primaryKey: ['id'])
+      .order('updated_at', ascending: false)
+      .limit(200);
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +19,7 @@ class PlatformAutomationPage extends StatelessWidget {
           title: const Text('أتمتة تشغيل المنصة', style: TextStyle(fontWeight: FontWeight.w900)),
           actions: [IconButton(onPressed: () {}, icon: const Icon(Icons.refresh))],
         ),
-        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        body: StreamBuilder<List<Map<String, dynamic>>>(
           stream: _stream(),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
@@ -27,12 +27,12 @@ class PlatformAutomationPage extends StatelessWidget {
             }
             if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
-            final docs = snapshot.data!.docs;
-            final ready = docs.where((d) => d.data()['ready'] == true).length;
+            final docs = snapshot.data!;
+            final ready = docs.where((d) => d['ready'] == true).length;
             final needs = docs.length - ready;
             final bySource = <String, int>{};
             for (final doc in docs) {
-              final source = (doc.data()['source'] ?? 'unknown').toString();
+              final source = (doc['source'] ?? 'unknown').toString();
               bySource[source] = (bySource[source] ?? 0) + 1;
             }
 
@@ -43,7 +43,7 @@ class PlatformAutomationPage extends StatelessWidget {
                 const SizedBox(height: 16),
                 const Text('ماذا يفعل المركز؟', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 8),
-                const Card(child: Padding(padding: EdgeInsets.all(14), child: Text('كل قسم أو مزود دفع أو متجر أو منتج يتم حفظه في Firestore يُفحص خادميًا وتُنشأ له حالة جاهزية. المركز يعرض النتيجة فقط؛ لا يكتب العميل حالة الجاهزية ولا يعدّل الرصيد أو السجل المالي.'))),
+                const Card(child: Padding(padding: EdgeInsets.all(14), child: Text('كل قسم أو مزود دفع أو متجر أو منتج يتم حفظه في Supabase يُفحص خادميًا وتُنشأ له حالة جاهزية. المركز يعرض النتيجة فقط؛ لا يكتب العميل حالة الجاهزية ولا يعدّل الرصيد أو السجل المالي.'))),
                 const SizedBox(height: 16),
                 _sourceSummary(bySource),
                 const SizedBox(height: 16),
