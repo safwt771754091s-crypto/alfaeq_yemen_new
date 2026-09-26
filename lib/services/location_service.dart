@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 
 class LocationService {
@@ -25,8 +24,7 @@ class LocationService {
     );
   }
 
-  static GeoPoint toGeoPoint(Position position) =>
-      GeoPoint(position.latitude, position.longitude);
+  static Map<String, double> toLocation(Position position) => {'latitude': position.latitude, 'longitude': position.longitude};
 
   /// Straight-line distance between two coordinates, in kilometres.
   static double distanceKm({
