@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
-import '../services/firestore_service.dart';
+import '../services/order_service.dart';
 import '../services/supabase_service.dart';
 import 'delivery_tracking.dart';
 
@@ -28,7 +28,7 @@ class _SupabaseOrders extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stream = FirestoreService(preferSupabase: true).supabaseMyOrders(userId);
+    final stream = OrderService(preferSupabase: true).supabaseMyOrders(userId);
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: stream,
       builder: (context, snapshot) {
