@@ -53,7 +53,7 @@ class _MerchantApprovalPageState extends State<MerchantApprovalPage> {
           'ownerId': data['owner_id'],
           'status': status,
         },
-        'createdAt': FieldValue.serverTimestamp(),
+        'created_at': DateTime.now().toUtc().toIso8601String(),
       });
 
       _message(status == 'approved' ? 'تم اعتماد المتجر وأصبح مؤهلاً للظهور للعملاء.' : 'تم رفض المتجر.');
@@ -107,8 +107,8 @@ class _MerchantApprovalPageState extends State<MerchantApprovalPage> {
                           const SizedBox(height: 12),
                           Text('الهاتف: ${data['phone'] ?? '—'}'),
                           Text('العنوان: ${data['address'] ?? '—'}'),
-                          Text('القسم: ${data['sectionId'] ?? '—'}'),
-                          Text('صاحب المتجر: ${data['ownerId'] ?? '—'}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                          Text('القسم: ${data['section_id'] ?? '—'}'),
+                          Text('صاحب المتجر: ${data['owner_id'] ?? '—'}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
                           const SizedBox(height: 14),
                           Row(children: [
                             Expanded(child: FilledButton.icon(onPressed: _busy ? null : () => _setStatus(doc, 'approved'), icon: const Icon(Icons.verified), label: const Text('اعتماد'))),
