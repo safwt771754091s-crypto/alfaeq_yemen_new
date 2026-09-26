@@ -47,6 +47,8 @@ jobs:
   deploy-web:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build-web
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
