@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
@@ -23,7 +22,7 @@ class _MerchantApprovalPageState extends State<MerchantApprovalPage> {
     return role == 'admin' || role == 'owner';
   }
 
-  Future<void> _setStatus(DocumentSnapshot<Map<String, dynamic>> doc, String status) async {
+  Future<void> _setStatus(Map<String, dynamic> doc, String status) async {
     final user = SupabaseService.client.auth.currentUser;
     if (user == null || !await _isStaff()) {
       _message('غير مصرح لك بإدارة اعتماد المتاجر.');
@@ -32,35 +31,34 @@ class _MerchantApprovalPageState extends State<MerchantApprovalPage> {
 
     setState(() => _busy = true);
     try {
-      final data = doc.data() ?? <String, dynamic>{};
+      final data = doc;
       final reviewerRole = await _auth.role();
-      final batch = FirebaseFirestore.instance.batch();
-      batch.update(doc.reference, {
+      await SupabaseService.client.from('stores').update({
         'status': status,
-        'reviewedBy': user.id,
-        'reviewedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      final audit = FirebaseFirestore.instance.collection('auditLogs').doc();
-      batch.set(audit, {
-        'actorUid': user.id,
+        'reviewed_by': user.id,
+        'reviewed_at': DateTime.now().toUtc().toIso8601String(),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', doc['id']);
+      await SupabaseService.client.from('audit_logs').insert({
+        'id': user.id + '-' + DateTime.now().microsecondsSinceEpoch.toString(),
+        'actor_uid': user.id,
         'email': user.email,
         'role': reviewerRole,
         'action': 'merchant_store_${status == 'approved' ? 'approved' : 'rejected'}',
         'result': 'success',
         'source': 'admin_merchant_approval',
         'details': {
-          'storeId': doc.id,
+          'storeId': doc['id'],
           'storeName': data['name'],
-          'ownerId': data['ownerId'],
+          'ownerId': data['owner_id'],
           'status': status,
         },
         'createdAt': FieldValue.serverTimestamp(),
       });
-      await batch.commit();
+
       _message(status == 'approved' ? 'تم اعتماد المتجر وأصبح مؤهلاً للظهور للعملاء.' : 'تم رفض المتجر.');
-    } on FirebaseException catch (e) {
-      _message('تعذر تحديث حالة المتجر: ${e.message ?? e.code}');
+    } catch (e) {
+      _message('تعذر تحديث حالة المتجر: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -82,19 +80,18 @@ class _MerchantApprovalPageState extends State<MerchantApprovalPage> {
           builder: (context, access) {
             if (access.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
             if (access.data != true) return const Center(child: Text('هذه الصفحة مخصصة للإدارة المعتمدة فقط.'));
-            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance.collection('stores').where('status', isEqualTo: 'pending').limit(100).snapshots(),
+            return StreamBuilder<List<Map<String, dynamic>>>(
+              stream: SupabaseService.client.from('stores').stream(primaryKey: ['id']).eq('status', 'pending').limit(100),
               builder: (context, snapshot) {
                 if (snapshot.hasError) return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('تعذر تحميل طلبات الاعتماد.\n${snapshot.error}')));
                 if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                final docs = snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                final docs = snapshot.data ?? const <Map<String, dynamic>>[];
                 if (docs.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('لا توجد متاجر بانتظار الاعتماد.')));
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
-                    final doc = docs[index];
-                    final data = doc.data();
+                    final data = docs[index];
                     return Card(
                       elevation: 0,
                       margin: const EdgeInsets.only(bottom: 12),
