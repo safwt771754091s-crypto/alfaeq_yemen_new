@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../core/product_units.dart';
-import '../services/firestore_service.dart';
+import '../services/order_service.dart';
 import '../services/supabase_service.dart';
 import 'location_picker_page.dart';
 
@@ -156,7 +156,7 @@ class _CartPageState extends State<CartPage> {
     }
     setState(() => _busy = true);
     try {
-      final orderId = await FirestoreService(preferSupabase: true).createOrder(
+      final orderId = await OrderService(preferSupabase: true).createOrder(
         customerId: _uid, items: _items, address: address, paymentMethod: paymentMethod,
         latitude: deliveryPoint?.latitude, longitude: deliveryPoint?.longitude,
       );
