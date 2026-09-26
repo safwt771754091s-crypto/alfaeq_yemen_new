@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:excel/excel.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
@@ -190,92 +189,72 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
     if (user == null || _preview.isEmpty) return;
     setState(() => _busy = true);
     try {
-      final db = FirebaseFirestore.instance;
       final references = _preview.map((r) => r.reference).toList();
       final existing = <String>{};
-      for (var start = 0; start < references.length; start += 10) {
-        final chunk = references.sublist(start, (start + 10).clamp(0, references.length));
-        final snap = await db.collection('products').where('reference', whereIn: chunk).get();
-        existing.addAll(snap.docs.map((d) => (d.data()['reference'] ?? '').toString()));
+      for (var start = 0; start < references.length; start += 100) {
+        final chunk = references.sublist(start, (start + 100).clamp(0, references.length));
+        final rows = await SupabaseService.client.from('products').select('reference').inFilter('reference', chunk);
+        existing.addAll(rows.map((r) => (r['reference'] ?? '').toString()));
       }
 
       final importable = _preview.where((row) => !existing.contains(row.reference)).toList();
       final skipped = _preview.length - importable.length;
 
-      for (var start = 0; start < importable.length; start += 400) {
-        final batch = db.batch();
-        final chunk = importable.sublist(start, (start + 400).clamp(0, importable.length));
-        for (final row in chunk) {
-          final ref = db.collection('products').doc();
-          batch.set(ref, {
-            'reference': row.reference,
-            'storeId': row.storeId,
-            'sectionId': row.sectionId,
-            'ownerId': user.uid,
-            'createdBy': user.uid,
-            'name': row.name,
-            'description': row.description,
-            'imageUrl': row.imageUrl,
-            'price': row.price,
-            'currency': 'YER',
-            'stock': row.stock,
-            'soldQuantity': 0,
-            'status': 'active',
-            'source': 'bulk_import',
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
-        await batch.commit();
+      for (var start = 0; start < importable.length; start += 100) {
+        final chunk = importable.sublist(start, (start + 100).clamp(0, importable.length));
+        final payload = chunk.map((row) => {
+          'id': '${user.id}-${row.reference}-${DateTime.now().microsecondsSinceEpoch}-${row.rowNumber}',
+          'reference': row.reference,
+          'store_id': row.storeId,
+          'section_id': row.sectionId,
+          'owner_id': user.id,
+          'name': row.name,
+          'description': row.description,
+          'image_url': row.imageUrl,
+          'price': row.price,
+          'currency': 'YER',
+          'stock': row.stock,
+          'stock_base': row.stock,
+          'sale_unit': 'piece',
+          'unit_label': 'قطعة',
+          'base_unit': 'piece',
+          'unit_scale': 1,
+          'step_base': 1,
+          'min_order_base': 1,
+          'sold_quantity': 0,
+          'sold_quantity_base': 0,
+          'status': 'active',
+          'metadata': {'created_by': user.id, 'source': 'admin_bulk_import'},
+        }).toList();
+        await SupabaseService.client.from('products').insert(payload);
       }
 
-      await db.collection('auditLogs').add({
-        'actorUid': user.uid,
+      await SupabaseService.client.from('audit_logs').insert({
+        'actor_uid': user.id,
         'action': 'products.bulk_import',
         'result': 'success',
         'source': 'admin_bulk_import',
-        'fileName': _fileName,
-        'attempted': _preview.length,
-        'imported': importable.length,
-        'skippedExistingReferences': skipped,
-        'invalidRows': _errors.length,
-        'createdAt': FieldValue.serverTimestamp(),
+        'details': {
+          'fileName': _fileName,
+          'attempted': _preview.length,
+          'imported': importable.length,
+          'skippedExistingReferences': skipped,
+          'invalidRows': _errors.length,
+        },
       });
 
       if (!mounted) return;
-      setState(() {
-        _preview = importable;
-        _duplicateCount += skipped;
-        _validCount = importable.length;
-      });
-      _message('اكتمل الاستيراد: ${importable.length} صنف جديد، وتم تجاوز $skipped رقم مرجع موجود مسبقاً.');
-    } on FirebaseException catch (e) {
-      _message('تعذر الاستيراد: ${e.message ?? e.code}');
+      setState(() => _preview = []);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم استيراد ${importable.length} صنفاً إلى Supabase وتجاوز ${skipped} مكرراً.')),
+      );
     } catch (e) {
-      _message('تعذر الاستيراد: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تنفيذ الاستيراد: $e')));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  Future<void> _downloadTemplate() async {
-    final bytes = Excel.createExcel();
-    final sheet = bytes['Sheet1'];
-    final headers = ['reference', 'name', 'quantity', 'price', 'imageUrl', 'description', 'storeId', 'sectionId'];
-    for (var i = 0; i < headers.length; i++) {
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(headers[i]);
-    }
-    final examples = ['PRD-0001', 'اسم الصنف', '10', '15000', 'https://...', 'وصف الصنف', 'STORE_ID', appSections.first.id];
-    for (var i = 0; i < examples.length; i++) {
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 1)).value = TextCellValue(examples[i]);
-    }
-    final data = Uint8List.fromList(bytes.encode()!);
-    final path = await FilePicker.platform.saveFile(fileName: 'alfaeq_products_template.xlsx', bytes: data);
-    if (path != null && mounted) _message('تم تجهيز نموذج Excel.');
-  }
-
-  void _message(String text) {
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
