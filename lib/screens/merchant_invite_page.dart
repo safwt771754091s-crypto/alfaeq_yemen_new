@@ -55,8 +55,6 @@ class _MerchantInvitePageState extends State<MerchantInvitePage> {
       setState(() => _message = e.message.isNotEmpty ? e.message : 'تعذر تفعيل دعوة التاجر.');
     } catch (e) {
       setState(() => _message = 'تعذر إنشاء الحساب: $e');
-    } catch (e) {
-      setState(() => _message = 'تعذر إكمال التسجيل: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
