@@ -148,8 +148,6 @@ class _PlatformControlPageState extends State<PlatformControlPage> {
       );
       await _checkOwner();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تنفيذ العملية: $e')));
     }
   }
