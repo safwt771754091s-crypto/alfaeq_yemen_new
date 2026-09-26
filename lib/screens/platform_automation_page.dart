@@ -97,8 +97,8 @@ class PlatformAutomationPage extends StatelessWidget {
     );
   }
 
-  Widget _automationTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
+  Widget _automationTile(BuildContext context, Map<String, dynamic> data) {
+    final docId = data['id']?.toString() ?? '';
     final source = (data['source'] ?? 'unknown').toString();
     final status = (data['status'] ?? 'unknown').toString();
     final isReady = data['ready'] == true;
@@ -108,7 +108,7 @@ class PlatformAutomationPage extends StatelessWidget {
     return Card(
       child: ExpansionTile(
         leading: Icon(isReady ? Icons.check_circle : Icons.pending_actions, color: isReady ? Colors.green : Colors.orange),
-        title: Text('${_sourceLabel(source)} — ${data['sourceId'] ?? doc.id}', style: const TextStyle(fontWeight: FontWeight.w800)),
+        title: Text('${_sourceLabel(source)} — ${data['sourceId'] ?? docId}', style: const TextStyle(fontWeight: FontWeight.w800)),
         subtitle: Text(_statusLabel(status)),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         children: [
