@@ -484,7 +484,7 @@ Future<void> _addProductToCart(BuildContext context, CatalogDocument product) as
   if (user == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول أولاً.'))); return; }
   final name = (product.data['name'] ?? product.data['title'] ?? 'صنف').toString();
   try {
-    await const CatalogService().addToCart(user.uid, product);
+    await const CatalogService().addToCart(user.id, product);
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تمت إضافة «' + name + '» إلى السلة.')));
   } on StateError catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -781,7 +781,7 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
       child: Scaffold(
         appBar: AppBar(title: const Text('المحفظة المالية', style: TextStyle(fontWeight: FontWeight.w900))),
         body: FutureBuilder<Map<String, dynamic>?>(
-          future: _loadWallet(user.uid),
+          future: _loadWallet(user.id),
           builder: (context, walletSnapshot) {
             if (walletSnapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
             if (walletSnapshot.hasError) return Center(child: Text('تعذر تحميل المحفظة: ${walletSnapshot.error}'));
@@ -807,7 +807,7 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
                 const Text('آخر العمليات', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 8),
                 FutureBuilder<List<Map<String, dynamic>>>(
-                  future: SupabaseService.client.from('wallet_operations').select().eq('uid', user.uid).order('created_at', ascending: false).limit(30),
+                  future: SupabaseService.client.from('wallet_operations').select().eq('uid', user.id).order('created_at', ascending: false).limit(30),
                   builder: (context, ops) {
                     if (ops.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
                     if (ops.hasError) return Text('تعذر تحميل العمليات: '+ops.error.toString());
@@ -845,8 +845,8 @@ class _AccountTab extends StatelessWidget {
         const SizedBox(height: 16),
         Card(child: ListTile(
           leading: const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.person_outline, color: _blue)),
-          title: Text(user?.displayName ?? 'مستخدم الفائق', style: const TextStyle(fontWeight: FontWeight.w900)),
-          subtitle: Text(user?.email ?? user?.phoneNumber ?? 'حساب مسجل الدخول'),
+          title: Text((user?.userMetadata['full_name'] ?? user?.userMetadata['name'] ?? 'مستخدم الفائق').toString(), style: const TextStyle(fontWeight: FontWeight.w900)),
+          subtitle: Text(user?.email ?? user?.phone ?? 'حساب مسجل الدخول'),
         )),
         ListTile(leading: const Icon(Icons.shopping_cart_outlined, color: _blue), title: const Text('السلة', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage()))),
         ListTile(leading: const Icon(Icons.receipt_long_outlined, color: _blue), title: const Text('طلباتي وتتبع التوصيل', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersPage()))),
