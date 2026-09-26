@@ -293,16 +293,16 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
                     onChanged: _busy ? null : (v) => setState(() => _selectedSectionId = v),
                   ),
                   const SizedBox(height: 8),
-                  StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: FirebaseFirestore.instance.collection('stores').where('status', whereIn: ['approved', 'active']).limit(200).snapshots(),
+                  FutureBuilder<List<Map<String, dynamic>>>(
+                    future: SupabaseService.client.from('stores').select('id,name,status').inFilter('status', ['approved', 'active']).order('name'),
                     builder: (context, snapshot) {
-                      final docs = snapshot.data?.docs ?? [];
+                      final rows = snapshot.data ?? const <Map<String, dynamic>>[];
                       return DropdownButtonFormField<String>(
                         initialValue: _selectedStoreId,
                         decoration: const InputDecoration(labelText: 'المتجر الافتراضي إذا لم يوجد storeId في الملف'),
                         items: [
                           const DropdownMenuItem<String>(value: null, child: Text('استخدم storeId الموجود في الملف')),
-                          ...docs.map((d) => DropdownMenuItem(value: d.id, child: Text('${d.data()['name'] ?? d.id}'))),
+                          ...rows.map((d) => DropdownMenuItem(value: d['id']?.toString(), child: Text('${d['name'] ?? d['id']}'))),
                         ],
                         onChanged: _busy ? null : (v) => setState(() => _selectedStoreId = v),
                       );
