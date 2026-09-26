@@ -2,7 +2,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 
 /// أدوات ذكاء الفائق — Supabase فقط.
-/// لا يوجد مسار بديل إلى Firebase أو قاعدة بيانات ثانية.
 class AlfaeqAiToolRegistry {
   static const int _maxResults = 8;
   final SupabaseClient _client;
