@@ -71,6 +71,46 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
+  web-smoke:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: deploy-web
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+      - name: Smoke test published Flutter app
+        env:
+          APP_URL: ${{ needs.deploy-web.outputs.page_url }}
+        run: |
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          const url = process.env.APP_URL;
+          if (!url) throw new Error('GitHub Pages did not return a deployment URL');
+          (async () => {
+            const browser = await chromium.launch({headless:true});
+            const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+            const errors = [];
+            page.on('pageerror', e => errors.push(String(e)));
+            page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+            await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+            await page.waitForTimeout(5000);
+            const state = await page.evaluate(() => ({
+              title: document.title,
+              glass: !!document.querySelector('flt-glass-pane'),
+              canvas: !!document.querySelector('canvas'),
+              bodyText: document.body.innerText || ''
+            }));
+            console.log(JSON.stringify({url, state, errors}, null, 2));
+            if (!state.glass && !state.canvas) throw new Error('Flutter engine did not start: published page is effectively blank');
+            if (errors.length) throw new Error('Browser console/page errors detected: ' + errors.join(' | '));
+            await browser.close();
+          })();
+          NODE
+
   build-android-debug:
     runs-on: ubuntu-latest
     timeout-minutes: 30
