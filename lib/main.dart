@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'core/app_sections.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/ai_assistant_page.dart';
@@ -38,24 +37,9 @@ class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
   }
 
   Future<void> _initializeServices() async {
-    // Supabase is the authoritative authentication and application backend.
+    // Keep browser startup limited to the Supabase bootstrap. Persisted
+    // legacy-session cleanup must never be able to block the Flutter shell.
     await SupabaseService.initialize();
-
-    // One-time migration reset: the current release changed the auth/data
-    // path. Clear any persisted legacy session so testing starts from a clean
-    // login screen. New logins are not affected on subsequent launches.
-    final prefs = await SharedPreferences.getInstance();
-    const migrationKey = 'alfaeq_auth_migration_2026_09_22_2';
-    if (prefs.getBool(migrationKey) != true) {
-      try {
-        if (SupabaseService.isInitialized) {
-          await SupabaseService.client.auth.signOut();
-        }
-      } catch (_) {}
-      await prefs.setBool(migrationKey, true);
-    }
-
-
   }
 
   @override
