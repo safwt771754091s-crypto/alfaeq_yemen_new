@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import '../services/firestore_service.dart';
@@ -17,9 +16,7 @@ class MyOrdersPage extends StatelessWidget {
         appBar: AppBar(title: const Text('طلباتي', style: TextStyle(fontWeight: FontWeight.w900))),
         body: user == null
             ? const Center(child: Text('يجب تسجيل الدخول لعرض طلباتك.'))
-            : SupabaseService.isInitialized
-                ? _SupabaseOrders(userId: user.id)
-                : _FirebaseOrders(userId: user.id),
+            : _SupabaseOrders(userId: user.id),
       ),
     );
   }
@@ -48,34 +45,11 @@ class _SupabaseOrders extends StatelessWidget {
   }
 }
 
-class _FirebaseOrders extends StatelessWidget {
-  final String userId;
-  const _FirebaseOrders({required this.userId});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('orders').where('customerId', isEqualTo: userId).limit(50).snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return Center(child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('تعذر تحميل الطلبات.\n${snapshot.error}', textAlign: TextAlign.center),
-        ));
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        final orders = [...(snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])]
-          ..sort((a, b) => _OrdersList.timestamp(b.data()['createdAt']).compareTo(_OrdersList.timestamp(a.data()['createdAt'])));
-        return _OrdersList(orders: orders.map((doc) => {'id': doc.id, ...doc.data()}).toList());
-      },
-    );
-  }
-}
-
 class _OrdersList extends StatelessWidget {
   final List<Map<String, dynamic>> orders;
   const _OrdersList({required this.orders});
 
   static DateTime timestamp(dynamic value) {
-    if (value is Timestamp) return value.toDate();
     if (value is DateTime) return value;
     if (value is String) return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
     return DateTime.fromMillisecondsSinceEpoch(0);
