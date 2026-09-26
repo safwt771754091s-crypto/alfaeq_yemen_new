@@ -1,4 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/supabase_service.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
@@ -114,7 +115,7 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 10),
             const Text('تحكم في تشغيل الفائق يمن من مكان واحد', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
-            const Text('الصلاحيات الحقيقية تظل مفروضة من Firebase Security Rules وCustom Claims على الخادم.', style: TextStyle(color: Colors.white70, height: 1.45)),
+            const Text('الصلاحيات الحقيقية تظل مفروضة من Supabase Auth وRLS وسياسات الخادم.', style: TextStyle(color: Colors.white70, height: 1.45)),
             const SizedBox(height: 14),
             FilledButton.icon(onPressed: () => _open(context, PlatformAutomationPage()), icon: const Icon(Icons.health_and_safety_outlined), label: const Text('فحص جاهزية المنصة')),
           ]),
@@ -125,7 +126,7 @@ class AdminDashboard extends StatelessWidget {
         future: _loadStats(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) return const Card(child: Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator())));
-          if (snapshot.hasError) return const Card(child: ListTile(leading: Icon(Icons.warning_amber_outlined), title: Text('تعذر تحميل المؤشرات'), subtitle: Text('تحقق من اتصال Firebase وصلاحيات حساب الإدارة.')));
+          if (snapshot.hasError) return const Card(child: ListTile(leading: Icon(Icons.warning_amber_outlined), title: Text('تعذر تحميل المؤشرات'), subtitle: Text('تحقق من اتصال Supabase وصلاحيات حساب الإدارة.')));
           final stats = snapshot.data!;
           return Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('مؤشرات الحسابات والتشغيل', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
@@ -141,8 +142,8 @@ class AdminDashboard extends StatelessWidget {
         },
       );
 
-  Widget _loginActivity() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance.collection('loginEvents').limit(50).snapshots(),
+  Widget _loginActivity() => StreamBuilder<List<Map<String, dynamic>>>(
+        stream: SupabaseService.client.from('login_events').stream(primaryKey: ['id']).order('created_at', ascending: false).limit(50),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Card(child: Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())));
@@ -150,7 +151,7 @@ class AdminDashboard extends StatelessWidget {
           if (snapshot.hasError) {
             return const Card(child: ListTile(title: Text('سجل الدخول'), subtitle: Text('تعذر قراءة سجل الدخول. تحقق من صلاحيات المالك.')));
           }
-          final docs = snapshot.data?.docs ?? const [];
+          final docs = snapshot.data ?? const <Map<String, dynamic>>[];
           return Card(
             child: Padding(
               padding: const EdgeInsets.all(14),
@@ -166,11 +167,11 @@ class AdminDashboard extends StatelessWidget {
                   const Padding(padding: EdgeInsets.all(12), child: Text('لا توجد أحداث دخول مسجلة بعد.'))
                 else
                   ...docs.map((doc) {
-                    final d = doc.data();
+                    final d = doc;
                     final email = (d['email'] ?? 'بدون بريد').toString();
                     final provider = (d['provider'] ?? 'unknown').toString();
-                    final ts = d['loginAt'];
-                    final when = ts is Timestamp ? ts.toDate().toLocal().toString() : 'جارٍ تسجيل الوقت';
+                    final ts = d['login_at'] ?? d['created_at'];
+                    final when = ts is String ? DateTime.tryParse(ts)?.toLocal().toString() ?? ts : 'جارٍ تسجيل الوقت';
                     return ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
