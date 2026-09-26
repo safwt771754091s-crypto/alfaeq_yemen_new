@@ -69,7 +69,7 @@ class AlfaeqAiToolRegistry {
   Future<Map<String,Object?>> _getMyAccountSummary() async {
     final u=_client.auth.currentUser;if(u==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
     final rows=await _client.from('users').select().eq('uid',u.id).limit(1);final d=rows.isEmpty?<String,dynamic>{}:Map<String,dynamic>.from(rows.first);
-    final meta=u.userMetadata;
+    final meta=u.userMetadata ?? const <String,dynamic>{};
     return {'ok':true,'uid':u.id,'email':u.email,'displayName':d['name']??meta['full_name']??meta['name'],'role':d['role']??'customer','phoneVerified':u.phone!=null,'emailVerified':u.emailConfirmedAt!=null};
   }
 
