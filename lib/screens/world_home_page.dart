@@ -845,7 +845,7 @@ class _AccountTab extends StatelessWidget {
         const SizedBox(height: 16),
         Card(child: ListTile(
           leading: const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.person_outline, color: _blue)),
-          title: Text((user?.userMetadata['full_name'] ?? user?.userMetadata['name'] ?? 'مستخدم الفائق').toString(), style: const TextStyle(fontWeight: FontWeight.w900)),
+          title: Text(((user?.userMetadata ?? const <String, dynamic>{})['full_name'] ?? (user?.userMetadata ?? const <String, dynamic>{})['name'] ?? 'مستخدم الفائق').toString(), style: const TextStyle(fontWeight: FontWeight.w900)),
           subtitle: Text(user?.email ?? user?.phone ?? 'حساب مسجل الدخول'),
         )),
         ListTile(leading: const Icon(Icons.shopping_cart_outlined, color: _blue), title: const Text('السلة', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage()))),
