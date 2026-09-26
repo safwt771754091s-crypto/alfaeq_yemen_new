@@ -1,40 +1,42 @@
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'supabase_service.dart';
 
-/// Starts the authoritative server-side Super Alfaeq catalog import.
-/// The catalog itself lives with Cloud Functions so the APK does not depend
-/// on duplicating a large product dataset into Flutter assets.
+/// Supabase-backed catalog readiness/import facade.
 class SuperAlfaeqCatalogImporter {
-  final FirebaseFunctions functions;
-
-  SuperAlfaeqCatalogImporter({FirebaseFunctions? firebaseFunctions})
-      : functions = firebaseFunctions ??
-            FirebaseFunctions.instanceFor(region: 'us-central1');
+  const SuperAlfaeqCatalogImporter();
 
   Future<bool> isReady() async {
+    if (!SupabaseService.isInitialized) return false;
     try {
-      final result = await functions
-          .httpsCallable('ensureSuperAlfaeqCatalog')
-          .call(<String, dynamic>{'checkOnly': true});
+      final result = await SupabaseService.client.functions.invoke(
+        'platform-api',
+        body: const {'action': 'catalog_ready'},
+      );
       final data = Map<String, dynamic>.from(result.data as Map);
       return data['ok'] == true && data['ready'] == true;
-    } on FirebaseFunctionsException {
-      return false;
+    } catch (_) {
+      try {
+        final rows = await SupabaseService.client.from('products').select('id').limit(1);
+        return rows.isNotEmpty;
+      } catch (_) {
+        return false;
+      }
     }
   }
 
-  Future<int> importIfNeeded({
-    void Function(int done, int total)? onProgress,
-  }) async {
-    // The callable performs authentication, owner/admin authorization,
-    // idempotency, batching and server-side writes.
-    final result = await functions
-        .httpsCallable('ensureSuperAlfaeqCatalog')
-        .call(<String, dynamic>{});
-    final data = Map<String, dynamic>.from(result.data as Map);
-    if (data['ok'] != true) return 0;
-    final imported = (data['imported'] as num?)?.toInt() ?? 0;
-    final active = (data['active'] as num?)?.toInt() ?? imported;
-    onProgress?.call(active, imported);
-    return imported;
+  Future<int> importIfNeeded({void Function(int done, int total)? onProgress}) async {
+    if (!SupabaseService.isInitialized) return 0;
+    try {
+      final result = await SupabaseService.client.functions.invoke(
+        'platform-api',
+        body: const {'action': 'catalog_ready'},
+      );
+      final data = Map<String, dynamic>.from(result.data as Map);
+      final active = (data['active'] as num?)?.toInt() ?? 0;
+      onProgress?.call(active, active);
+      return active;
+    } on FunctionException {
+      return 0;
+    }
   }
 }
