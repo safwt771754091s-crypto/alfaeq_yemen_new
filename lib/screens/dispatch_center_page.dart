@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/auth_service.dart';
@@ -27,7 +26,6 @@ class _DispatchCenterPageState extends State<DispatchCenterPage> {
       final a=(raw['latitude'] as num?)?.toDouble(), b=(raw['longitude'] as num?)?.toDouble();
       if(a!=null&&b!=null)return LatLng(a,b);
     }
-    if(raw is GeoPoint)return LatLng(raw.latitude,raw.longitude);
     final a=(d['latitude'] as num?)?.toDouble(), b=(d['longitude'] as num?)?.toDouble();
     return a!=null&&b!=null?LatLng(a,b):null;
   }
