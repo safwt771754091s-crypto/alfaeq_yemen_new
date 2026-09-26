@@ -46,8 +46,6 @@ class _MerchantInvitesPageState extends State<MerchantInvitesPage> {
       _message(e.message);
     } catch (e) {
       _message('تعذر إنشاء رابط التاجر: $e');
-    } catch (e) {
-      _message('تعذر إنشاء الرابط: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
