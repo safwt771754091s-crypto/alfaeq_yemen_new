@@ -270,12 +270,12 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('استيراد حقيقي إلى Firestore', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                  const Text('استيراد حقيقي إلى Supabase', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 8),
                   const Text('ارفع Excel أو CSV يحتوي على رقم المرجع، اسم الصنف، الكمية، السعر والصورة. ستتم المعاينة والتحقق قبل الحفظ.'),
                   const SizedBox(height: 12),
                   Wrap(spacing: 8, runSpacing: 8, children: [
-                    OutlinedButton.icon(onPressed: _busy ? null : _downloadTemplate, icon: const Icon(Icons.download_outlined), label: const Text('تحميل نموذج Excel')),
+                    
                     FilledButton.icon(onPressed: _busy ? null : _pickFile, icon: const Icon(Icons.upload_file_outlined), label: const Text('رفع ملف الأصناف')),
                   ]),
                 ]),
@@ -330,7 +330,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
                 isThreeLine: true,
               ))),
               const SizedBox(height: 12),
-              SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _busy ? null : _import, icon: const Icon(Icons.cloud_upload_outlined), label: Text('اعتماد واستيراد $_validCount صنف إلى Firestore'))),
+              SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _busy ? null : _import, icon: const Icon(Icons.cloud_upload_outlined), label: Text('اعتماد واستيراد $_validCount صنف إلى Supabase'))),
             ],
           ],
         ),
