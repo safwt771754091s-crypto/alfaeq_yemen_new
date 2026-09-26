@@ -202,20 +202,30 @@ class AdminDashboard extends StatelessWidget {
   }
 
   Future<_AdminStats> _loadStats() async {
-    final db = FirebaseFirestore.instance;
+    final client = SupabaseService.client;
     final results = await Future.wait([
-      db.collection('users').get(),
-      db.collection('users').where('isOnline', isEqualTo: true).get(),
-      db.collection('stores').get(),
-      db.collection('products').get(),
-      db.collection('orders').get(),
-      db.collection('walletOperations').get(),
-      db.collection('auditLogs').get(),
-      db.collection('loginEvents').get(),
+      client.from('users').select('uid'),
+      client.from('users').select('uid').eq('is_online', true),
+      client.from('stores').select('id'),
+      client.from('products').select('id'),
+      client.from('orders').select('id'),
+      client.from('wallet_operations').select('id'),
+      client.from('audit_logs').select('id'),
+      client.from('login_events').select('uid'),
     ]);
-    final loginDocs = results[7].docs;
-    final loggedInUsers = loginDocs.map((d) => d.data()['uid']?.toString()).whereType<String>().toSet().length;
-    return _AdminStats(users: results[0].size, onlineUsers: results[1].size, loggedInUsers: loggedInUsers, loginEvents: results[7].size, stores: results[2].size, products: results[3].size, orders: results[4].size, walletOperations: results[5].size, auditLogs: results[6].size);
+    final loginRows = results[7] as List;
+    final loggedInUsers = loginRows.map((d) => (d as Map)['uid']?.toString()).whereType<String>().toSet().length;
+    return _AdminStats(
+      users: (results[0] as List).length,
+      onlineUsers: (results[1] as List).length,
+      loggedInUsers: loggedInUsers,
+      loginEvents: loginRows.length,
+      stores: (results[2] as List).length,
+      products: (results[3] as List).length,
+      orders: (results[4] as List).length,
+      walletOperations: (results[5] as List).length,
+      auditLogs: (results[6] as List).length,
+    );
   }
 
   static void _open(BuildContext context, Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
