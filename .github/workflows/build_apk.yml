@@ -53,6 +53,8 @@ jobs:
         with:
           cache-read-only: false
       - name: Build APK (with dependency retry)
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         shell: bash
         run: |
           set -e
