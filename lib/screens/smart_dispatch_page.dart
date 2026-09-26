@@ -21,7 +21,7 @@ class _SmartDispatchPageState extends State<SmartDispatchPage> {
     final online = d['is_online'] == true;
     final active = (d['active_order_count'] as num?)?.toDouble() ?? 0;
     final rating = (d['rating'] as num?)?.toDouble() ?? 5;
-    var score = (approved ? 50 : 0) + (online ? 40 : 0) + (10 - active).clamp(0, 10) + rating.clamp(0, 5);
+    var score = (approved ? 50 : 0).toDouble() + (online ? 40 : 0).toDouble() + (10 - active).clamp(0, 10).toDouble() + rating.clamp(0, 5).toDouble();
     if (d['latitude'] is num && d['longitude'] is num) score += 5;
     return score;
   }
