@@ -49,18 +49,18 @@ class _SmartDispatchPageState extends State<SmartDispatchPage> {
         'driverId': driver.id,
         'deliveryStatus': 'assigned',
         'assignedAt': FieldValue.serverTimestamp(),
-        'assignedBy': user.uid,
+        'assignedBy': user.id,
         'updatedAt': FieldValue.serverTimestamp(),
       });
       batch.set(FirebaseFirestore.instance.collection('deliveryEvents').doc(), {
         'orderId': order.id,
         'driverId': driver.id,
         'status': 'assigned',
-        'assignedBy': user.uid,
+        'assignedBy': user.id,
         'createdAt': FieldValue.serverTimestamp(),
       });
       batch.set(FirebaseFirestore.instance.collection('auditLogs').doc(), {
-        'actorUid': user.uid,
+        'actorUid': user.id,
         'email': user.email,
         'role': await _auth.role(),
         'action': 'smart_dispatch_assign',
