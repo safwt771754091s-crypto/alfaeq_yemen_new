@@ -1,9 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
 
 class DriverFleetMapPage extends StatelessWidget {
   const DriverFleetMapPage({super.key});
@@ -34,28 +34,28 @@ class DriverFleetMapPage extends StatelessWidget {
             if (access.data != true) {
               return const Center(child: Text('لا تملك صلاحية متابعة المندوبين.'));
             }
-            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance.collection('drivers').snapshots(),
+            return StreamBuilder<List<Map<String, dynamic>>>(
+              stream: SupabaseService.client.from('drivers').stream(primaryKey: ['id']),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('تعذر تحميل المندوبين.\n${snapshot.error}')));
+                  return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('تعذر تحميل المندوبين.\\n${snapshot.error}')));
                 }
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final drivers = snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                final drivers = snapshot.data ?? const <Map<String, dynamic>>[];
                 final points = <_DriverPoint>[];
-                for (final doc in drivers) {
-                  final data = doc.data();
-                  final location = data['currentLocation'];
-                  if (location is GeoPoint) {
+                for (final data in drivers) {
+                  final lat = (data['latitude'] as num?)?.toDouble();
+                  final lng = (data['longitude'] as num?)?.toDouble();
+                  if (lat != null && lng != null) {
                     points.add(_DriverPoint(
-                      id: doc.id,
-                      point: LatLng(location.latitude, location.longitude),
-                      online: data['isOnline'] == true,
+                      id: data['id']?.toString() ?? '',
+                      point: LatLng(lat, lng),
+                      online: data['is_online'] == true,
                       approved: data['approved'] == true,
-                      activeOrders: (data['activeOrderCount'] as num?)?.toInt() ?? 0,
+                      activeOrders: (data['active_order_count'] as num?)?.toInt() ?? 0,
                     ));
                   }
                 }
