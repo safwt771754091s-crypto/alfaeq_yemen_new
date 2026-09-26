@@ -59,8 +59,6 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
       _message('تم إرسال المتجر للمراجعة مع موقعه الجغرافي. لن يظهر للعملاء حتى يتم اعتماده.');
     } catch (e) {
       _message('تعذر حفظ المتجر: $e');
-    } catch (_) {
-      _message('يجب تفعيل الموقع والسماح للفائق يمن بالوصول إلى موقع المتجر.');
     } finally { if (mounted) setState(() => _saving = false); }
   }
 
