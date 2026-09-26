@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
@@ -41,27 +40,25 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     setState(() => _saving = true);
     try {
       final position = await LocationService.requireCurrentPosition();
-      final location = GeoPoint(position.latitude, position.longitude);
-      final ref = await FirebaseFirestore.instance.collection('stores').add({
+      final storeId = user.id + '-' + DateTime.now().microsecondsSinceEpoch.toString();
+      await SupabaseService.client.from('stores').insert({
+        'id': storeId,
         'name': name,
         'phone': phone,
         'address': _address.text.trim(),
-        'sectionId': _sectionId,
+        'section_id': _sectionId,
         'status': 'pending',
-        'ownerId': user.id,
-        'createdBy': user.id,
-        'location': location,
+        'owner_id': user.id,
         'latitude': position.latitude,
         'longitude': position.longitude,
-        'locationSource': 'device',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
+        'location': {'latitude': position.latitude, 'longitude': position.longitude, 'source': 'device'},
+        'metadata': {'created_by': user.id},
       });
-      _selectedStoreId = ref.id;
+      _selectedStoreId = storeId;
       _storeName.clear(); _phone.clear(); _address.clear();
       _message('تم إرسال المتجر للمراجعة مع موقعه الجغرافي. لن يظهر للعملاء حتى يتم اعتماده.');
-    } on FirebaseException catch (e) {
-      _message('تعذر حفظ المتجر: ${e.message ?? e.code}');
+    } catch (e) {
+      _message('تعذر حفظ المتجر: $e');
     } catch (_) {
       _message('يجب تفعيل الموقع والسماح للفائق يمن بالوصول إلى موقع المتجر.');
     } finally { if (mounted) setState(() => _saving = false); }
@@ -73,21 +70,21 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     if (price == null || price < 0 || stock == null || stock < 0) { _message('السعر والكمية يجب أن يكونا أرقاماً صحيحة وغير سالبة.'); return; }
     setState(() => _saving = true);
     try {
-      await FirebaseFirestore.instance.collection('products').add({'storeId': storeId, 'ownerId': user.id, 'createdBy': user.id, 'name': name, 'price': price, 'currency': 'YER', 'stock': stock, 'stockBase': ProductUnit.fromId(_saleUnit).toBase(stock).round(), 'saleUnit': _saleUnit, 'unitLabel': ProductUnit.fromId(_saleUnit).label, 'baseUnit': ProductUnit.fromId(_saleUnit).baseUnit, 'unitScale': ProductUnit.fromId(_saleUnit).scale, 'stepBase': ProductUnit.fromId(_saleUnit).defaultStepBase, 'minOrderBase': ProductUnit.fromId(_saleUnit).defaultStepBase, 'soldQuantity': 0, 'soldQuantityBase': 0, 'status': 'active', 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp()});
+      await SupabaseService.client.from('products').insert({'id': user.id + '-' + DateTime.now().microsecondsSinceEpoch.toString(), 'store_id': storeId, 'owner_id': user.id, 'name': name, 'price': price, 'currency': 'YER', 'stock': stock, 'stock_base': ProductUnit.fromId(_saleUnit).toBase(stock).round(), 'sale_unit': _saleUnit, 'unit_label': ProductUnit.fromId(_saleUnit).label, 'base_unit': ProductUnit.fromId(_saleUnit).baseUnit, 'unit_scale': ProductUnit.fromId(_saleUnit).scale, 'step_base': ProductUnit.fromId(_saleUnit).defaultStepBase, 'min_order_base': ProductUnit.fromId(_saleUnit).defaultStepBase, 'sold_quantity': 0, 'sold_quantity_base': 0, 'status': 'active', 'metadata': {'created_by': user.id}});
       _productName.clear(); _price.clear(); _stock.clear(); _message('تم حفظ الصنف بنجاح.');
-    } on FirebaseException catch (e) { _message('تعذر حفظ الصنف: ${e.message ?? e.code}'); }
+    } catch (e) { _message('تعذر حفظ الصنف: $e'); }
     finally { if (mounted) setState(() => _saving = false); }
   }
 
-  Future<void> _updateProduct(QueryDocumentSnapshot<Map<String, dynamic>> doc) async {
-    final data = doc.data();
+  Future<void> _updateProduct(Map<String, dynamic> doc) async {
+    final data = doc;
     final priceController = TextEditingController(text: '${data['price'] ?? ''}');
     final stockController = TextEditingController(text: '${data['stock'] ?? ''}');
     final result = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: Text('${data['name'] ?? 'تعديل الصنف'}'), content: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر')), TextField(controller: stockController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المخزون'))]), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حفظ'))]));
     if (result != true) return;
     final price = num.tryParse(priceController.text.trim()); final stock = int.tryParse(stockController.text.trim());
     if (price == null || price < 0 || stock == null || stock < 0) { _message('السعر والمخزون غير صالحين.'); return; }
-    await doc.reference.update({'price': price, 'stock': stock, 'updatedAt': FieldValue.serverTimestamp()});
+    await SupabaseService.client.from('products').update({'price': price, 'stock': stock, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', doc['id']);
   }
 
   void _message(String text) { if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text))); }
@@ -101,12 +98,12 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     ])));
   }
 
-  Widget _stores(String uid) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: FirebaseFirestore.instance.collection('stores').where('ownerId', isEqualTo: uid).limit(30).snapshots(), builder: (context, snapshot) {
+  Widget _stores(String uid) => StreamBuilder<List<Map<String, dynamic>>>(stream: SupabaseService.client.from('stores').stream(primaryKey: ['id']).eq('owner_id', uid).limit(30), builder: (context, snapshot) {
     if (snapshot.hasError) return _error(snapshot.error.toString());
     if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
-    final docs = snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    final docs = snapshot.data ?? const <Map<String, dynamic>>[];
     if (docs.isEmpty) return const _EmptyCard(text: 'لم تنشئ متجراً بعد.');
-    return Column(children: docs.map((doc) { final data = doc.data(); final selected = _selectedStoreId == doc.id; return Card(elevation: 0, child: ListTile(selected: selected, leading: CircleAvatar(backgroundColor: const Color(0xFFE7F3EE), child: Icon(Icons.storefront_outlined, color: Theme.of(context).colorScheme.primary)), title: Text('${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900)), subtitle: Text('${data['status'] ?? 'pending'} • ${data['phone'] ?? ''}'), trailing: selected ? const Icon(Icons.check_circle) : const Icon(Icons.chevron_left), onTap: () => setState(() => _selectedStoreId = doc.id))); }).toList());
+    return Column(children: docs.map((doc) { final data = doc; final selected = _selectedStoreId == doc['id']; return Card(elevation: 0, child: ListTile(selected: selected, leading: CircleAvatar(backgroundColor: const Color(0xFFE7F3EE), child: Icon(Icons.storefront_outlined, color: Theme.of(context).colorScheme.primary)), title: Text('${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900)), subtitle: Text('${data['status'] ?? 'pending'} • ${data['phone'] ?? ''}'), trailing: selected ? const Icon(Icons.check_circle) : const Icon(Icons.chevron_left), onTap: () => setState(() => _selectedStoreId = doc['id'].toString()))); }).toList());
   });
 
   Widget _storeForm() => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
@@ -119,10 +116,10 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
   Widget _productForm() => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [if (_selectedStoreId == null) const Align(alignment: Alignment.centerRight, child: Text('اختر متجراً أولاً من القائمة أعلاه.', style: TextStyle(color: Colors.black54))), TextField(controller: _productName, decoration: const InputDecoration(labelText: 'اسم الصنف')), TextField(controller: _price, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر بالريال اليمني')), TextField(controller: _stock, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'المخزون بـ ${ProductUnit.fromId(_saleUnit).label}')),
     DropdownButtonFormField<String>(initialValue: _saleUnit, decoration: const InputDecoration(labelText: 'وحدة البيع'), items: [for (final u in ProductUnit.all) DropdownMenuItem(value: u.id, child: Text(u.label))], onChanged: (value) { if (value != null) setState(() => _saleUnit = value); }), const SizedBox(height: 12), SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _saving || _selectedStoreId == null ? null : _createProduct, icon: const Icon(Icons.add), label: const Text('حفظ الصنف')))])));
 
-  Widget _products(String uid) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: FirebaseFirestore.instance.collection('products').where('ownerId', isEqualTo: uid).limit(100).snapshots(), builder: (context, snapshot) {
+  Widget _products(String uid) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: FirebaseFirestore.instance.collection('products').where('owner_id', isEqualTo: uid).limit(100).snapshots(), builder: (context, snapshot) {
     if (snapshot.hasError) return _error(snapshot.error.toString());
     if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
-    final docs = snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[]; final filtered = _selectedStoreId == null ? docs : docs.where((doc) => doc.data()['storeId'] == _selectedStoreId).toList();
+    final docs = snapshot.data ?? const <Map<String, dynamic>>[]; final filtered = _selectedStoreId == null ? docs : docs.where((doc) => doc['store_id'] == _selectedStoreId).toList();
     if (filtered.isEmpty) return const _EmptyCard(text: 'لا توجد أصناف لهذا المتجر بعد.');
     return Column(children: filtered.map((doc) { final data = doc.data(); return Card(elevation: 0, child: ListTile(leading: const Icon(Icons.inventory_2_outlined), title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('مخزون: ${data['stock'] ?? 0} • حالة: ${data['status'] ?? 'active'}'), trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [Text('${data['price'] ?? 0} ${data['currency'] ?? 'YER'}', style: const TextStyle(fontWeight: FontWeight.w900)), TextButton(onPressed: () => _updateProduct(doc), child: const Text('تعديل'))]))); }).toList());
   });
