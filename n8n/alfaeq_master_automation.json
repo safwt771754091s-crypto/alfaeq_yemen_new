@@ -434,7 +434,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ ok: true, source: 'alfaeq_yemen_new', eventId: $json.eventId, eventType: $json.eventType }) }}",
+        "responseBody": "={{ JSON.stringify({ ok: true, source: 'alfaeq_yemen_new', eventId: $('Validate & Normalize').first().json.eventId, eventType: $('Validate & Normalize').first().json.eventType }) }}",
         "options": {}
       },
       "id": "response",
@@ -563,6 +563,28 @@
             "index": 0
           }
         ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Studio — Product Asset": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Automation": {
+      "main": [
         [
           {
             "node": "Respond",
