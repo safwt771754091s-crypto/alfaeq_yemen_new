@@ -111,9 +111,9 @@ class _MerchantApprovalPageState extends State<MerchantApprovalPage> {
                           Text('صاحب المتجر: ${data['owner_id'] ?? '—'}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
                           const SizedBox(height: 14),
                           Row(children: [
-                            Expanded(child: FilledButton.icon(onPressed: _busy ? null : () => _setStatus(doc, 'approved'), icon: const Icon(Icons.verified), label: const Text('اعتماد'))),
+                            Expanded(child: FilledButton.icon(onPressed: _busy ? null : () => _setStatus(data, 'approved'), icon: const Icon(Icons.verified), label: const Text('اعتماد'))),
                             const SizedBox(width: 10),
-                            Expanded(child: OutlinedButton.icon(onPressed: _busy ? null : () => _setStatus(doc, 'rejected'), icon: const Icon(Icons.block), label: const Text('رفض'))),
+                            Expanded(child: OutlinedButton.icon(onPressed: _busy ? null : () => _setStatus(data, 'rejected'), icon: const Icon(Icons.block), label: const Text('رفض'))),
                           ]),
                         ]),
                       ),
