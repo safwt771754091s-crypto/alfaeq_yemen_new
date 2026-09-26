@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -18,14 +17,6 @@ class _LocationRequiredPageState extends State<LocationRequiredPage> {
   String? _error;
 
   String _saveError(Object error) {
-    if (error is FirebaseException) {
-      if (error.code == 'permission-denied') {
-        return 'تم تحديد الموقع، لكن Firebase رفض حفظه. سأحتاج إصلاح صلاحيات قاعدة البيانات قبل المتابعة.';
-      }
-      if (error.code == 'unavailable') {
-        return 'تم تحديد الموقع، لكن قاعدة البيانات غير متاحة الآن. تحقق من الإنترنت وحاول مرة أخرى.';
-      }
-    }
     return 'تعذر حفظ الموقع في قاعدة بيانات الفائق يمن. حاول مرة أخرى.';
   }
 
@@ -48,9 +39,7 @@ class _LocationRequiredPageState extends State<LocationRequiredPage> {
     } catch (error) {
       if (mounted) {
         setState(() {
-          _error = error is FirebaseException
-              ? _saveError(error)
-              : 'تعذر الوصول إلى موقع الهاتف. اسمح للموقع من إعدادات المتصفح ثم حاول مرة أخرى، أو حدد موقعك يدويًا على الخريطة.';
+          _error = 'تعذر الوصول إلى موقع الهاتف. اسمح للموقع من إعدادات المتصفح ثم حاول مرة أخرى، أو حدد موقعك يدويًا على الخريطة.';
         });
       }
     } finally {
@@ -74,7 +63,7 @@ class _LocationRequiredPageState extends State<LocationRequiredPage> {
         const SizedBox(height: 18),
         const Text('الموقع مطلوب للمتابعة', textAlign: TextAlign.center, style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900)),
         const SizedBox(height: 12),
-        const Text('حدد موقعك على الخريطة أو استخدم موقع الهاتف. الموقع الحقيقي يُحفظ في Firebase لاستخدام الخدمات القريبة والتوصيل وتوزيع الطلبات.', textAlign: TextAlign.center, style: TextStyle(height: 1.5)),
+        const Text('حدد موقعك على الخريطة أو استخدم موقع الهاتف. الموقع الحقيقي يُحفظ في Supabase لاستخدام الخدمات القريبة والتوصيل وتوزيع الطلبات.', textAlign: TextAlign.center, style: TextStyle(height: 1.5)),
         const SizedBox(height: 18),
         if (_error != null) Container(width: double.infinity, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Theme.of(context).colorScheme.errorContainer, borderRadius: BorderRadius.circular(12)), child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onErrorContainer))),
         if (_error != null) const SizedBox(height: 12),
