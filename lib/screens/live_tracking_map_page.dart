@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -18,9 +17,7 @@ class LiveTrackingMapPage extends StatelessWidget {
         appBar: AppBar(title: const Text('الخريطة والتتبع الحي')),
         body: uid == null
             ? const Center(child: Text('يجب تسجيل الدخول لعرض التتبع.'))
-            : SupabaseService.isInitialized
-                ? _SupabaseTracking(orderId: orderId, uid: uid)
-                : _FirebaseTracking(orderId: orderId, uid: uid),
+            : _SupabaseTracking(orderId: orderId, uid: uid),
       ),
     );
   }
@@ -49,32 +46,11 @@ class _SupabaseTracking extends StatelessWidget {
   }
 }
 
-class _FirebaseTracking extends StatelessWidget {
-  final String orderId;
-  final String uid;
-  const _FirebaseTracking({required this.orderId, required this.uid});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('orders').doc(orderId).snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) return const Center(child: Text('تعذر تحميل موقع الطلب.'));
-        final data = snapshot.data!.data()!;
-        if (data['customerId'] != uid) return const Center(child: Text('لا تملك صلاحية عرض هذا التتبع.'));
-        return _TrackingMap(data: data);
-      },
-    );
-  }
-}
-
 class _TrackingMap extends StatelessWidget {
   final Map<String, dynamic> data;
   const _TrackingMap({required this.data});
 
   LatLng? _point(dynamic raw) {
-    if (raw is GeoPoint) return LatLng(raw.latitude, raw.longitude);
     if (raw is Map) {
       final lat = raw['latitude'];
       final lng = raw['longitude'];
