@@ -41,3 +41,15 @@ Flutter/Supabase → **Alfaeq Event Webhook** → Validate & Normalize → **Sup
 أرسل POST إلى Webhook مع header `x-alfaeq-automation-secret`.
 ابدأ بـ `test.ping`. يجب أن يصل إلى Event Inbox ثم يعود رد JSON يحتوي `accepted: true`.
 إعادة إرسال نفس `eventId` يجب أن تكون `duplicate: true` ولا تضيف صفاً جديداً.
+
+
+## Order-created processing v4
+
+For `order.created`, Route Event calls `ALFAEQ_PROCESS_ORDER_INVENTORY_URL` with `data.orderId`.
+The HTTP node authenticates with the Supabase service-role key stored only in n8n.
+
+Required n8n variables:
+- `ALFAEQ_PROCESS_ORDER_INVENTORY_URL`: `https://<project-ref>.supabase.co/functions/v1/process-order-inventory`
+- `ALFAEQ_SUPABASE_SERVICE_ROLE_KEY`: service-role key, n8n only
+
+The handler returns `inventoryProcessed=true` only after the trusted reservation function succeeds.
