@@ -229,7 +229,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ok:true,accepted:$json.accepted,eventId:$json.eventId,eventType:$json.eventType}) }}",
+        "responseBody": "={{ JSON.stringify({ok:$json.inventoryProcessed!==false,accepted:$json.accepted,duplicate:$json.duplicate,eventId:$json.eventId,eventType:$json.eventType,inventoryProcessed:$json.inventoryProcessed}) }}",
         "options": {}
       },
       "id": "response",
@@ -239,6 +239,56 @@
       "position": [
         360,
         0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.ALFAEQ_PROCESS_ORDER_INVENTORY_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.ALFAEQ_SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "orderId",
+              "value": "={{$json.data.orderId}}"
+            }
+          ]
+        }
+      },
+      "id": "process-order-inventory",
+      "name": "Process Order Inventory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        320,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result=$input.first()?.json??{}; const event=$('Event Envelope').first().json; return [{json:{...event,inventoryProcessed:result.ok===true,inventoryResult:result}}];"
+      },
+      "id": "order-result",
+      "name": "Order Inventory Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        -160
       ]
     }
   ],
@@ -291,7 +341,7 @@
       "main": [
         [
           {
-            "node": "Respond",
+            "node": "Process Order Inventory",
             "type": "main",
             "index": 0
           }
@@ -325,11 +375,33 @@
           }
         ]
       ]
+    },
+    "Process Order Inventory": {
+      "main": [
+        [
+          {
+            "node": "Order Inventory Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order Inventory Result": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "alfaeq-n8n-v8"
+  "versionId": "alfaeq-n8n-v9-order-inventory"
 }
