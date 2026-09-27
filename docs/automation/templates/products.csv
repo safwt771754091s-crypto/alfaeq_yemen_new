@@ -1,0 +1,2 @@
+reference,name,store_id,section_id,price,currency,description,image_url,sale_unit,status
+P-001,اسم المنتج,STORE_ID,markets,1000,YER,وصف المنتج,https://example.com/image.jpg,piece,active
