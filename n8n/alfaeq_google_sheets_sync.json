@@ -1,0 +1,135 @@
+{
+  "name": "Alfaeq Yemen — Google Sheets Catalog Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alfaeq-sheets-sync",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "sheet-webhook",
+      "name": "Google Sheets Sync Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -720,
+        0
+      ],
+      "webhookId": "alfaeq-sheets-sync"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input=$input.first()?.json??{}; const body=input.body&&typeof input.body==='object'?input.body:input; const entity=String(body.entity??'product').trim().toLowerCase(); const rows=Array.isArray(body.rows)?body.rows:[]; if(!['product','customer'].includes(entity)) throw new Error('entity must be product or customer'); if(!rows.length) throw new Error('rows is required'); if(rows.length>1000) throw new Error('maximum 1000 rows per request'); return [{json:{entity,dry_run:body.dry_run===true,rows}}];"
+      },
+      "id": "validate",
+      "name": "Validate Sheet Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.ALFAEQ_SHEETS_SYNC_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-alfaeq-sheets-secret",
+              "value": "={{$vars.ALFAEQ_SHEETS_SYNC_SECRET}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "entity",
+              "value": "={{$json.entity}}"
+            },
+            {
+              "name": "dry_run",
+              "value": "={{$json.dry_run}}"
+            },
+            {
+              "name": "rows",
+              "value": "={{JSON.stringify($json.rows)}}"
+            }
+          ]
+        }
+      },
+      "id": "sync",
+      "name": "Supabase Sheets Sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{JSON.stringify($json)}}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        80,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Google Sheets Sync Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Sheet Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Sheet Payload": {
+      "main": [
+        [
+          {
+            "node": "Supabase Sheets Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Sheets Sync": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "alfaeq-sheets-sync-v1"
+}
