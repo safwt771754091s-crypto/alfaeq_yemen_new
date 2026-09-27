@@ -104,6 +104,7 @@ create_order_draft ينشئ طلباً معلّقاً فقط ولا ينفذ أ�
       'orderId': {'type': 'string'},
     }, required: ['orderId']),
     _tool('get_my_account_summary', 'Read a safe account summary.', {}),
+    _tool('get_platform_summary', 'Read a safe operational summary of the Alfaeq Yemen platform. Owner/admin only.', {}),
     _tool('get_security_summary', 'Read a non-sensitive security summary for authorized staff.', {}),
     _tool('get_my_cart', 'Read the signed-in user cart.', {}),
     _tool('add_to_cart', 'Add an active product to the cart.', {
