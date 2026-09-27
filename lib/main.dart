@@ -17,84 +17,67 @@ import 'core/product_units.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const AlfaeqBootstrapApp());
-}
 
-class AlfaeqBootstrapApp extends StatefulWidget {
-  const AlfaeqBootstrapApp({super.key});
+  Object? startupError;
+  StackTrace? startupStack;
 
-  @override
-  State<AlfaeqBootstrapApp> createState() => _AlfaeqBootstrapAppState();
-}
-
-class _AlfaeqBootstrapAppState extends State<AlfaeqBootstrapApp> {
-  late final Future<void> _startup;
-
-  @override
-  void initState() {
-    super.initState();
-    _startup = _initializeServices();
-  }
-
-  Future<void> _initializeServices() async {
-    // Keep browser startup limited to the Supabase bootstrap. Persisted
-    // legacy-session cleanup must never be able to block the Flutter shell.
+  try {
+    // Initialize Supabase completely before any widget can access Auth.
+    // This follows the supported supabase_flutter startup order and prevents
+    // AuthGate from racing the client's internal auth initialization.
     await SupabaseService.initialize();
+  } catch (error, stackTrace) {
+    startupError = error;
+    startupStack = stackTrace;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<void>(
-      future: _startup,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const MaterialApp(
-            debugShowCheckedModeBanner: false,
-            home: Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
-            ),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return MaterialApp(
-            debugShowCheckedModeBanner: false,
-            home: Directionality(
-              textDirection: TextDirection.rtl,
-              child: Scaffold(
-                appBar: AppBar(title: const Text('الفائق يمن')),
-                body: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: SelectableText(
-                      'تعذر تشغيل خدمات الفائق يمن.\\n\\nخطأ التهيئة: ${snapshot.error}\\n\\nأعد تحميل الصفحة. إذا استمر الخطأ، أرسل لنا صورة هذه الشاشة.',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-
-        return const AlfaeqYemenApp();
-      },
-    );
-  }
+  runApp(AlfaeqYemenApp(
+    startupError: startupError,
+    startupStack: startupStack,
+  ));
 }
 
 class AlfaeqYemenApp extends StatelessWidget {
-  const AlfaeqYemenApp({super.key});
+  final Object? startupError;
+  final StackTrace? startupStack;
+
+  const AlfaeqYemenApp({
+    super.key,
+    this.startupError,
+    this.startupStack,
+  });
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
+  Widget build(BuildContext context) {
+    if (startupError != null) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'الفائق يمن',
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            appBar: AppBar(title: const Text('الفائق يمن')),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: SelectableText(
+                  'تعذر تشغيل خدمات الفائق يمن.\\n\\nخطأ التهيئة: $startupError',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'الفائق يمن',
         theme: ThemeData(useMaterial3: true, colorSchemeSeed: const Color(0xFF0B6E4F), scaffoldBackgroundColor: const Color(0xFFF7F9F8)),
         home: _initialHome(),
       );
+  }
 
   Widget _initialHome() {
     if (kIsWeb) {
