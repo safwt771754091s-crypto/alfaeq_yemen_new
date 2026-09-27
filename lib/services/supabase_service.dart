@@ -21,14 +21,16 @@ class SupabaseService {
 
   static Future<void> initialize() async {
     if (_initialized || publishableKey.isEmpty) return;
-    final authOptions = kIsWeb
-        ? const FlutterAuthClientOptions(localStorage: EmptyLocalStorage())
-        : const FlutterAuthClientOptions();
-
+    // Use Supabase's supported platform storage on every target. The previous
+    // web-only EmptyLocalStorage override disabled the SDK's normal browser
+    // session path and still left PKCE storage on the default implementation.
+    // That combination is not appropriate for a production auth client.
     await Supabase.initialize(
       url: projectUrl,
       publishableKey: publishableKey,
-      authOptions: authOptions,
+      authOptions: const FlutterAuthClientOptions(
+        persistSession: true,
+      ),
       debug: false,
     );
     _initialized = true;
