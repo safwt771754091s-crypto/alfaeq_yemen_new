@@ -48,7 +48,7 @@ Deno.serve(async (req: Request) => {
 
   if (existingError) return json({ ok: false, error: "idempotency_lookup_failed" }, 500);
   if (existing) {
-    return json({ ok: true, deduplicated: true, taskId: existing.id, status: existing.status });
+    return json({ ok: true, deduplicated: true, eventId, eventType, occurredAt, data, taskId: existing.id, status: existing.status });
   }
 
   const role = roleForEvent(eventType);
@@ -94,7 +94,7 @@ Deno.serve(async (req: Request) => {
   if (taskError) {
     if (taskError.code === "23505") {
       const retry = await admin.from("ai_tasks").select("id,status").eq("metadata->>event_id", eventId).maybeSingle();
-      if (retry.data) return json({ ok: true, deduplicated: true, taskId: retry.data.id, status: retry.data.status });
+      if (retry.data) return json({ ok: true, deduplicated: true, eventId, eventType, occurredAt, data, taskId: retry.data.id, status: retry.data.status });
     }
     return json({ ok: false, error: "task_create_failed", detail: taskError.message }, 500);
   }
@@ -106,7 +106,7 @@ Deno.serve(async (req: Request) => {
     payload: { source: "n8n", event_id: eventId, event_type: eventType },
   });
 
-  return json({ ok: true, deduplicated: false, task });
+  return json({ ok: true, deduplicated: false, eventId, eventType, occurredAt, data, task });
 });
 
 function roleForEvent(eventType: string): string {
