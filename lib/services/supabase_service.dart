@@ -14,13 +14,25 @@ class SupabaseService {
     defaultValue: 'https://esvljorjykzgrpnrxnma.supabase.co',
   );
 
-  static const publishableKey = String.fromEnvironment(
+  static const _defaultPublishableKey =
+      'sb_publishable_xJfLBgrqWM8yEa3FM9qfig_FwnfTKue';
+
+  static const _configuredPublishableKey = String.fromEnvironment(
     'SUPABASE_PUBLISHABLE_KEY',
-    defaultValue: 'sb_publishable_xJfLBgrqWM8yEa3FM9qfig_FwnfTKue',
   );
 
+  /// Publishable client key. If CI passes an empty environment variable,
+  /// do not silently leave Supabase uninitialized.
+  static String get publishableKey =>
+      _configuredPublishableKey.isNotEmpty
+          ? _configuredPublishableKey
+          : _defaultPublishableKey;
+
   static Future<void> initialize() async {
-    if (_initialized || publishableKey.isEmpty) return;
+    if (_initialized) return;
+    if (projectUrl.isEmpty || publishableKey.isEmpty) {
+      throw StateError('Supabase client configuration is missing.');
+    }
     // Use Supabase's supported platform storage on every target. The previous
     // web-only EmptyLocalStorage override disabled the SDK's normal browser
     // session path and still left PKCE storage on the default implementation.
