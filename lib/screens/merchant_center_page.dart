@@ -129,7 +129,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     final docs = snapshot.data ?? const <Map<String, dynamic>>[]; final filtered = _selectedStoreId == null ? docs : docs.where((doc) => doc['store_id'] == _selectedStoreId).toList();
     if (filtered.isEmpty) return const _EmptyCard(text: 'لا توجد أصناف لهذا المتجر بعد.');
     return Column(children: filtered.map((doc) { final data = doc; return Card(elevation: 0, child: ListTile(leading: const Icon(Icons.inventory_2_outlined), title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('مخزون: ${data['stock'] ?? 0} • حالة: ${data['status'] ?? 'active'}'), trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [Text('${data['price'] ?? 0} ${data['currency'] ?? 'YER'}', style: const TextStyle(fontWeight: FontWeight.w900)), TextButton(onPressed: () => _updateProduct(doc), child: const Text('تعديل'))]))); }).toList());
-          );
+          });
         },
       );
 
