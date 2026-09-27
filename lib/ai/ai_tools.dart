@@ -13,41 +13,53 @@ class AlfaeqAiToolRegistry {
     bool userConfirmed=false,
   }) async {
     try {
+      final Map<String,Object?> result;
       switch(name){
-        case 'search_catalog': return await _searchCatalog(args);
-        case 'get_my_orders': return await _getMyOrders(args);
-        case 'get_my_order': return await _getMyOrder(args);
-        case 'get_my_account_summary': return await _getMyAccountSummary();
-        case 'get_platform_summary': return await _getPlatformSummary();
-        case 'get_security_summary': return await _getSecuritySummary(audit:audit);
-        case 'get_my_cart': return await _getMyCart();
-        case 'add_to_cart': return await _addToCart(args,userConfirmed:userConfirmed);
-        case 'update_cart_item': return await _updateCartItem(args,userConfirmed:userConfirmed);
-        case 'remove_from_cart': return await _removeFromCart(args,userConfirmed:userConfirmed);
-        case 'create_order_draft': return await _createOrderDraft(args,userConfirmed:userConfirmed);
-        default:return {'ok':false,'error':'الأداة غير مسموحة.'};
+        case 'search_catalog': result = await _searchCatalog(args); break;
+        case 'get_my_orders': result = await _getMyOrders(args); break;
+        case 'get_my_order': result = await _getMyOrder(args); break;
+        case 'get_my_account_summary': result = await _getMyAccountSummary(); break;
+        case 'get_platform_summary': result = await _getPlatformSummary(); break;
+        case 'get_security_summary': result = await _getSecuritySummary(audit:audit); break;
+        case 'get_my_cart': result = await _getMyCart(); break;
+        case 'add_to_cart': result = await _addToCart(args,userConfirmed:userConfirmed); break;
+        case 'update_cart_item': result = await _updateCartItem(args,userConfirmed:userConfirmed); break;
+        case 'remove_from_cart': result = await _removeFromCart(args,userConfirmed:userConfirmed); break;
+        case 'create_order_draft': result = await _createOrderDraft(args,userConfirmed:userConfirmed); break;
+        default: result = {'ok':false,'error':'الأداة غير مسموحة.'};
       }
+      final ok = result['ok'] == true;
+      final permission = result['permission']?.toString();
+      await audit(
+        action:'ai_tool_${name}',
+        result: ok ? 'success' : (permission == 'confirmation_required' ? 'confirmation_required' : 'failed'),
+        details:{'confirmed':userConfirmed,'ok':ok,'permission':permission},
+      );
+      return result;
     } catch(e) {
-      await audit(action:'ai_tool_$name',result:'failed',details:{'error':e.toString()});
+      await audit(action:'ai_tool_${name}',result:'failed',details:{'confirmed':userConfirmed});
       return {'ok':false,'error':'تعذر تنفيذ الأداة بأمان.'};
     }
   }
-
   Future<Map<String,Object?>> _searchCatalog(Map<String,Object?> args) async {
     final q=(args['query']??'').toString().trim().toLowerCase();
     final type=(args['type']??'both').toString();
     if(q.isEmpty||q.length>80)return {'ok':false,'error':'عبارة البحث غير صالحة.'};
     final products=<Map<String,Object?>>[],stores=<Map<String,Object?>>[];
     if(type=='products'||type=='both'){
-      final rows=await _client.from('products').select().eq('status','active').order('name').limit(80);
-      for(final raw in rows){final d=Map<String,dynamic>.from(raw),name=(d['name']??'').toString(),cat=(d['section_id']??'').toString();if('$name $cat'.toLowerCase().contains(q)){products.add({'id':d['id'],'name':name,'category':cat,'price':d['price'],'currency':d['currency']??'YER','storeId':d['store_id'],'available':d['stock_base']});if(products.length>=_maxResults)break;}}
+      final pattern='%${_escapeLike(q)}%';
+      final rows=await _client.from('products').select('id,name,section_id,price,currency,store_id,stock_base').eq('status','active').ilike('name',pattern).order('name').limit(_maxResults);
+      for(final raw in rows){final d=Map<String,dynamic>.from(raw);products.add({'id':d['id'],'name':d['name'],'category':d['section_id'],'price':d['price'],'currency':d['currency']??'YER','storeId':d['store_id'],'available':d['stock_base']});}
     }
     if(type=='stores'||type=='both'){
-      final rows=await _client.from('stores').select().inFilter('status',['approved','active']).order('name').limit(80);
-      for(final raw in rows){final d=Map<String,dynamic>.from(raw),name=(d['name']??'').toString(),cat=(d['section_id']??'').toString();if('$name $cat'.toLowerCase().contains(q)){stores.add({'id':d['id'],'name':name,'category':cat,'city':d['address'],'active':true});if(stores.length>=_maxResults)break;}}
+      final pattern='%${_escapeLike(q)}%';
+      final rows=await _client.from('stores').select('id,name,section_id,address,status').inFilter('status',['approved','active']).ilike('name',pattern).order('name').limit(_maxResults);
+      for(final raw in rows){final d=Map<String,dynamic>.from(raw);stores.add({'id':d['id'],'name':d['name'],'category':d['section_id'],'city':d['address'],'active':true});}
     }
     return {'ok':true,'query':q,'products':products,'stores':stores,'resultCount':products.length+stores.length};
   }
+
+  String _escapeLike(String value) => value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
 
   Future<Map<String,Object?>> _getMyOrders(Map<String,Object?> args) async {
     final u=_client.auth.currentUser;if(u==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
