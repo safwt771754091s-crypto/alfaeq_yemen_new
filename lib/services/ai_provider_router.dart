@@ -13,6 +13,7 @@ class AiProviderRouter {
 
   static const supportedProviders = <String>[
     'unsloth',
+    'naive_n05_flash',
     'openai_compatible',
     'anthropic_compatible',
     'deepseek',
@@ -34,6 +35,7 @@ class AiProviderRouter {
     final first = chooseRoute(preferredProvider: preferredProvider);
     final chain = <String>[first];
     for (final provider in const [
+      'naive_n05_flash',
       'openai_compatible',
       'anthropic_compatible',
       'deepseek',
