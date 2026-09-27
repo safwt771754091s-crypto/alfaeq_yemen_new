@@ -1,9 +1,12 @@
 import 'dart:convert';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../services/unsloth_ai_service.dart';
 import 'ai_permission_gateway.dart';
 import 'ai_tools.dart';
 import 'alfaeq_prompt_library.dart';
+import '../services/supabase_service.dart';
 
 /// Production AI orchestration for Alfaeq Yemen.
 ///
@@ -16,6 +19,7 @@ class AlfaeqAiService {
   final AlfaeqAiToolRegistry _tools;
   final AlfaeqAiPermissionGateway _permissions;
   final UnslothAiService _ai;
+  final SupabaseClient _client;
   final List<Map<String, dynamic>> _messages = [];
   _PendingAiAction? _pendingAction;
 
@@ -23,9 +27,11 @@ class AlfaeqAiService {
     AlfaeqAiToolRegistry? tools,
     AlfaeqAiPermissionGateway? permissions,
     UnslothAiService? ai,
+    SupabaseClient? client,
   })  : _tools = tools ?? AlfaeqAiToolRegistry(),
         _permissions = permissions ?? AlfaeqAiPermissionGateway(),
-        _ai = ai ?? UnslothAiService() {
+        _ai = ai ?? UnslothAiService(),
+        _client = client ?? SupabaseService.client {
     _resetSystemMessage();
   }
 
