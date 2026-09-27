@@ -164,8 +164,23 @@ create_order_draft ينشئ طلباً معلّقاً فقط ولا ينفذ أ�
     required String result,
     Map<String, dynamic>? details,
   }) async {
-    // Tool registry already owns the detailed audit path. This hook deliberately
-    // avoids writing provider secrets, prompts, or customer payloads.
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+    final toolName = action.startsWith('ai_tool_') ? action.substring(8) : action;
+    try {
+      await _client.from('ai_tool_audit_logs').insert({
+        'actor_uid': user.id,
+        'tool_name': toolName,
+        'result': result,
+        'confirmed': details?['confirmed'] == true,
+        'details': {
+          'ok': details?['ok'],
+          'permission': details?['permission'],
+        },
+      });
+    } catch (_) {
+      // Audit failure must never break the user's AI request.
+    }
   }
 
   Future<Map<String, Object?>> _execute(
