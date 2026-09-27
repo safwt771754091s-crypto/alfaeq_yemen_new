@@ -18,6 +18,7 @@ class AlfaeqAiToolRegistry {
         case 'get_my_orders': return await _getMyOrders(args);
         case 'get_my_order': return await _getMyOrder(args);
         case 'get_my_account_summary': return await _getMyAccountSummary();
+        case 'get_platform_summary': return await _getPlatformSummary();
         case 'get_security_summary': return await _getSecuritySummary(audit:audit);
         case 'get_my_cart': return await _getMyCart();
         case 'add_to_cart': return await _addToCart(args,userConfirmed:userConfirmed);
@@ -70,6 +71,37 @@ class AlfaeqAiToolRegistry {
     final rows=await _client.from('users').select().eq('uid',u.id).limit(1);final d=rows.isEmpty?<String,dynamic>{}:Map<String,dynamic>.from(rows.first);
     final meta=u.userMetadata ?? const <String,dynamic>{};
     return {'ok':true,'uid':u.id,'email':u.email,'displayName':d['name']??meta['full_name']??meta['name'],'role':d['role']??'customer','phoneVerified':u.phone!=null,'emailVerified':u.emailConfirmedAt!=null};
+  }
+
+  Future<Map<String,Object?>> _getPlatformSummary() async {
+    final u = _client.auth.currentUser;
+    if (u == null) return {'ok': false, 'error': 'يجب تسجيل الدخول أولاً.'};
+    final profile = await _client.from('users')
+        .select('role,owner,admin,developer,access_level')
+        .eq('uid', u.id)
+        .limit(1);
+    if (profile.isEmpty) return {'ok': false, 'error': 'ملف الصلاحيات غير موجود.'};
+    final p = Map<String,dynamic>.from(profile.first);
+    final allowed = p['role'] == 'owner' || p['role'] == 'admin' || p['role'] == 'developer' ||
+        p['owner'] == true || p['admin'] == true || p['developer'] == true;
+    if (!allowed) return {'ok': false, 'error': 'هذه الأداة متاحة للمالك والإدارة فقط.'};
+
+    final products = await _client.from('products').select('id,status').limit(1000);
+    final stores = await _client.from('stores').select('id,status').limit(500);
+    final orders = await _client.from('orders').select('id,status').limit(1000);
+    final wallets = await _client.from('wallets').select('uid,status,currency').limit(1000);
+    return {
+      'ok': true,
+      'role': p['role'],
+      'accessLevel': p['access_level'],
+      'counts': {
+        'products': products.length,
+        'stores': stores.length,
+        'orders': orders.length,
+        'wallets': wallets.length,
+      },
+      'source': 'Supabase',
+    };
   }
 
   Future<Map<String,Object?>> _getSecuritySummary({required Future<void> Function({required String action,required String result,Map<String,dynamic>? details}) audit}) async {
