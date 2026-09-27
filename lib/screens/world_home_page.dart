@@ -5,6 +5,7 @@ import '../core/app_sections.dart';
 import '../services/auth_service.dart';
 import '../services/catalog_service.dart';
 import '../services/supabase_service.dart';
+import '../services/wallet_service.dart';
 import '../services/public_content_service.dart';
 import 'ai_assistant_page.dart';
 import 'cart_page.dart';
@@ -787,6 +788,7 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
             if (walletSnapshot.hasError) return Center(child: Text('تعذر تحميل المحفظة: ${walletSnapshot.error}'));
             final data = walletSnapshot.data ?? <String, dynamic>{};
             final balance = num.tryParse('${data['available_balance'] ?? 0}') ?? 0;
+            final walletMissing = walletSnapshot.data == null;
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -799,6 +801,24 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
                 ])),
                 ),
                 const SizedBox(height: 14),
+                if (walletMissing)
+                  FilledButton.icon(
+                    onPressed: () async {
+                      try {
+                        await const WalletService().ensureMyWallet();
+                        if (mounted) setState(() {});
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('تعذر إنشاء المحفظة: $e')),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.account_balance_wallet_outlined),
+                    label: const Text('إنشاء محفظتي الإلكترونية'),
+                  ),
+                if (walletMissing) const SizedBox(height: 14),
                 const _Info(
                   title: 'العمليات المالية',
                   text: 'الإيداع والسحب والتحويل تُنفّذ فقط عبر العمليات الآمنة في الخادم. لا يتم تعديل الرصيد مباشرة من التطبيق.',
