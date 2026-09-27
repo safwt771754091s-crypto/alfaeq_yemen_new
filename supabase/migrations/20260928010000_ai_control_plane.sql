@@ -60,3 +60,32 @@ drop policy if exists "ai_tasks_read_authenticated" on public.ai_tasks;
 create policy "ai_tasks_read_authenticated" on public.ai_tasks for select to authenticated using (true);
 drop policy if exists "ai_activity_read_authenticated" on public.ai_activity_log;
 create policy "ai_activity_read_authenticated" on public.ai_activity_log for select to authenticated using (true);
+
+create unique index if not exists ai_tasks_event_id_unique
+  on public.ai_tasks ((metadata->>'event_id'))
+  where metadata->>'event_id' is not null;
+
+-- Seed the initial AI organization hierarchy idempotently.
+insert into public.ai_agents (name, role, capabilities, adapter_type, status)
+select 'Alfaeq AI CEO', 'CEO', array['strategy','delegation','governance'], 'http', 'idle'
+where not exists (select 1 from public.ai_agents where name = 'Alfaeq AI CEO');
+
+insert into public.ai_agents (name, role, manager_id, capabilities, adapter_type, status)
+select 'Alfaeq CTO', 'CTO', id, array['engineering','architecture','security'], 'http', 'idle'
+from public.ai_agents where name = 'Alfaeq AI CEO'
+and not exists (select 1 from public.ai_agents where name = 'Alfaeq CTO');
+
+insert into public.ai_agents (name, role, manager_id, capabilities, adapter_type, status)
+select 'Alfaeq Operations', 'Operations', id, array['orders','dispatch','merchant','operations'], 'http', 'idle'
+from public.ai_agents where name = 'Alfaeq AI CEO'
+and not exists (select 1 from public.ai_agents where name = 'Alfaeq Operations');
+
+insert into public.ai_agents (name, role, manager_id, capabilities, adapter_type, status)
+select 'Alfaeq Marketing', 'Marketing', id, array['marketing','promotion','content'], 'http', 'idle'
+from public.ai_agents where name = 'Alfaeq AI CEO'
+and not exists (select 1 from public.ai_agents where name = 'Alfaeq Marketing');
+
+insert into public.ai_agents (name, role, manager_id, capabilities, adapter_type, status)
+select 'Alfaeq Automation', 'Automation', id, array['automation','n8n','integrations'], 'http', 'idle'
+from public.ai_agents where name = 'Alfaeq CTO'
+and not exists (select 1 from public.ai_agents where name = 'Alfaeq Automation');
