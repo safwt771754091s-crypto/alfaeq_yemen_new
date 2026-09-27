@@ -1,0 +1,335 @@
+{
+  "name": "Alfaeq Yemen — Master Automation v2",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "alfaeq-events",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Alfaeq Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -900,
+        0
+      ],
+      "webhookId": "alfaeq-events"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input=$input.first()?.json??{}; const body=input.body&&typeof input.body==='object'?input.body:input; const rawHeaders=input.headers&&typeof input.headers==='object'?input.headers:{}; const headers=Object.fromEntries(Object.entries(rawHeaders).map(([k,v])=>[String(k).toLowerCase(),String(v??'')])); const secret=headers['x-alfaeq-automation-secret']||''; const expected=$vars?.ALFAEQ_N8N_SHARED_SECRET||''; if(!expected) throw new Error('ALFAEQ_N8N_SHARED_SECRET variable is missing'); if(secret!==expected) throw new Error('Invalid Alfaeq automation secret'); for(const key of ['eventId','eventType','occurredAt']) if(!body[key]) throw new Error('Missing event field: '+key); return [{json:{source:String(body.source||'alfaeq_yemen_new'),version:Number(body.version||1),eventId:String(body.eventId),eventType:String(body.eventType),occurredAt:String(body.occurredAt),data:body.data??body.payload??{}}}];"
+      },
+      "id": "normalize",
+      "name": "Validate & Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.ALFAEQ_SUPABASE_RPC_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.ALFAEQ_SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.ALFAEQ_SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_event_id",
+              "value": "={{$json.eventId}}"
+            },
+            {
+              "name": "p_source",
+              "value": "={{$json.source}}"
+            },
+            {
+              "name": "p_version",
+              "value": "={{$json.version}}"
+            },
+            {
+              "name": "p_event_type",
+              "value": "={{$json.eventType}}"
+            },
+            {
+              "name": "p_occurred_at",
+              "value": "={{$json.occurredAt}}"
+            },
+            {
+              "name": "p_data",
+              "value": "={{JSON.stringify($json.data)}}"
+            }
+          ]
+        }
+      },
+      "id": "inbox",
+      "name": "Supabase Event Inbox",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -420,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const event=$('Validate & Normalize').first().json; const db=$input.first()?.json??{}; const row=Array.isArray(db)?(db[0]??{}):db; return [{json:{...event,accepted:row.accepted===true,duplicate:row.duplicate===true}}];"
+      },
+      "id": "envelope",
+      "name": "Event Envelope",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -180,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.eventType}}",
+                    "rightValue": "order.created",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "order"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.eventType}}",
+                    "rightValue": "product.created",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "product"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.eventType}}",
+                    "rightValue": "product.updated",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "productUpdated"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.eventType}}",
+                    "rightValue": "order.updated",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "orderUpdated"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.eventType}}",
+                    "rightValue": "test.ping",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "test"
+            }
+          ]
+        }
+      },
+      "id": "switch",
+      "name": "Route Event",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        60,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ok:true,accepted:$json.accepted,eventId:$json.eventId,eventType:$json.eventType}) }}",
+        "options": {}
+      },
+      "id": "response",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        360,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Alfaeq Event Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate & Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Normalize": {
+      "main": [
+        [
+          {
+            "node": "Supabase Event Inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Event Inbox": {
+      "main": [
+        [
+          {
+            "node": "Event Envelope",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Envelope": {
+      "main": [
+        [
+          {
+            "node": "Route Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Event": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "alfaeq-n8n-v8"
+}
