@@ -185,6 +185,11 @@ begin
     select product_id,sum(quantity) quantity,sum(quantity_base) quantity_base
     from public.inventory_movements
     where order_id=p_order_id and movement_type='sale_reservation'
+      and not exists (
+        select 1 from public.inventory_movements r
+        where r.order_id=p_order_id and r.product_id=inventory_movements.product_id
+          and r.movement_type='sale_reservation_release'
+      )
     group by product_id order by product_id
   loop
     select * into p from public.products where id=m.product_id for update;
