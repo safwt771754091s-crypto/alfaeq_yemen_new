@@ -17,3 +17,28 @@ create index if not exists automation_event_inbox_status_idx on public.automatio
 alter table public.automation_event_inbox enable row level security;
 revoke all on public.automation_event_inbox from anon, authenticated;
 comment on table public.automation_event_inbox is 'Idempotent inbox for Alfaeq automation events. One event_id is accepted once; business side effects remain in dedicated workflows.';
+
+create or replace function public.accept_automation_event(
+  p_event_id text,
+  p_source text,
+  p_version integer,
+  p_event_type text,
+  p_occurred_at timestamptz,
+  p_data jsonb
+) returns table(accepted boolean, duplicate boolean)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.automation_event_inbox(event_id,source,version,event_type,occurred_at,data)
+  values (p_event_id,p_source,p_version,p_event_type,p_occurred_at,coalesce(p_data,'{}'::jsonb))
+  on conflict (event_id) do nothing;
+  if found then
+    return query select true, false;
+  else
+    return query select false, true;
+  end if;
+end;
+$$;
+revoke all on function public.accept_automation_event(text,text,integer,text,timestamptz,jsonb) from public, anon, authenticated;
