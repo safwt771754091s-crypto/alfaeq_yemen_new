@@ -290,6 +290,38 @@
         560,
         -160
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "accepted-event",
+              "leftValue": "={{$json.accepted}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "accepted-gate",
+      "name": "Accepted Event?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        60,
+        220
+      ]
     }
   ],
   "connections": {
@@ -330,7 +362,7 @@
       "main": [
         [
           {
-            "node": "Route Event",
+            "node": "Accepted Event?",
             "type": "main",
             "index": 0
           }
@@ -397,11 +429,29 @@
           }
         ]
       ]
+    },
+    "Accepted Event?": {
+      "main": [
+        [
+          {
+            "node": "Route Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "alfaeq-n8n-v9-order-inventory"
+  "versionId": "alfaeq-n8n-v10-accepted-event-gate"
 }
