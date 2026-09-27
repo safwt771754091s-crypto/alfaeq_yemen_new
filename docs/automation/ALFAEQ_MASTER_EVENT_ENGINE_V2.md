@@ -18,7 +18,7 @@ Flutter/Supabase → **Alfaeq Event Webhook** → Validate & Normalize → **Sup
 ## متغيرات n8n المطلوبة
 
 - `ALFAEQ_N8N_SHARED_SECRET`
-- `ALFAEQ_SUPABASE_REST_URL` — مثال: `https://<project-ref>.supabase.co/rest/v1/automation_event_inbox`
+- `ALFAEQ_SUPABASE_RPC_URL` — مثال: `https://<project-ref>.supabase.co/rest/v1/rpc/accept_automation_event`
 - `ALFAEQ_SUPABASE_SERVICE_ROLE_KEY` — يحفظ داخل n8n فقط.
 - `ALFAEQ_IMAGE_STUDIO_URL` و `ALFAEQ_IMAGE_STUDIO_TOKEN` عند تفعيل مسار الصور.
 - `ALFAEQ_WHATSAPP_AUTOMATION_URL` عند تفعيل مسار واتساب.
