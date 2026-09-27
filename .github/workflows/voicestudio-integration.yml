@@ -1,0 +1,68 @@
+name: VoiceStudio integration check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "lib/services/voice_studio_service.dart"
+      - "docs/integrations/voicestudio.md"
+      - ".github/workflows/voicestudio-integration.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      VOICESTUDIO_BASE_URL: \${{ secrets.VOICESTUDIO_BASE_URL }}
+      VOICESTUDIO_API_KEY: \${{ secrets.VOICESTUDIO_API_KEY }}
+    steps:
+      - name: Check configuration
+        run: |
+          if [ -z "$VOICESTUDIO_BASE_URL" ]; then
+            echo "VoiceStudio endpoint is not configured; integration check is skipped."
+            exit 0
+          fi
+
+      - name: Check backend health and API contract
+        if: env.VOICESTUDIO_BASE_URL != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth=()
+          if [ -n "\${VOICESTUDIO_API_KEY:-}" ]; then
+            auth=(-H "Authorization: Bearer \${VOICESTUDIO_API_KEY}")
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            "\${VOICESTUDIO_BASE_URL%/}/health" "\${auth[@]}" >/tmp/health.json
+
+          curl --fail-with-body --silent --show-error \
+            "\${VOICESTUDIO_BASE_URL%/}/openapi.json" "\${auth[@]}" >/tmp/openapi.json
+
+          curl --fail-with-body --silent --show-error \
+            "\${VOICESTUDIO_BASE_URL%/}/v1/audio/voices" "\${auth[@]}" >/tmp/voices.json
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          health = json.loads(Path("/tmp/health.json").read_text())
+          openapi = json.loads(Path("/tmp/openapi.json").read_text())
+          voices = json.loads(Path("/tmp/voices.json").read_text())
+
+          if not isinstance(health, dict):
+              raise SystemExit("VoiceStudio /health did not return an object")
+          if not isinstance(openapi, dict) or "openapi" not in openapi:
+              raise SystemExit("VoiceStudio /openapi.json is not a valid OpenAPI document")
+          if not isinstance(voices, (list, dict)):
+              raise SystemExit("VoiceStudio /v1/audio/voices returned an invalid payload")
+
+          print("VoiceStudio health: OK")
+          print("VoiceStudio OpenAPI: OK")
+          print("VoiceStudio voices endpoint: OK")
+          PY
