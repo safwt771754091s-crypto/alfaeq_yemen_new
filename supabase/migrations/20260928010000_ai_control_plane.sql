@@ -89,3 +89,5 @@ insert into public.ai_agents (name, role, manager_id, capabilities, adapter_type
 select 'Alfaeq Automation', 'Automation', id, array['automation','n8n','integrations'], 'http', 'idle'
 from public.ai_agents where name = 'Alfaeq CTO'
 and not exists (select 1 from public.ai_agents where name = 'Alfaeq Automation');
+
+create index if not exists ai_tasks_parent_task_idx on public.ai_tasks(parent_task_id);
