@@ -34,7 +34,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$vars.ALFAEQ_SUPABASE_REST_URL}}",
+        "url": "={{$vars.ALFAEQ_SUPABASE_RPC_URL}}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -49,10 +49,6 @@
             {
               "name": "Content-Type",
               "value": "application/json"
-            },
-            {
-              "name": "Prefer",
-              "value": "resolution=ignore-duplicates,return=minimal"
             }
           ]
         },
@@ -61,27 +57,27 @@
         "bodyParameters": {
           "parameters": [
             {
-              "name": "event_id",
+              "name": "p_event_id",
               "value": "={{$json.eventId}}"
             },
             {
-              "name": "source",
+              "name": "p_source",
               "value": "={{$json.source}}"
             },
             {
-              "name": "version",
+              "name": "p_version",
               "value": "={{$json.version}}"
             },
             {
-              "name": "event_type",
+              "name": "p_event_type",
               "value": "={{$json.eventType}}"
             },
             {
-              "name": "occurred_at",
+              "name": "p_occurred_at",
               "value": "={{$json.occurredAt}}"
             },
             {
-              "name": "data",
+              "name": "p_data",
               "value": "={{JSON.stringify($json.data)}}"
             }
           ]
@@ -98,7 +94,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const event=$('Validate & Normalize').first().json; return [{json:{...event,accepted:true}}];"
+        "jsCode": "const event=$('Validate & Normalize').first().json; const db=$input.first()?.json??{}; const row=Array.isArray(db)?(db[0]??{}):db; return [{json:{...event,accepted:row.accepted===true,duplicate:row.duplicate===true}}];"
       },
       "id": "envelope",
       "name": "Event Envelope",
