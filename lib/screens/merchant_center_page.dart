@@ -5,6 +5,7 @@ import '../core/app_sections.dart';
 import '../services/location_service.dart';
 import '../core/product_units.dart';
 import '../services/supabase_service.dart';
+import '../services/auth_service.dart';
 
 class MerchantCenterPage extends StatefulWidget {
   const MerchantCenterPage({super.key});
@@ -114,13 +115,23 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
   Widget _productForm() => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [if (_selectedStoreId == null) const Align(alignment: Alignment.centerRight, child: Text('اختر متجراً أولاً من القائمة أعلاه.', style: TextStyle(color: Colors.black54))), TextField(controller: _productName, decoration: const InputDecoration(labelText: 'اسم الصنف')), TextField(controller: _price, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر بالريال اليمني')), TextField(controller: _stock, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'المخزون بـ ${ProductUnit.fromId(_saleUnit).label}')),
     DropdownButtonFormField<String>(initialValue: _saleUnit, decoration: const InputDecoration(labelText: 'وحدة البيع'), items: [for (final u in ProductUnit.all) DropdownMenuItem(value: u.id, child: Text(u.label))], onChanged: (value) { if (value != null) setState(() => _saleUnit = value); }), const SizedBox(height: 12), SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _saving || _selectedStoreId == null ? null : _createProduct, icon: const Icon(Icons.add), label: const Text('حفظ الصنف')))])));
 
-  Widget _products(String uid) => StreamBuilder<List<Map<String, dynamic>>>(stream: SupabaseService.client.from('products').stream(primaryKey: ['id']).eq('owner_id', uid).limit(100), builder: (context, snapshot) {
+  Widget _products(String uid) => FutureBuilder<bool>(
+        future: AuthService().hasOwnerClaim(),
+        builder: (context, ownerSnapshot) {
+          final isOwner = ownerSnapshot.data == true;
+          return StreamBuilder<List<Map<String, dynamic>>>(
+            stream: isOwner
+                ? SupabaseService.client.from('products').stream(primaryKey: ['id']).limit(1000)
+                : SupabaseService.client.from('products').stream(primaryKey: ['id']).eq('owner_id', uid).limit(100),
+            builder: (context, snapshot) {
     if (snapshot.hasError) return _error(snapshot.error.toString());
     if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
     final docs = snapshot.data ?? const <Map<String, dynamic>>[]; final filtered = _selectedStoreId == null ? docs : docs.where((doc) => doc['store_id'] == _selectedStoreId).toList();
     if (filtered.isEmpty) return const _EmptyCard(text: 'لا توجد أصناف لهذا المتجر بعد.');
     return Column(children: filtered.map((doc) { final data = doc; return Card(elevation: 0, child: ListTile(leading: const Icon(Icons.inventory_2_outlined), title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('مخزون: ${data['stock'] ?? 0} • حالة: ${data['status'] ?? 'active'}'), trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [Text('${data['price'] ?? 0} ${data['currency'] ?? 'YER'}', style: const TextStyle(fontWeight: FontWeight.w900)), TextButton(onPressed: () => _updateProduct(doc), child: const Text('تعديل'))]))); }).toList());
-  });
+          );
+        },
+      );
 
   Widget _error(String text) => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(14), child: Text('تعذر تحميل البيانات.\n$text')));
 }
