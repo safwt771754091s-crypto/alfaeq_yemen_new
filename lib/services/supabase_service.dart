@@ -21,9 +21,14 @@ class SupabaseService {
 
   static Future<void> initialize() async {
     if (_initialized || publishableKey.isEmpty) return;
+    final authOptions = kIsWeb
+        ? const FlutterAuthClientOptions(localStorage: EmptyLocalStorage())
+        : const FlutterAuthClientOptions();
+
     await Supabase.initialize(
       url: projectUrl,
       publishableKey: publishableKey,
+      authOptions: authOptions,
       debug: false,
     );
     _initialized = true;
