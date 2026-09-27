@@ -81,9 +81,18 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     final stockController = TextEditingController(text: '${data['stock'] ?? ''}');
     final result = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: Text('${data['name'] ?? 'تعديل الصنف'}'), content: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر')), TextField(controller: stockController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المخزون'))]), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حفظ'))]));
     if (result != true) return;
-    final price = num.tryParse(priceController.text.trim()); final stock = int.tryParse(stockController.text.trim());
+    final price = num.tryParse(priceController.text.trim()); final stock = num.tryParse(stockController.text.trim());
     if (price == null || price < 0 || stock == null || stock < 0) { _message('السعر والمخزون غير صالحين.'); return; }
-    await SupabaseService.client.from('products').update({'price': price, 'stock': stock, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', doc['id']);
+    try {
+      await SupabaseService.client.from('products').update({'price': price, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', doc['id']);
+      await SupabaseService.client.rpc('adjust_product_inventory', params: {'p_product_id': doc['id'], 'p_new_stock': stock});
+      _message('تم تحديث السعر والمخزون وتسجيل حركة المخزون.');
+    } catch (e) {
+      _message('تعذر تحديث الصنف: $e');
+    } finally {
+      priceController.dispose();
+      stockController.dispose();
+    }
   }
 
   void _message(String text) { if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text))); }
