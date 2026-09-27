@@ -32,6 +32,15 @@ class AuthService {
   }
 
   Future<AuthResponse?> signInWithGoogle() async {
+    if (kIsWeb) {
+      final redirectTo = Uri.base.origin + Uri.base.path;
+      await auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: redirectTo,
+      );
+      return null;
+    }
+
     final google = GoogleSignIn();
     final account = await google.signIn();
     if (account == null) return null;
