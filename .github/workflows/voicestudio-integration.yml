@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      VOICESTUDIO_BASE_URL: \${{ secrets.VOICESTUDIO_BASE_URL }}
-      VOICESTUDIO_API_KEY: \${{ secrets.VOICESTUDIO_API_KEY }}
+      VOICESTUDIO_BASE_URL: ${{ secrets.VOICESTUDIO_BASE_URL }}
+      VOICESTUDIO_API_KEY: ${{ secrets.VOICESTUDIO_API_KEY }}
     steps:
       - name: Check configuration
         run: |
@@ -33,19 +33,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          auth=()
-          if [ -n "\${VOICESTUDIO_API_KEY:-}" ]; then
-            auth=(-H "Authorization: Bearer \${VOICESTUDIO_API_KEY}")
-          fi
+          BASE_URL=$(printf '%s' "$VOICESTUDIO_BASE_URL" | sed 's:/*$::')
 
-          curl --fail-with-body --silent --show-error \
-            "\${VOICESTUDIO_BASE_URL%/}/health" "\${auth[@]}" >/tmp/health.json
+          request() {
+            path="$1"
+            output="$2"
+            if [ -n "$VOICESTUDIO_API_KEY" ]; then
+              curl --fail-with-body --silent --show-error \
+                -H "Authorization: Bearer $VOICESTUDIO_API_KEY" \
+                "$BASE_URL$path" >"$output"
+            else
+              curl --fail-with-body --silent --show-error \
+                "$BASE_URL$path" >"$output"
+            fi
+          }
 
-          curl --fail-with-body --silent --show-error \
-            "\${VOICESTUDIO_BASE_URL%/}/openapi.json" "\${auth[@]}" >/tmp/openapi.json
-
-          curl --fail-with-body --silent --show-error \
-            "\${VOICESTUDIO_BASE_URL%/}/v1/audio/voices" "\${auth[@]}" >/tmp/voices.json
+          request "/health" /tmp/health.json
+          request "/openapi.json" /tmp/openapi.json
+          request "/v1/audio/voices" /tmp/voices.json
 
           python3 - <<'PY'
           import json
