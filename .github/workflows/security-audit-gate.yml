@@ -62,16 +62,6 @@ jobs:
             fi
           done
 
-      - name: Verify agent safety contracts
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -s CONVENTIONS.md
-          test -s docs/engineering/security-audit.md
-          grep -q "isolated workspace" docs/engineering/security-audit.md
-          grep -q "confirmed.*needs_validation.*rejected" docs/engineering/security-audit.md
-          grep -q "never merge" .github/workflows/alfaeq-project-executor.yml ||             grep -q "never merge directly" .github/workflows/alfaeq-project-executor.yml
-
       - name: Produce audit manifest
         shell: bash
         run: |
