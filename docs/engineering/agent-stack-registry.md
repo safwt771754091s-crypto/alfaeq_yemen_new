@@ -7,6 +7,7 @@ This repository is the production application. External agent projects are engin
 | Source | Role | Status | Alfaeq integration |
 |---|---|---|---|
 | OpenHands | long-running agent runtime, conversations, tools/skills, server/automation | integrated conceptually | docs/engineering/openhands.md |
+| Alfaeq Project Executor | issue/manual -> OpenHands -> PR execution loop | integrated | .github/workflows/alfaeq-project-executor.yml, docs/engineering/project-executor.md |
 | mini-SWE-agent | bounded autonomous issue-fix loop | integrated conceptually | docs/engineering/mini-swe-agent.md |
 | Aider | architect/editor workflow | integrated | .aider.conf.yml, CONVENTIONS.md |
 | Jev Ultrafast | fast structured browser action selection | integrated as a documented capability | docs/engineering/jev-ultrafast.md |
