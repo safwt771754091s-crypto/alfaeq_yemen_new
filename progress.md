@@ -10,14 +10,22 @@
 No task is marked complete from intention or code inspection alone. Record the command/result or GitHub Actions evidence here.
 
 ## Current task
-Build the minimum production Harness without changing application behavior.
+Connect order, inventory, and merchant through the production Event Bus without moving business truth out of Supabase.
+
+## Implemented
+- Added database Event Bus producers for orders, inventory movements, and merchant stores.
+- Added explicit event-contract documentation.
+- Preserved atomic inventory reservation and its idempotency constraint.
+- Preserved the existing automation-worker retry/backoff path.
+- Kept privileged RPCs and event producer execution restricted from clients.
 
 ## Next
-1. Review Harness files.
-2. Add event-contract documentation.
-3. Inspect order_service, inventory, and merchant implementations.
-4. Define producer/consumer/idempotency boundaries.
-5. Run the production build checkpoint in GitHub Actions.
+1. Run the production build checkpoint in GitHub Actions.
+2. Inspect CI logs for analyze/test/web/APK failures.
+3. Verify the migration contract and event routing after CI.
 
 ## Last verified
-Repository structure and README reviewed before adding this harness.
+- Harness files exist on `feat/harness-engineering`.
+- Event producer migration committed at `e2e2da0407d06fe2fb6cdc676a8ec8dde52cefc3`.
+- Event contract documentation committed.
+- Fresh CI evidence is still required before marking the integration complete.
