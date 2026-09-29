@@ -1,0 +1,40 @@
+name: Alfaeq AI Executor Scheduler
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alfaeq-ai-executor
+  cancel-in-progress: false
+
+jobs:
+  dispatch-and-reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate executor secret
+        env:
+          EXECUTOR_SECRET: ${{ secrets.ALFAEQ_N8N_SHARED_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "${EXECUTOR_SECRET:-}" || {
+            echo "::error::ALFAEQ_N8N_SHARED_SECRET must be configured in GitHub repository secrets."
+            exit 1
+          }
+
+      - name: Dispatch and reconcile AI engineering runs
+        env:
+          EXECUTOR_SECRET: ${{ secrets.ALFAEQ_N8N_SHARED_SECRET }}
+          SUPABASE_FUNCTION_URL: https://esvljorjykzgrpnrxnma.supabase.co/functions/v1/ai-executor-dispatcher
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -X POST "${SUPABASE_FUNCTION_URL}" \
+            -H "content-type: application/json" \
+            -H "x-alfaeq-automation-secret: ${EXECUTOR_SECRET}" \
+            --data '{"action":"dispatch_and_reconcile"}'
