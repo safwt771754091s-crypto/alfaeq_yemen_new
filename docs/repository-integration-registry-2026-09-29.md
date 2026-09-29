@@ -25,6 +25,7 @@ This registry covers the repositories discovered in the user's GitHub account du
 - pinchtab — isolated browser worker.
 - impeccable — frontend accessibility/UI quality methodology.
 - drawdb — schema/design tooling.
+- gaia — agent orchestration governance, execution contracts, memory separation, and deterministic safety gates.
 
 ## Useful references / optional services
 - GPT-researcher
