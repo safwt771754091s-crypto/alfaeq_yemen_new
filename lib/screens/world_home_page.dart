@@ -11,6 +11,7 @@ import 'cart_page.dart';
 import 'location_picker_page.dart';
 import 'my_orders_page.dart';
 import 'notifications_page.dart';
+import 'ai_assistant_page.dart';
 import 'support_chat_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
@@ -735,6 +736,7 @@ class ServicesHubPage extends StatelessWidget {
             _ServiceTile(icon: Icons.shopping_cart_outlined, title: 'السلة', subtitle: 'مراجعة الأصناف قبل الطلب', page: const CartPage()),
             _ServiceTile(icon: Icons.local_shipping_outlined, title: 'طلباتي', subtitle: 'متابعة الطلبات والتوصيل', page: const MyOrdersPage()),
             _ServiceTile(icon: Icons.account_balance_wallet_outlined, title: 'المحافظ', subtitle: 'مركز المحافظ والخدمات المالية', page: const WalletCenterPage()),
+            _ServiceTile(icon: Icons.auto_awesome, title: 'ذكاء الفائق', subtitle: 'اطلب من الذكاء تنفيذ خدماتك', page: const AiAssistantPage()),
           ],
         ),
       );
