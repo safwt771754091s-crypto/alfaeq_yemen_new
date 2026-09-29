@@ -11,6 +11,7 @@ import 'cart_page.dart';
 import 'location_picker_page.dart';
 import 'my_orders_page.dart';
 import 'notifications_page.dart';
+import 'support_chat_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
 const _yellow = Color(0xFFFFC107);
@@ -869,6 +870,7 @@ class _AccountTab extends StatelessWidget {
         ListTile(leading: const Icon(Icons.receipt_long_outlined, color: _blue), title: const Text('طلباتي وتتبع التوصيل', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersPage()))),
         ListTile(leading: const Icon(Icons.account_balance_wallet_outlined, color: _blue), title: const Text('محفظتي', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletCenterPage()))),
         ListTile(leading: const Icon(Icons.notifications_none, color: _blue), title: const Text('الإشعارات', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()))),
+        ListTile(leading: const Icon(Icons.support_agent_outlined, color: _blue), title: const Text('دعم الفائق', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatPage()))),
         const Divider(height: 24),
         FilledButton.icon(onPressed: () => _logout(context), icon: const Icon(Icons.logout), label: const Text('تسجيل الخروج'), style: FilledButton.styleFrom(backgroundColor: _navy)),
       ],
