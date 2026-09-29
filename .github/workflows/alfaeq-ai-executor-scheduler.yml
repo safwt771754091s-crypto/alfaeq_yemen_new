@@ -19,16 +19,16 @@ jobs:
     steps:
       - name: Dispatch and reconcile AI engineering runs
         env:
-          OPENHANDS_API_KEY: ${{ secrets.OPENHANDS_API_KEY }}
+          OH_KEY: ${{ secrets.OPENHANDS_API_KEY }}
           SUPABASE_FUNCTION_URL: https://esvljorjykzgrpnrxnma.supabase.co/functions/v1/ai-executor-dispatcher
         run: |
           set -euo pipefail
-          test -n "${OPENHANDS_API_KEY:-}" || {
-            echo "::error::OPENHANDS_API_KEY must be configured in GitHub repository secrets."
+          test -n "${OH_KEY:-}" || {
+            echo "::error::The OpenHands provider secret is not configured in GitHub repository secrets."
             exit 1
           }
           curl --fail-with-body --silent --show-error \
             -X POST "${SUPABASE_FUNCTION_URL}" \
             -H "content-type: application/json" \
-            -H "x-openhands-api-key: ${OPENHANDS_API_KEY}" \
+            -H "x-openhands-api-key: ${OH_KEY}" \
             --data '{"action":"dispatch_and_reconcile"}'
