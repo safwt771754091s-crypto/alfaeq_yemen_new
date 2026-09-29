@@ -30,7 +30,7 @@ jobs:
           grep -q "CI gate" docs/engineering/ALFAEQ_CLAUDE_SKILLS_GATES.md
           grep -q "Evidence-first completion" docs/engineering/ALFAEQ_GAIA_AGENT_GOVERNANCE.md
           grep -q "Acceptance criteria" docs/engineering/ALFAEQ_COMPOST_SDLC.md
-          grep -q "immutable review evidence" docs/engineering/ALFAEQ_PR_REVIEW_CONTRACT.md
+          grep -q "immutable by commit identity" docs/engineering/ALFAEQ_PR_REVIEW_CONTRACT.md
       - name: Reject forbidden client dependencies
         shell: bash
         run: |
