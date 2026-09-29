@@ -7,7 +7,6 @@ import '../services/catalog_service.dart';
 import '../services/supabase_service.dart';
 import '../services/wallet_service.dart';
 import '../services/public_content_service.dart';
-import 'ai_assistant_page.dart';
 import 'cart_page.dart';
 import 'location_picker_page.dart';
 import 'my_orders_page.dart';
@@ -148,7 +147,7 @@ class _HomeTabState extends State<_HomeTab> {
               const SizedBox(height: 14),
               const _SearchBar(),
               const SizedBox(height: 16),
-              _HeroBanner(onTap: () => widget.onOpen(context, const AiAssistantPage())),
+              const _HeroBanner(),
               const SizedBox(height: 10),
               const _BannerDots(),
               const SizedBox(height: 18),
@@ -276,13 +275,11 @@ class _SearchBar extends StatelessWidget {
 }
 
 class _HeroBanner extends StatelessWidget {
-  final VoidCallback onTap;
-  const _HeroBanner({required this.onTap});
+  const _HeroBanner();
 
   @override
   Widget build(BuildContext context) => InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
         child: Container(
           height: 178,
           padding: const EdgeInsets.all(22),
@@ -304,7 +301,7 @@ class _HeroBanner extends StatelessWidget {
                     SizedBox(height: 12),
                     Text('تسوق • خدمات • توصيل • سفر • أعمال', style: TextStyle(color: Colors.white70, fontSize: 12)),
                     SizedBox(height: 14),
-                    Text('اسأل ذكاء الفائق ←', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                    Text('اطلب • ادفع • تتبع • استلم', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                   ],
                 ),
               ),
@@ -736,7 +733,6 @@ class ServicesHubPage extends StatelessWidget {
             _ServiceTile(icon: Icons.shopping_cart_outlined, title: 'السلة', subtitle: 'مراجعة الأصناف قبل الطلب', page: const CartPage()),
             _ServiceTile(icon: Icons.local_shipping_outlined, title: 'طلباتي', subtitle: 'متابعة الطلبات والتوصيل', page: const MyOrdersPage()),
             _ServiceTile(icon: Icons.account_balance_wallet_outlined, title: 'المحافظ', subtitle: 'مركز المحافظ والخدمات المالية', page: const WalletCenterPage()),
-            _ServiceTile(icon: Icons.auto_awesome, title: 'ذكاء الفائق', subtitle: 'مساعد المنصة', page: const AiAssistantPage()),
           ],
         ),
       );
@@ -871,7 +867,6 @@ class _AccountTab extends StatelessWidget {
         ListTile(leading: const Icon(Icons.shopping_cart_outlined, color: _blue), title: const Text('السلة', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage()))),
         ListTile(leading: const Icon(Icons.receipt_long_outlined, color: _blue), title: const Text('طلباتي وتتبع التوصيل', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersPage()))),
         ListTile(leading: const Icon(Icons.account_balance_wallet_outlined, color: _blue), title: const Text('محفظتي', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletCenterPage()))),
-        ListTile(leading: const Icon(Icons.auto_awesome, color: _blue), title: const Text('ذكاء الفائق يمن', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()))),
         const Divider(height: 24),
         FilledButton.icon(onPressed: () => _logout(context), icon: const Icon(Icons.logout), label: const Text('تسجيل الخروج'), style: FilledButton.styleFrom(backgroundColor: _navy)),
       ],
