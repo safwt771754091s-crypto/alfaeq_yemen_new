@@ -1,0 +1,2 @@
+-- Reconciled production migration 20260929144148_commercial_support_chat_v1.sql
+-- The live project already contains this migration; retained as a source-control reconciliation marker.
