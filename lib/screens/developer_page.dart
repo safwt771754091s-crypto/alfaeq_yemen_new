@@ -56,6 +56,19 @@ class _DeveloperPageState extends State<DeveloperPage>{
       }
     }catch(_){}
   }
+  Future<void> _runAutomation() async {
+    setState(()=>_status='جارٍ تشغيل عامل أتمتة الفائق...');
+    try {
+      final r=await SupabaseService.client.functions.invoke('developer-control',body:{'action':'run_automation_worker'});
+      if(r.status<200||r.status>=300)throw StateError(r.data.toString());
+      setState(()=>_status='تم تشغيل عامل الأتمتة واستلام النتيجة من Supabase.');
+      await _audit('automation_worker_run','accepted');
+    } catch(e) {
+      setState(()=>_status='تعذر تشغيل الأتمتة: '+e.toString());
+      await _audit('automation_worker_run','failed',details:{'error':e.toString()});
+    }
+  }
+
   Future<void> _scan()async{
     if(_scanning)return;setState(()=>_scanning=true);
     final findings=<String>[],counts=<String,int>{};
@@ -93,6 +106,15 @@ class _DeveloperPageState extends State<DeveloperPage>{
         const Text('جلسات التنفيذ',style:TextStyle(fontSize:19,fontWeight:FontWeight.w900)),
         if(_runs.isEmpty)const Card(child:ListTile(title:Text('لا توجد جلسات مسجلة بعد.'))),
         ..._runs.take(10).map((r)=>Card(child:ListTile(leading:Icon(r['status']=='failed'?Icons.error_outline:Icons.engineering_outlined),title:Text((r['provider']??'agent').toString()+' • '+(r['status']??'unknown').toString()),subtitle:Text('Task: '+(r['task_id']??'-').toString()+'\n'+(r['repository']??'').toString()+' @ '+(r['branch']??'').toString())))),
+        const SizedBox(height:18),
+        const Text('أتمتة الفائق داخل التطبيق',style:TextStyle(fontSize:19,fontWeight:FontWeight.w900)),
+        const SizedBox(height:8),
+        Card(child:ListTile(
+          leading:const Icon(Icons.account_tree_outlined),
+          title:const Text('تشغيل عامل الأتمتة'),
+          subtitle:const Text('معالجة Event Inbox وإرسال الأحداث إلى n8n عبر طبقة Supabase.'),
+          trailing:FilledButton.icon(onPressed:_busy?null:_runAutomation,icon:const Icon(Icons.play_arrow),label:const Text('تشغيل')),
+        )),
         const SizedBox(height:18),
         const Text('الفحص والأمان',style:TextStyle(fontSize:19,fontWeight:FontWeight.w900)),
         Card(child:ListTile(title:const Text('Supabase Auth + RLS'),subtitle:Text('الدور الحالي: '+_role))),
