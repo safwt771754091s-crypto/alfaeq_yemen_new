@@ -1,5 +1,4 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../services/firestore_service.dart';
 import '../services/supabase_service.dart';
 
 class AlfaeqAiToolRegistry {
@@ -65,7 +64,7 @@ class AlfaeqAiToolRegistry {
   Future<Map<String,Object?>> _createOrder(Map<String,Object?> a,bool confirmed) async {
     if(!confirmed)return {'ok':false,'permission':'confirmation_required','error':'ينتظر تأكيد المستخدم.'};final u=_db.auth.currentUser;if(u==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
     final raw=a['items'];final address=(a['address']??'').toString().trim();final payment=(a['paymentMethod']??'').toString();if(raw is! List||raw.isEmpty||address.isEmpty)return {'ok':false,'error':'بيانات الطلب غير مكتملة.'};
-    final rpcItems=raw.whereType<Map>().map((e)=>{'product_id':e['productId'],'quantity':e['quantity']}).toList();final orderId=await _db.rpc('create_order',params:{'p_items':rpcItems,'p_address':address,'p_payment_method':payment});await FirestoreService(preferSupabase:true).clearCart(u.id);
+    final rpcItems=raw.whereType<Map>().map((e)=>{'product_id':e['productId'],'quantity':e['quantity']}).toList();final orderId=await _db.rpc('create_order',params:{'p_items':rpcItems,'p_address':address,'p_payment_method':payment});await _db.from('carts').delete().eq('uid',u.id);
     return {'ok':true,'orderId':orderId.toString(),'status':'pending','paymentProcessed':false,'message':'تم إنشاء الطلب عبر المعاملة الحقيقية في Supabase.'};
   }
 }
