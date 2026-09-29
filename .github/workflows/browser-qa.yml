@@ -1,0 +1,82 @@
+name: Browser QA
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "Published or staging Flutter Web URL"
+        required: true
+        type: string
+  workflow_run:
+    workflows: ["Flutter Build"]
+    types: [completed]
+
+concurrency:
+  group: browser-qa-\${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-critical-path:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+      - name: Resolve application URL
+        id: url
+        env:
+          INPUT_URL: \${{ inputs.app_url }}
+        run: |
+          if [ -n "$INPUT_URL" ]; then echo "app_url=$INPUT_URL" >> "$GITHUB_OUTPUT"; else echo "app_url=https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/" >> "$GITHUB_OUTPUT"; fi
+      - name: Run non-destructive browser QA
+        env:
+          APP_URL: \${{ steps.url.outputs.app_url }}
+        run: |
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          const fs = require('fs');
+          (async () => {
+            const browser = await chromium.launch({headless:true});
+            const results = [];
+            for (const p of [
+              {name:'mobile-rtl', width:390, height:844, locale:'ar-YE'},
+              {name:'tablet-rtl', width:768, height:1024, locale:'ar-YE'},
+              {name:'desktop', width:1440, height:900, locale:'en-US'}
+            ]) {
+              const context = await browser.newContext({viewport:{width:p.width,height:p.height}, locale:p.locale});
+              const page = await context.newPage();
+              const errors = [];
+              page.on('pageerror', e => errors.push(String(e)));
+              page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+              await page.goto(process.env.APP_URL, {waitUntil:'domcontentloaded', timeout:60000});
+              await page.waitForTimeout(5000);
+              const state = await page.evaluate(() => ({
+                title: document.title,
+                flutter: !!document.querySelector('flt-glass-pane') || !!document.querySelector('canvas'),
+                textLength: (document.body.innerText || '').trim().length,
+                direction: document.documentElement.dir || getComputedStyle(document.documentElement).direction
+              }));
+              results.push({profile:p.name,state,errors});
+              if (!state.flutter) throw new Error(p.name + ': Flutter engine did not start');
+              if (errors.length) throw new Error(p.name + ': ' + errors.join(' | '));
+              await context.close();
+            }
+            fs.writeFileSync('browser-qa-results.json', JSON.stringify({generatedAt:new Date().toISOString(),appUrl:process.env.APP_URL,destructiveActions:false,results},null,2));
+            await browser.close();
+          })().catch(e => { console.error(e); process.exit(1); });
+          NODE
+      - name: Upload browser QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alfaeq-browser-qa
+          path: browser-qa-results.json
+          if-no-files-found: ignore
