@@ -155,6 +155,33 @@ EOF
           echo "::error::OpenHands execution timed out after 1800 seconds."
           exit 1
 
+      - name: Record executor handoff artifact
+        if: always()
+        shell: bash
+        env:
+          CONVERSATION_ID: ${{ steps.openhands.outputs.conversation-id }}
+          CONVERSATION_STATUS: ${{ steps.openhands.outputs.status }}
+          CONVERSATION_URL: ${{ steps.openhands.outputs.conversation-url }}
+        run: |
+          set -euo pipefail
+          mkdir -p execution-artifacts
+          {
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "commit=${GITHUB_SHA}"
+            echo "task=${{ inputs.task }}"
+            echo "conversation_id=${CONVERSATION_ID:-unknown}"
+            echo "conversation_status=${CONVERSATION_STATUS:-unknown}"
+            echo "conversation_url=${CONVERSATION_URL:-unknown}"
+            echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > execution-artifacts/executor-handoff.txt
+
+      - name: Upload executor handoff
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alfaeq-project-executor-handoff
+          path: execution-artifacts/executor-handoff.txt
+
       - name: Emit execution handoff
         if: success()
         shell: bash
