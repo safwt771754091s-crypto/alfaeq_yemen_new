@@ -38,6 +38,14 @@ void main() {
       expect(page, contains("read_at"));
     });
 
+
+    test('commercial support chat uses server-side RPCs', () {
+      final page = File('lib/screens/support_chat_page.dart').readAsStringSync();
+      expect(page, contains("rpc('create_support_thread'"));
+      expect(page, contains("rpc('send_chat_message'"));
+      expect(page, contains("from('chat_messages')"));
+    });
+
     test('the commercial app does not expose the future builder UI', () {
       final main = File('lib/main.dart').readAsStringSync();
       final home = File('lib/screens/world_home_page.dart').readAsStringSync();
