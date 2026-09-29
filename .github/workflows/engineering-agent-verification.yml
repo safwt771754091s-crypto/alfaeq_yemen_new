@@ -1,0 +1,68 @@
+name: Engineering Agent Verification
+
+on:
+  pull_request:
+    paths:
+      - "lib/**"
+      - "test/**"
+      - "supabase/**"
+      - "docs/engineering/**"
+      - ".aider.conf.yml"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engineering-agent-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy-and-static-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for production secrets in agent-facing files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE --exclude-dir=.git --exclude-dir=.dart_tool --exclude-dir=build \
+            '(service_role|SUPABASE_SERVICE_ROLE|SUPABASE_SERVICE_ROLE_KEY|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|github_pat_|ghp_[A-Za-z0-9_]+)' \
+            .aider.conf.yml CONVENTIONS.md docs/engineering .github 2>/dev/null; then
+            echo "Potential privileged credential found in engineering-agent configuration."
+            exit 1
+          fi
+
+      - name: Verify engineering contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s docs/engineering/agent-stack-registry.md
+          test -s docs/engineering/sandbox-execution-contract.md
+          test -s docs/engineering/openhands.md
+          test -s docs/engineering/mini-swe-agent.md
+          test -s CONVENTIONS.md
+
+  flutter-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.5"
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Flutter tests
+        run: flutter test
