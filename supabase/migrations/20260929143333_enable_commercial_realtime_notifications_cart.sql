@@ -1,0 +1,2 @@
+-- Reconciled production migration 20260929143333_enable_commercial_realtime_notifications_cart.sql
+-- The live project already contains this migration; retained as a source-control reconciliation marker.
