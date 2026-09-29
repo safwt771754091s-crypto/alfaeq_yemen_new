@@ -46,11 +46,13 @@ void main() {
       expect(page, contains("from('chat_messages')"));
     });
 
-    test('the commercial app does not expose the future builder UI', () {
-      final main = File('lib/main.dart').readAsStringSync();
+    test('commercial app exposes Alfaeq Intelligence only as the user execution assistant', () {
       final home = File('lib/screens/world_home_page.dart').readAsStringSync();
-      expect(main, isNot(contains('AiAssistantPage')));
-      expect(home, isNot(contains('AiAssistantPage')));
+      final ai = File('lib/screens/ai_assistant_page.dart').readAsStringSync();
+      expect(home, contains("import 'ai_assistant_page.dart';"));
+      expect(home, contains('AiAssistantPage()'));
+      expect(ai, contains('AlfaeqAiService'));
+      expect(ai, contains('تأكيد التنفيذ'));
     });
   });
 }
