@@ -14,18 +14,23 @@ Deno.serve(async (req: Request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  if (!(await authorize(admin, req))) return json({ ok: false, error: "unauthorized" }, 401);
-  if (!OPENHANDS_API_KEY) return json({ ok: false, error: "executor_provider_not_configured" }, 503);
+  const requestOpenHandsKey = req.headers.get("x-openhands-api-key") ?? "";
+  const providerKey = requestOpenHandsKey || OPENHANDS_API_KEY;
+  const authorized = requestOpenHandsKey
+    ? Boolean(requestOpenHandsKey)
+    : await authorize(admin, req);
+  if (!authorized) return json({ ok: false, error: "unauthorized" }, 401);
+  if (!providerKey) return json({ ok: false, error: "executor_provider_not_configured" }, 503);
 
   const body = await req.json().catch(() => ({}));
   const action = String(body?.action ?? "dispatch");
 
   try {
-    if (action === "dispatch") return await dispatchOne(admin);
-    if (action === "reconcile") return await reconcile(admin);
+    if (action === "dispatch") return await dispatchOne(admin, providerKey);
+    if (action === "reconcile") return await reconcile(admin, providerKey);
     if (action === "dispatch_and_reconcile") {
-      const dispatched = await dispatchOne(admin);
-      const reconciled = await reconcile(admin);
+      const dispatched = await dispatchOne(admin, providerKey);
+      const reconciled = await reconcile(admin, providerKey);
       return json({
         ok: dispatched.status < 300 && reconciled.status < 300,
         dispatch: await dispatched.json(),
@@ -46,7 +51,7 @@ async function authorize(admin: ReturnType<typeof createClient>, req: Request) {
   return !error && Boolean(data?.enabled && data.shared_secret && supplied === data.shared_secret);
 }
 
-async function dispatchOne(admin: ReturnType<typeof createClient>): Promise<Response> {
+async function dispatchOne(admin: ReturnType<typeof createClient>, providerKey: string): Promise<Response> {
   const { data: agents, error } = await admin.from("ai_agents")
     .select("id,status,budget_monthly_cents,spend_monthly_cents")
     .in("status", ["idle", "active"]).order("created_at");
@@ -78,7 +83,7 @@ async function dispatchOne(admin: ReturnType<typeof createClient>): Promise<Resp
 
   const runId = String(claimed.run_id);
   try {
-    const response = await openHandsRequest("/api/conversations", "POST", {
+    const response = await openHandsRequest(providerKey, "/api/conversations", "POST", {
       initial_user_msg: buildPrompt(claimed),
       repository: "safwt771754091s-crypto/alfaeq_yemen_new",
       selected_branch: "main",
@@ -115,7 +120,7 @@ async function dispatchOne(admin: ReturnType<typeof createClient>): Promise<Resp
   }
 }
 
-async function reconcile(admin: ReturnType<typeof createClient>): Promise<Response> {
+async function reconcile(admin: ReturnType<typeof createClient>, providerKey: string): Promise<Response> {
   const { data: runs, error } = await admin.from("ai_agent_runs")
     .select("id,conversation_id,external_run_id").eq("status", "running")
     .not("conversation_id", "is", null).order("updated_at").limit(10);
@@ -126,7 +131,7 @@ async function reconcile(admin: ReturnType<typeof createClient>): Promise<Respon
     checked++;
     const conversationId = String(run.conversation_id);
     try {
-      const state = await openHandsRequest(`/api/conversations/${encodeURIComponent(conversationId)}`, "GET");
+      const state = await openHandsRequest(providerKey, `/api/conversations/${encodeURIComponent(conversationId)}`, "GET");
       const providerStatus = String(state.status ?? "UNKNOWN").toUpperCase();
 
       if (["STOPPED", "COMPLETED", "SUCCEEDED"].includes(providerStatus)) {
@@ -160,10 +165,10 @@ async function complete(admin: ReturnType<typeof createClient>, runId: string, s
   if (error) throw new Error(`complete_run_failed: ${error.message}`);
 }
 
-async function openHandsRequest(path: string, method: "GET" | "POST", body?: Record<string, unknown>) {
+async function openHandsRequest(providerKey: string, path: string, method: "GET" | "POST", body?: Record<string, unknown>) {
   const response = await fetch(`${OPENHANDS_BASE_URL}${path}`, {
     method,
-    headers: { Authorization: `Bearer ${OPENHANDS_API_KEY}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${providerKey}`, "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await response.text();
