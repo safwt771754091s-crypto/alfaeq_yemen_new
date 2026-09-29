@@ -21,7 +21,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: alfaeq-project-executor-\${{ github.event.issue.number || inputs.task || github.ref }}
+  group: alfaeq-project-executor-${{ github.event.issue.number || inputs.task || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
     if: github.event_name == 'issues' && github.event.label.name == 'alfaeq-execute'
     runs-on: ubuntu-latest
     env:
-      OPENHANDS_API_KEY: \${{ secrets.OPENHANDS_API_KEY }}
+      OPENHANDS_API_KEY: ${{ secrets.OPENHANDS_API_KEY }}
     steps:
       - name: Verify executor is configured
         shell: bash
@@ -47,9 +47,9 @@ jobs:
           prompt: |
             You are the Alfaeq Yemen engineering executor.
 
-            Repository: \${{ github.repository }}
-            Issue: #\${{ github.event.issue.number }}
-            Title: \${{ github.event.issue.title }}
+            Repository: ${{ github.repository }}
+            Issue: #${{ github.event.issue.number }}
+            Title: ${{ github.event.issue.title }}
 
             Complete the requested project work end-to-end, but do not merge directly to main.
             Work in an isolated workspace and create a focused PR.
@@ -69,20 +69,20 @@ jobs:
             - If a required external credential/service is unavailable, stop at a safe boundary and document the exact blocker instead of fabricating a result.
 
             Issue body:
-            \${{ github.event.issue.body }}
-          repository: \${{ github.repository }}
+            ${{ github.event.issue.body }}
+          repository: ${{ github.repository }}
           selected-branch: main
           poll: "true"
           timeout-seconds: "1800"
           poll-interval-seconds: "30"
-          github-token: \${{ secrets.GITHUB_TOKEN }}
-          openhands-api-key: \${{ secrets.OPENHANDS_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          openhands-api-key: ${{ secrets.OPENHANDS_API_KEY }}
 
   execute-manual:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
-      OPENHANDS_API_KEY: \${{ secrets.OPENHANDS_API_KEY }}
+      OPENHANDS_API_KEY: ${{ secrets.OPENHANDS_API_KEY }}
     steps:
       - name: Verify executor is configured
         shell: bash
@@ -100,9 +100,9 @@ jobs:
             You are the Alfaeq Yemen engineering executor.
 
             Execute this task end-to-end in the repository, then create a focused PR:
-            \${{ inputs.task }}
+            ${{ inputs.task }}
 
-            Branch requested by operator: \${{ inputs.branch }}
+            Branch requested by operator: ${{ inputs.branch }}
 
             Production contract:
             - Supabase is the source of truth for product state.
@@ -112,10 +112,10 @@ jobs:
             - Run analyze/tests/relevant builds/security checks.
             - Do not merge directly to main.
             - Report concrete evidence and blockers only.
-          repository: \${{ github.repository }}
-          selected-branch: \${{ inputs.branch }}
+          repository: ${{ github.repository }}
+          selected-branch: ${{ inputs.branch }}
           poll: "true"
           timeout-seconds: "1800"
           poll-interval-seconds: "30"
-          github-token: \${{ secrets.GITHUB_TOKEN }}
-          openhands-api-key: \${{ secrets.OPENHANDS_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          openhands-api-key: ${{ secrets.OPENHANDS_API_KEY }}
