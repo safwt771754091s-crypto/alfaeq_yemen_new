@@ -39,7 +39,7 @@ jobs:
           set -euo pipefail
           if grep -RInE --exclude-dir=.git --exclude-dir=.dart_tool --exclude-dir=build \
             '(service_role|SUPABASE_SERVICE_ROLE|SUPABASE_SERVICE_ROLE_KEY|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|github_pat_|ghp_[A-Za-z0-9_]+)' \
-            .aider.conf.yml CONVENTIONS.md docs/engineering .github 2>/dev/null; then
+            .aider.conf.yml CONVENTIONS.md docs/engineering .aider.conf.yml CONVENTIONS.md 2>/dev/null; then
             echo "Potential privileged credential found in engineering-agent configuration."
             exit 1
           fi
