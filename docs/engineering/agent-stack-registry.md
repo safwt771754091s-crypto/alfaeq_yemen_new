@@ -11,6 +11,7 @@ This repository is the production application. External agent projects are engin
 | mini-SWE-agent | bounded autonomous issue-fix loop | integrated conceptually | docs/engineering/mini-swe-agent.md |
 | Aider | architect/editor workflow | integrated | .aider.conf.yml, CONVENTIONS.md |
 | Jev Ultrafast | fast structured browser action selection | integrated as a documented capability | docs/engineering/jev-ultrafast.md |
+| security-audit-skill | six-phase security audit, independent validation, coverage ledger and machine-readable findings | integrated as engineering security gate | docs/engineering/security-audit.md |
 | SWE-ReX | isolated/remote command execution for agents | NEW | sandbox contract below |
 | OpenSandbox | secure/extensible sandbox runtime | already present as a separate fork | use as sandbox implementation candidate |
 | OpenCode | coding-agent/runtime patterns | already present as a separate fork | use selectively; never expose an unauthenticated server |
