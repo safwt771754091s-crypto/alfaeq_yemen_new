@@ -85,7 +85,8 @@ $$;
 
 create or replace function public.complete_ai_agent_run(
   p_run_id uuid, p_status text,
-  p_result jsonb default '{}'::jsonb, p_error text default null
+  p_result jsonb default '{}'::jsonb, p_error text default null,
+  p_external_run_id text default null, p_conversation_id text default null
 )
 returns public.ai_agent_runs
 language plpgsql security definer set search_path = public, private
@@ -104,7 +105,8 @@ begin
   if not found then raise exception 'run_not_found'; end if;
 
   update public.ai_agent_runs set status=p_status, result=coalesce(p_result,'{}'::jsonb),
-    error=p_error, completed_at=now(), updated_at=now()
+    error=p_error, external_run_id=coalesce(p_external_run_id, external_run_id),
+    conversation_id=coalesce(p_conversation_id, conversation_id), completed_at=now(), updated_at=now()
   where id=p_run_id returning * into v_run;
 
   select * into v_task from public.ai_tasks where id=v_run.task_id for update;
@@ -125,6 +127,6 @@ end;
 $$;
 
 revoke all on function public.claim_ai_task_for_execution(uuid,text,text,text) from public, anon, authenticated;
-revoke all on function public.complete_ai_agent_run(uuid,text,jsonb,text) from public, anon, authenticated;
+revoke all on function public.complete_ai_agent_run(uuid,text,jsonb,text,text,text) from public, anon, authenticated;
 grant execute on function public.claim_ai_task_for_execution(uuid,text,text,text) to service_role;
-grant execute on function public.complete_ai_agent_run(uuid,text,jsonb,text) to service_role;
+grant execute on function public.complete_ai_agent_run(uuid,text,jsonb,text,text,text) to service_role;
