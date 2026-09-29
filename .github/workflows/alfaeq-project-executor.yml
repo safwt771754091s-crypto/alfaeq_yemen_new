@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "\${OPENHANDS_API_KEY:-}" ]; then
+          if [ -z "${OPENHANDS_API_KEY:-}" ]; then
             echo "::notice::OPENHANDS_API_KEY is not configured; execution is intentionally skipped."
             exit 0
           fi
@@ -88,7 +88,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "\${OPENHANDS_API_KEY:-}" ]; then
+          if [ -z "${OPENHANDS_API_KEY:-}" ]; then
             echo "::error::OPENHANDS_API_KEY is required for manual execution."
             exit 1
           fi
