@@ -6,6 +6,7 @@ import '../services/location_service.dart';
 import '../core/product_units.dart';
 import '../services/supabase_service.dart';
 import '../services/auth_service.dart';
+import '../services/alfaeq_event_bus_service.dart';
 
 class MerchantCenterPage extends StatefulWidget {
   const MerchantCenterPage({super.key});
@@ -25,6 +26,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
   String? _selectedStoreId;
   String _saleUnit = 'piece';
   bool _saving = false;
+  final _eventBus = AlfaeqEventBusService();
 
   @override
   void dispose() {
@@ -55,6 +57,18 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
         'location': {'latitude': position.latitude, 'longitude': position.longitude, 'source': 'device'},
         'metadata': {'created_by': user.id},
       });
+      await _eventBus.publishStoreUpdated(storeId, data: {
+        'ownerId': user.id,
+        'status': 'pending',
+        'sectionId': _sectionId,
+        'name': name,
+        'version': 'created',
+      });
+      await _eventBus.publishMerchantUpdated(user.id, data: {
+        'storeId': storeId,
+        'action': 'store.created',
+        'version': 'store-$storeId',
+      });
       _selectedStoreId = storeId;
       _storeName.clear(); _phone.clear(); _address.clear();
       _message('تم إرسال المتجر للمراجعة مع موقعه الجغرافي. لن يظهر للعملاء حتى يتم اعتماده.');
@@ -69,7 +83,43 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     if (price == null || price < 0 || stock == null || stock < 0) { _message('السعر والكمية يجب أن يكونا أرقاماً صحيحة وغير سالبة.'); return; }
     setState(() => _saving = true);
     try {
-      await SupabaseService.client.from('products').insert({'id': user.id + '-' + DateTime.now().microsecondsSinceEpoch.toString(), 'store_id': storeId, 'owner_id': user.id, 'name': name, 'price': price, 'currency': 'YER', 'stock': stock, 'stock_base': ProductUnit.fromId(_saleUnit).toBase(stock).round(), 'sale_unit': _saleUnit, 'unit_label': ProductUnit.fromId(_saleUnit).label, 'base_unit': ProductUnit.fromId(_saleUnit).baseUnit, 'unit_scale': ProductUnit.fromId(_saleUnit).scale, 'step_base': ProductUnit.fromId(_saleUnit).defaultStepBase, 'min_order_base': ProductUnit.fromId(_saleUnit).defaultStepBase, 'sold_quantity': 0, 'sold_quantity_base': 0, 'status': 'active', 'metadata': {'created_by': user.id}});
+      final productId = user.id + '-' + DateTime.now().microsecondsSinceEpoch.toString();
+      final unit = ProductUnit.fromId(_saleUnit);
+      final stockBase = unit.toBase(stock).round();
+      await SupabaseService.client.from('products').insert({
+        'id': productId,
+        'store_id': storeId,
+        'owner_id': user.id,
+        'name': name,
+        'price': price,
+        'currency': 'YER',
+        'stock': stock,
+        'stock_base': stockBase,
+        'sale_unit': _saleUnit,
+        'unit_label': unit.label,
+        'base_unit': unit.baseUnit,
+        'unit_scale': unit.scale,
+        'step_base': unit.defaultStepBase,
+        'min_order_base': unit.defaultStepBase,
+        'sold_quantity': 0,
+        'sold_quantity_base': 0,
+        'status': 'active',
+        'metadata': {'created_by': user.id},
+      });
+      await _eventBus.publishProductCreated(productId, data: {
+        'storeId': storeId,
+        'ownerId': user.id,
+        'stock': stock,
+        'stockBase': stockBase,
+        'price': price,
+      });
+      await _eventBus.publishInventoryChanged(productId, data: {
+        'storeId': storeId,
+        'ownerId': user.id,
+        'stock': stock,
+        'stockBase': stockBase,
+        'reason': 'product.created',
+      });
       _productName.clear(); _price.clear(); _stock.clear(); _message('تم حفظ الصنف بنجاح.');
     } catch (e) { _message('تعذر حفظ الصنف: $e'); }
     finally { if (mounted) setState(() => _saving = false); }
@@ -83,7 +133,24 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     if (result != true) return;
     final price = num.tryParse(priceController.text.trim()); final stock = int.tryParse(stockController.text.trim());
     if (price == null || price < 0 || stock == null || stock < 0) { _message('السعر والمخزون غير صالحين.'); return; }
-    await SupabaseService.client.from('products').update({'price': price, 'stock': stock, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', doc['id']);
+    final productId = doc['id'].toString();
+    final updatedAt = DateTime.now().toUtc();
+    final stockBase = ProductUnit.fromProduct(data).toBase(stock).round();
+    await SupabaseService.client.from('products').update({
+      'price': price,
+      'stock': stock,
+      'stock_base': stockBase,
+      'updated_at': updatedAt.toIso8601String(),
+    }).eq('id', productId);
+    await _eventBus.publishInventoryChanged(productId, data: {
+      'storeId': data['store_id'],
+      'ownerId': data['owner_id'],
+      'stock': stock,
+      'stockBase': stockBase,
+      'price': price,
+      'reason': 'merchant.product.updated',
+      'version': updatedAt.microsecondsSinceEpoch.toString(),
+    });
   }
 
   void _message(String text) { if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text))); }
