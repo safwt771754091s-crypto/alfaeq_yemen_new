@@ -1,56 +1,54 @@
+
 # Alfaeq Project Executor
 
-The Alfaeq engineering plane turns a concrete project task into a bounded engineering run:
+## Purpose
 
-Task/Issue -> OpenHands -> isolated workspace -> inspect -> edit -> test -> security -> PR -> GitHub Actions -> release gate
+The Project Executor turns an engineering request into a bounded agent execution. It is an engineering-plane component; it does not execute production business mutations.
 
-The production Flutter/Supabase application remains separate from the engineering-agent plane.
+## Execution contract
 
-## Triggering
+```
+Issue / task
+  -> ai_tasks
+  -> agent claim
+  -> ai_agent_runs
+  -> OpenHands conversation
+  -> isolated workspace
+  -> inspect / plan / edit
+  -> tests / build / security audit
+  -> focused PR
+  -> GitHub Actions
+  -> independent verification
+  -> release gate
+```
 
-### Issue-driven execution
-1. Create or update a GitHub Issue with a precise engineering task.
-2. Add the \`alfaeq-execute\` label.
-3. The \`Alfaeq Project Executor\` workflow starts OpenHands.
-4. OpenHands works on the repository and proposes a focused PR.
-5. Existing GitHub Actions provide the build/test verdict.
-6. The PR is reviewed before merging.
+### Durable ownership
 
-### Manual execution
-Run **Alfaeq Project Executor** from GitHub Actions and provide a task. This is useful for large planned platform milestones.
+- `public.ai_tasks`: canonical engineering work item.
+- `public.ai_agent_runs`: durable attempt, provider, repository, branch, external run ID, conversation ID, status and result.
+- OpenHands Conversation: agent execution state.
+- Git/GitHub: source history and PR state.
+- Supabase product tables: production business state; engineering agents do not write them directly.
 
-## Required secret
+### Provider boundary
 
-The repository needs the GitHub Actions secret \`OPENHANDS_API_KEY\`.
+The executor must treat OpenHands as a provider behind a narrow API boundary. Provider-specific identifiers are recorded in `ai_agent_runs.external_run_id` and `ai_agent_runs.conversation_id`.
 
-The workflow deliberately does not run the agent when that secret is absent. GitHub documents that secrets are supplied through the \`secrets\` context and should not be used directly in \`if\` expressions; the workflow therefore copies the secret to a job environment and gates execution there. OpenHands' current GitHub Action supports repository targeting and polling.
+If OpenHands is unavailable, the task remains recoverable and must not be marked succeeded.
 
-No Supabase service-role credential is given to the engineering agent. Product data stays behind Supabase/RLS and server-side functions.
+### Release gate
 
-## Database execution state
+A successful agent conversation is not a successful release. Completion requires:
 
-Production now contains \`public.ai_agent_runs\` plus service-only claim/complete functions. This gives the agent plane a durable execution record without exposing agent credentials or internal run state to public clients.
+1. clean focused diff;
+2. no committed secrets;
+3. migration/RLS review where applicable;
+4. formatting/static analysis/tests;
+5. relevant Flutter/Web/Android build;
+6. security-audit gate;
+7. GitHub Actions evidence;
+8. human/release approval before merge or production deployment.
 
-## Definition of done
+### Safety
 
-A task is not complete merely because the agent says it is complete. The repository must have:
-- focused diff;
-- no secrets;
-- migration/RLS/security review;
-- Flutter analyze/tests;
-- relevant APK/Web build;
-- GitHub Actions evidence;
-- PR review;
-- explicit release decision.
-
-## Existing agent stack
-
-- Aider: architecture/editor workflow
-- mini-SWE-agent: bounded issue-fix loop
-- OpenHands: long-running agent runtime and GitHub execution
-- Jev Ultrafast: structured browser decision layer
-- OpenSandbox/SWE-ReX: isolation/execution candidates
-- Supabase: product state and event bus
-- n8n: external business automation
-
-The executor is intentionally a composition of these capabilities, not a monolithic runtime.
+The executor must never pass production service-role credentials to the agent. Browser automation and target-controlled commands require an isolated environment with resource limits. External paid/live checks remain separate from offline CI.
