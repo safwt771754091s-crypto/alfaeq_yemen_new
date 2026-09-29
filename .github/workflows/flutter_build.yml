@@ -8,6 +8,7 @@ on:
       - supabase-migration-foundation
       - fix-web-platform-core
       - fix/stage4-cart-catalog-link
+      - feat/harness-engineering
   pull_request:
     branches:
       - main

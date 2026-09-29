@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "active_feature": "event-bus-order-inventory-merchant",
+  "features": [
+    {
+      "id": "harness-foundation",
+      "name": "Production engineering harness",
+      "status": "in_progress",
+      "depends_on": [],
+      "done_when": [
+        "AGENTS.md defines production constraints and verification",
+        "progress.md records current state and evidence",
+        "session-handoff.md makes the next session restartable",
+        "verification commands are documented"
+      ]
+    },
+    {
+      "id": "event-bus-order-inventory-merchant",
+      "name": "Order / Inventory / Merchant event integration",
+      "status": "in_progress",
+      "depends_on": ["harness-foundation"],
+      "done_when": [
+        "event contracts are explicit",
+        "producers and consumers are identified",
+        "retry and idempotency are defined",
+        "failure and rollback paths are verified"
+      ]
+    },
+    {
+      "id": "production-build-gate",
+      "name": "Production build gate",
+      "status": "planned",
+      "depends_on": ["harness-foundation"],
+      "done_when": [
+        "flutter analyze passes",
+        "flutter test passes",
+        "web release build passes",
+        "APK build passes"
+      ]
+    }
+  ]
+}
