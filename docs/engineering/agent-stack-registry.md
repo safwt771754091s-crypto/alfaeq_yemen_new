@@ -9,6 +9,7 @@ This repository is the production application. External agent projects are engin
 | OpenHands | long-running agent runtime, conversations, tools/skills, server/automation | integrated conceptually | docs/engineering/openhands.md |
 | mini-SWE-agent | bounded autonomous issue-fix loop | integrated conceptually | docs/engineering/mini-swe-agent.md |
 | Aider | architect/editor workflow | integrated | .aider.conf.yml, CONVENTIONS.md |
+| Jev Ultrafast | fast structured browser action selection | integrated as a documented capability | docs/engineering/jev-ultrafast.md |
 | SWE-ReX | isolated/remote command execution for agents | NEW | sandbox contract below |
 | OpenSandbox | secure/extensible sandbox runtime | already present as a separate fork | use as sandbox implementation candidate |
 | OpenCode | coding-agent/runtime patterns | already present as a separate fork | use selectively; never expose an unauthenticated server |
@@ -42,6 +43,13 @@ The engineering-agent plane must never receive production service-role credentia
 Flutter -> Supabase Auth/RLS -> transactional domain functions -> canonical event bus -> n8n/external automation -> notifications/integrations
 
 The engineering-agent plane and production application plane remain separate.
+
+### Jev Ultrafast
+- structured visible-control observation;
+- one typed operation plus a compatible target per decision cycle;
+- target revalidation before browser mutation;
+- text generation only when typing is required;
+- independent postcondition verification after DONE.
 
 ## What we are taking from the listed repositories
 
