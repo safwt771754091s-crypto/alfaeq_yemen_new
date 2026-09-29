@@ -1,19 +1,19 @@
 # Alfaeq Order / Inventory / Merchant Event Contracts
 
 ## Source of truth
-Supabase PostgreSQL is authoritative for orders, products/inventory, stores/merchants, and the durable `automation_events` stream. n8n is an automation consumer/orchestrator, not a business-data source of truth.
+Supabase PostgreSQL is authoritative for orders, products/inventory, stores/merchants, and the durable `automation_events` stream. n8n is an automation consumer/orchestrator, not a business-data source of truth. The production database already has a private outbox helper (`private.enqueue_automation_event`) used by order/store triggers.
 
 ## Events
 
 | Event | Aggregate | Producer | Purpose |
 |---|---|---|---|
 | `order.created` | order | `orders` INSERT trigger | Starts trusted order processing and downstream automation. |
-| `order.status_changed` | order | `orders` UPDATE trigger | Propagates merchant/customer/delivery state changes. |
+| `order.updated` | order | existing `private.trg_enqueue_order_event` | Propagates order changes. |
 | `inventory.reserved` | inventory | `inventory_movements` INSERT | Records successful sale reservation after the atomic inventory operation. |
 | `inventory.released` | inventory | `inventory_movements` INSERT | Records reservation/release movements. |
 | `inventory.adjusted` | inventory | `inventory_movements` INSERT | Records other inventory ledger movements. |
-| `merchant.store.created` | merchant | `stores` INSERT trigger | Starts merchant/store onboarding automation. |
-| `merchant.store.updated` | merchant | `stores` UPDATE trigger | Propagates material merchant/store changes. |
+| `store.created` | store | existing `private.trg_enqueue_store_event` | Starts merchant/store onboarding automation. |
+| `store.updated` | store | existing `private.trg_enqueue_store_event` | Propagates store changes. |
 
 ## Reliability boundaries
 
