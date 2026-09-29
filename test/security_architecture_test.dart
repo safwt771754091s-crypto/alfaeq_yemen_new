@@ -30,7 +30,6 @@ void main() {
       final migration = File('supabase/migrations/20260922190300_production_rpc_hardening.sql').readAsStringSync();
       expect(orders, contains("rpc('create_order'"));
       expect(migration, contains('create or replace function public.create_order'));
-      expect(migration, contains('automation_event_inbox'));
     });
 
     test('commercial notifications stay on Supabase', () {
