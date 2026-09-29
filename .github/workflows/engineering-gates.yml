@@ -39,7 +39,7 @@ jobs:
             echo "::error::Legacy Firebase runtime dependency detected in the Flutter/client tree."
             exit 1
           fi
-          if git grep -nE -- 'firebase deploy --only functions' -- '.github/workflows' '*.sh' '*.ps1'; then
+          if git grep -nE -- 'firebase deploy --only functions' -- '.github/workflows/*.yml' ':!.github/workflows/engineering-gates.yml' '*.sh' '*.ps1'; then
             echo "::error::Legacy Firebase deployment command detected."
             exit 1
           fi
