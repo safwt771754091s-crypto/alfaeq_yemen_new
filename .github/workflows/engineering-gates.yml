@@ -1,0 +1,90 @@
+name: Alfaeq Engineering Gates
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engineering-gates-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-and-supply-chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate engineering contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/engineering/ALFAEQ_CLAUDE_SKILLS_GATES.md
+          test -f docs/engineering/ALFAEQ_GAIA_AGENT_GOVERNANCE.md
+          test -f docs/engineering/ALFAEQ_PR_REVIEW_CONTRACT.md
+          test -f docs/engineering/ALFAEQ_COMPOST_SDLC.md
+          grep -q "CI gate" docs/engineering/ALFAEQ_CLAUDE_SKILLS_GATES.md
+          grep -q "Evidence-first completion" docs/engineering/ALFAEQ_GAIA_AGENT_GOVERNANCE.md
+          grep -q "Acceptance criteria" docs/engineering/ALFAEQ_COMPOST_SDLC.md
+          grep -q "immutable review evidence" docs/engineering/ALFAEQ_PR_REVIEW_CONTRACT.md
+      - name: Reject forbidden production dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -nE -- 'firebase_auth|cloud_firestore|FirebaseFirestore|FirebaseAuth|firebase deploy --only functions' -- '*.dart' '*.yaml' '*.yml' '*.json' '*.sh' '*.ps1' '*.ts' '*.js'; then
+            echo "::error::Legacy Firebase runtime/deployment dependency detected."
+            exit 1
+          fi
+      - name: Reject privileged client credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          files="$(git ls-files -- '*.dart' '*.yaml' '*.yml' '*.json' '*.ts' '*.js' '*.sql' ':!pubspec.lock' ':!package-lock.json')"
+          [ -n "$files" ] || exit 0
+          if grep -nE 'SUPABASE_SERVICE_ROLE_KEY|service_role' $files; then
+            echo "::error::Privileged Supabase credential/reference detected in tracked application source."
+            exit 1
+          fi
+      - name: Validate migration naming and safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d supabase/migrations
+          while IFS= read -r f; do
+            base="$(basename "$f")"
+            if ! [[ "$base" =~ ^[0-9]{14}_[a-z0-9_]+\.sql$ ]]; then
+              echo "::error file=$f::Migration filename must be YYYYMMDDHHMMSS_description.sql"
+              exit 1
+            fi
+          done < <(find supabase/migrations -type f -name '*.sql' | sort)
+          while IFS= read -r f; do
+            if grep -qiE 'create (or replace )?function.*security definer|security definer' "$f"; then
+              grep -qiE 'set search_path[[:space:]]*=' "$f" || {
+                echo "::error file=$f::SECURITY DEFINER migration requires explicit search_path."
+                exit 1
+              }
+            fi
+          done < <(find supabase/migrations -type f -name '*.sql' | sort)
+      - name: Produce immutable gate evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p gate-artifacts
+          cat > gate-artifacts/engineering-gate.json <<EOF
+          {
+            "commit": "$GITHUB_SHA",
+            "ref": "$GITHUB_REF",
+            "event": "$GITHUB_EVENT_NAME",
+            "contract": "compost-pr-inbox-gaia",
+            "destructive_actions": false,
+            "checks": ["engineering-contract","legacy-firebase-block","privileged-client-credential-block","migration-safety"]
+          }
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alfaeq-engineering-gate-evidence
+          path: gate-artifacts/engineering-gate.json
