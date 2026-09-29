@@ -6,7 +6,6 @@ import '../services/auth_service.dart';
 import 'admin_data_entry.dart';
 import 'admin_user_management_page.dart';
 import 'cart_page.dart';
-import 'ai_assistant_page.dart';
 import 'bulk_product_import_page.dart';
 import 'developer_page.dart';
 import 'dispatch_center_page.dart';
@@ -14,7 +13,6 @@ import 'location_picker_page.dart';
 import 'merchant_approval_page.dart';
 import 'merchant_invites_page.dart';
 import 'merchant_portal_page.dart';
-import 'platform_automation_page.dart';
 import 'platform_control_page.dart';
 import 'whatsapp_automation_page.dart';
 
@@ -82,14 +80,12 @@ class AdminDashboard extends StatelessWidget {
                 const SizedBox(height: 8),
                 _ActionCard(icon: Icons.manage_accounts_outlined, title: 'المستخدمون والأدوار', subtitle: 'إدارة الأدوار والصلاحيات وتعطيل الحسابات وإلغاء الجلسات', onTap: () => _open(context, AdminUserManagementPage())),
                 _ActionCard(icon: Icons.tune_outlined, title: 'مركز تشغيل المنصة', subtitle: 'الأقسام، الدفع، التجار والإعدادات التشغيلية', onTap: () => _open(context, PlatformControlPage())),
-                _ActionCard(icon: Icons.radar_outlined, title: 'أتمتة وجاهزية المنصة', subtitle: 'قراءة حالة الجاهزية القادمة من الخادم', onTap: () => _open(context, PlatformAutomationPage())),
                 _ActionCard(icon: Icons.message_outlined, title: 'أتمتة واتساب', subtitle: 'استقبال منتجات التجار عبر WhatsApp Business وربطها بالمتجر', onTap: () => _open(context, WhatsAppAutomationPage())),
                 _ActionCard(icon: Icons.fact_check_outlined, title: 'اعتماد المتاجر', subtitle: 'مراجعة واعتماد طلبات التجار', onTap: () => _open(context, MerchantApprovalPage())),
                 _ActionCard(icon: Icons.add_link, title: 'التجار والروابط', subtitle: 'إنشاء وإدارة دعوات التجار', onTap: () => _open(context, MerchantInvitesPage())),
                 _ActionCard(icon: Icons.storefront_outlined, title: 'مركز التاجر', subtitle: 'الكتالوج والمنتجات والطلبات', onTap: () => _open(context, MerchantPortalPage())),
                 _ActionCard(icon: Icons.add_business_outlined, title: 'إدخال البيانات', subtitle: 'إضافة المتاجر والمنتجات مع تحديد موقع المتجر على الخريطة', onTap: () => _open(context, AdminDataEntry())),
                 _ActionCard(icon: Icons.table_view_outlined, title: 'استيراد Excel بالجملة', subtitle: 'رفع Excel/CSV ومعاينة الأصناف ثم اعتمادها دفعة واحدة', onTap: () => _open(context, const BulkProductImportPage())),
-                _ActionCard(icon: Icons.auto_awesome, title: 'ذكاء الفائق', subtitle: 'المساعد الذكي للمالك والإدارة مع بوابة الصلاحيات', onTap: () => _open(context, const AiAssistantPage())),
                 _ActionCard(icon: Icons.local_shipping_outlined, title: 'التوزيع والمندوبون', subtitle: 'تشغيل التوزيع ومتابعة الطلبات', onTap: () => _open(context, DispatchCenterPage())),
                 _ActionCard(icon: Icons.code_outlined, title: 'مركز المطور والأمن', subtitle: 'الفحص، سجل التدقيق، وتقارير الحماية', onTap: () => _open(context, DeveloperPage())),
                 const SizedBox(height: 18),
@@ -116,7 +112,7 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 6),
             const Text('الصلاحيات الحقيقية تظل مفروضة من Supabase Auth وRLS وسياسات الخادم.', style: TextStyle(color: Colors.white70, height: 1.45)),
             const SizedBox(height: 14),
-            FilledButton.icon(onPressed: () => _open(context, PlatformAutomationPage()), icon: const Icon(Icons.health_and_safety_outlined), label: const Text('فحص جاهزية المنصة')),
+            FilledButton.icon(onPressed: () => _open(context, DeveloperPage()), icon: const Icon(Icons.health_and_safety_outlined), label: const Text('فحص أمان المنصة')),
           ]),
         ),
       );
@@ -191,7 +187,6 @@ class AdminDashboard extends StatelessWidget {
       _QuickAction(Icons.store, 'اعتماد المتاجر', () => _open(context, MerchantApprovalPage())),
       _QuickAction(Icons.add_business, 'إضافة بيانات', () => _open(context, AdminDataEntry())),
       _QuickAction(Icons.table_view_outlined, 'استيراد Excel', () => _open(context, const BulkProductImportPage())),
-      _QuickAction(Icons.auto_awesome, 'ذكاء الفائق', () => _open(context, const AiAssistantPage())),
       _QuickAction(Icons.map_outlined, 'خريطة المتاجر', () => _open(context, LocationPickerPage(title: 'خريطة المنصة'))),
       _QuickAction(Icons.account_balance_wallet_outlined, 'الدفع والمحافظ', () => _open(context, PlatformControlPage())),
       _QuickAction(Icons.delivery_dining_outlined, 'التوزيع', () => _open(context, DispatchCenterPage())),
