@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'core/app_sections.dart';
 import 'screens/admin_dashboard.dart';
-import 'screens/ai_assistant_page.dart';
 import 'screens/auth_gate.dart';
 import 'screens/cart_page.dart';
 import 'screens/developer_page.dart';
@@ -164,7 +163,6 @@ class HomePage extends StatelessWidget {
           appBar: AppBar(
             title: const Text('الفائق يمن', style: TextStyle(fontWeight: FontWeight.w900)),
             actions: [
-              IconButton(tooltip: 'ذكاء الفائق', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage())), icon: const Icon(Icons.auto_awesome)),
               StreamBuilder<List<Map<String, dynamic>>>(
                 stream: SupabaseService.client.auth.currentUser == null || !SupabaseService.isInitialized
                     ? null
@@ -216,7 +214,6 @@ class HomePage extends StatelessWidget {
               IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none)),
               PopupMenuButton<String>(
                 onSelected: (value) {
-                  if (value == 'ai') Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()));
                   if (value == 'cart') Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage()));
                   if (value == 'orders') Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersPage()));
                   if (value == 'admin') _openAdmin(context);
@@ -224,7 +221,6 @@ class HomePage extends StatelessWidget {
                   if (value == 'logout') _signOut(context);
                 },
                 itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'ai', child: ListTile(leading: Icon(Icons.auto_awesome), title: Text('ذكاء الفائق'))),
                   PopupMenuItem(value: 'cart', child: ListTile(leading: Icon(Icons.shopping_cart_outlined), title: Text('السلة'))),
                   PopupMenuItem(value: 'orders', child: ListTile(leading: Icon(Icons.receipt_long_outlined), title: Text('طلباتي وتتبع الطلبات'))),
                   PopupMenuItem(value: 'admin', child: ListTile(leading: Icon(Icons.admin_panel_settings_outlined), title: Text('لوحة الإدارة'))),
@@ -240,15 +236,6 @@ class HomePage extends StatelessWidget {
             children: [
               TextField(decoration: InputDecoration(hintText: 'ابحث عن متجر أو منتج أو خدمة...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none))),
               const SizedBox(height: 16),
-              InkWell(
-                borderRadius: BorderRadius.circular(24),
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage())),
-                child: Container(
-                  padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), color: const Color(0xFF0B6E4F)),
-                  child: const Row(children: [Icon(Icons.auto_awesome, color: Colors.white, size: 34), SizedBox(width: 14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('مرحباً بك في الفائق يمن', style: TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900)), SizedBox(height: 8), Text('منصة عالمية تبدأ من اليمن — اسأل ذكاء الفائق عن الخدمات والبحث والتخطيط.', style: TextStyle(color: Colors.white70))]))]),
-                ),
-              ),
               const SizedBox(height: 24),
               const Text('الأقسام الـ16', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
               const SizedBox(height: 12),
