@@ -1,0 +1,90 @@
+name: Alfaeq Security Audit Gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject committed secrets in engineering/runtime config
+        shell: bash
+        run: |
+          set -euo pipefail
+          files="$(git ls-files --             '*.dart' '*.yaml' '*.yml' '*.json' '*.ts' '*.js' '*.sql' '*.md' '*.conf'             ':!*.lock' ':!pubspec.lock' ':!package-lock.json')"
+          if [ -z "$files" ]; then exit 0; fi
+          if grep -nE 'SUPABASE_SERVICE_ROLE_KEY|service_role|OPENAI_API_KEY[[:space:]]*[:=]|OPENHANDS_API_KEY[[:space:]]*[:=][^\$]' $files; then
+            echo "::error::Potential secret or privileged credential committed to source."
+            exit 1
+          fi
+
+      - name: Check Supabase migration safety markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          migrations="supabase/migrations"
+          test -d "$migrations"
+          while IFS= read -r f; do
+            if grep -qE 'create or replace function.*security definer|security definer' "$f"; then
+              if ! grep -qE 'set search_path[[:space:]]*=' "$f"; then
+                echo "::error file=$f::SECURITY DEFINER function without explicit search_path."
+                exit 1
+              fi
+            fi
+          done < <(find "$migrations" -type f -name '*.sql' | sort)
+
+      - name: Check exposed-table RLS declarations
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in supabase/migrations/*.sql; do
+            [ -f "$f" ] || continue
+            if grep -Eq 'create table (if not exists )?public\.' "$f"; then
+              table_names="$(grep -Eo 'create table (if not exists )?public\.[a-zA-Z0-9_]+' "$f" | sed -E 's/.*public\.//' | sort -u)"
+              while read -r t; do
+                [ -n "$t" ] || continue
+                if ! grep -Eq "alter table (if not exists )?public\.${t}[[:space:]]+enable row level security|alter table public\.${t}[[:space:]]+enable row level security" "$f"; then
+                  echo "::warning file=$f::Table public.${t} is created here without an RLS enable statement in the same migration; verify intentionally."
+                fi
+              done <<< "$table_names"
+            fi
+          done
+
+      - name: Verify agent safety contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s CONVENTIONS.md
+          test -s docs/engineering/security-audit.md
+          grep -q "isolated workspace" docs/engineering/security-audit.md
+          grep -q "confirmed.*needs_validation.*rejected" docs/engineering/security-audit.md
+          grep -q "never merge" .github/workflows/alfaeq-project-executor.yml ||             grep -q "never merge directly" .github/workflows/alfaeq-project-executor.yml
+
+      - name: Produce audit manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit-artifacts
+          {
+            echo "commit=${GITHUB_SHA}"
+            echo "ref=${GITHUB_REF}"
+            echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "status=static-security-gate-passed"
+          } > audit-artifacts/security-audit-manifest.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alfaeq-security-audit-manifest
+          path: audit-artifacts/security-audit-manifest.txt
