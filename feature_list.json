@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "active_feature": "harness-foundation",
+  "active_feature": "event-bus-order-inventory-merchant",
   "features": [
     {
       "id": "harness-foundation",
@@ -17,7 +17,7 @@
     {
       "id": "event-bus-order-inventory-merchant",
       "name": "Order / Inventory / Merchant event integration",
-      "status": "planned",
+      "status": "in_progress",
       "depends_on": ["harness-foundation"],
       "done_when": [
         "event contracts are explicit",
