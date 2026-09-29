@@ -27,7 +27,7 @@ void main() {
 
     test('order creation stays on the Supabase transactional RPC', () {
       final orders = File('lib/services/order_service.dart').readAsStringSync();
-      final migration = File('supabase/migrations/20260929010000_order_created_transactional_event.sql').readAsStringSync();
+      final migration = File('supabase/migrations/20260922190300_production_rpc_hardening.sql').readAsStringSync();
       expect(orders, contains("rpc('create_order'"));
       expect(migration, contains('create or replace function public.create_order'));
       expect(migration, contains('automation_event_inbox'));
