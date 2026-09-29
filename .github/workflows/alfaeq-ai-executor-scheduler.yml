@@ -17,24 +17,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Validate executor secret
-        env:
-          EXECUTOR_SECRET: ${{ secrets.ALFAEQ_N8N_SHARED_SECRET }}
-        run: |
-          set -euo pipefail
-          test -n "${EXECUTOR_SECRET:-}" || {
-            echo "::error::ALFAEQ_N8N_SHARED_SECRET must be configured in GitHub repository secrets."
-            exit 1
-          }
-
       - name: Dispatch and reconcile AI engineering runs
         env:
-          EXECUTOR_SECRET: ${{ secrets.ALFAEQ_N8N_SHARED_SECRET }}
+          OPENHANDS_API_KEY: ${{ secrets.OPENHANDS_API_KEY }}
           SUPABASE_FUNCTION_URL: https://esvljorjykzgrpnrxnma.supabase.co/functions/v1/ai-executor-dispatcher
         run: |
           set -euo pipefail
+          test -n "${OPENHANDS_API_KEY:-}" || {
+            echo "::error::OPENHANDS_API_KEY must be configured in GitHub repository secrets."
+            exit 1
+          }
           curl --fail-with-body --silent --show-error \
             -X POST "${SUPABASE_FUNCTION_URL}" \
             -H "content-type: application/json" \
-            -H "x-alfaeq-automation-secret: ${EXECUTOR_SECRET}" \
+            -H "x-openhands-api-key: ${OPENHANDS_API_KEY}" \
             --data '{"action":"dispatch_and_reconcile"}'
