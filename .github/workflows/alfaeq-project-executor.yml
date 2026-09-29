@@ -1,0 +1,121 @@
+name: Alfaeq Project Executor
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Project task for the engineering agent"
+        required: true
+        type: string
+      branch:
+        description: "Branch to work from"
+        required: false
+        default: main
+        type: string
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: alfaeq-project-executor-\${{ github.event.issue.number || inputs.task || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  execute-issue:
+    if: github.event_name == 'issues' && github.event.label.name == 'alfaeq-execute'
+    runs-on: ubuntu-latest
+    env:
+      OPENHANDS_API_KEY: \${{ secrets.OPENHANDS_API_KEY }}
+    steps:
+      - name: Verify executor is configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "\${OPENHANDS_API_KEY:-}" ]; then
+            echo "::notice::OPENHANDS_API_KEY is not configured; execution is intentionally skipped."
+            exit 0
+          fi
+
+      - name: Run OpenHands on the issue
+        if: env.OPENHANDS_API_KEY != ''
+        uses: All-Hands-AI/openhands-github-action@v1
+        with:
+          prompt: |
+            You are the Alfaeq Yemen engineering executor.
+
+            Repository: \${{ github.repository }}
+            Issue: #\${{ github.event.issue.number }}
+            Title: \${{ github.event.issue.title }}
+
+            Complete the requested project work end-to-end, but do not merge directly to main.
+            Work in an isolated workspace and create a focused PR.
+
+            Engineering contract:
+            - Supabase PostgreSQL is the production source of truth.
+            - Inspect existing migrations, RLS, RPCs, event bus, and Flutter services before changing them.
+            - Never commit secrets or service-role/secret keys.
+            - Critical order/inventory/payment mutations must be transactional and idempotent.
+            - Use reversible operations with prior-state/compensation metadata where external side effects exist.
+            - Prefer the existing Supabase event bus for business events.
+            - Keep agent runtime state separate from product state.
+            - Use typed/structured browser automation only when needed; revalidate targets before mutation and independently verify outcomes.
+            - Run formatter, Flutter analyze, tests, relevant builds, and security checks.
+            - Review the final diff for RLS, authorization, idempotency, migrations, backward compatibility, and Arabic/RTL behavior.
+            - Do not claim success without concrete command/test evidence.
+            - If a required external credential/service is unavailable, stop at a safe boundary and document the exact blocker instead of fabricating a result.
+
+            Issue body:
+            \${{ github.event.issue.body }}
+          repository: \${{ github.repository }}
+          selected-branch: main
+          poll: "true"
+          timeout-seconds: "1800"
+          poll-interval-seconds: "30"
+          github-token: \${{ secrets.GITHUB_TOKEN }}
+          openhands-api-key: \${{ secrets.OPENHANDS_API_KEY }}
+
+  execute-manual:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      OPENHANDS_API_KEY: \${{ secrets.OPENHANDS_API_KEY }}
+    steps:
+      - name: Verify executor is configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "\${OPENHANDS_API_KEY:-}" ]; then
+            echo "::error::OPENHANDS_API_KEY is required for manual execution."
+            exit 1
+          fi
+
+      - name: Run OpenHands on the requested task
+        uses: All-Hands-AI/openhands-github-action@v1
+        with:
+          prompt: |
+            You are the Alfaeq Yemen engineering executor.
+
+            Execute this task end-to-end in the repository, then create a focused PR:
+            \${{ inputs.task }}
+
+            Branch requested by operator: \${{ inputs.branch }}
+
+            Production contract:
+            - Supabase is the source of truth for product state.
+            - Inspect existing schema/migrations/RLS/RPCs/event bus before edits.
+            - Never commit secrets.
+            - Preserve transactionality, idempotency, compensation, and authorization.
+            - Run analyze/tests/relevant builds/security checks.
+            - Do not merge directly to main.
+            - Report concrete evidence and blockers only.
+          repository: \${{ github.repository }}
+          selected-branch: \${{ inputs.branch }}
+          poll: "true"
+          timeout-seconds: "1800"
+          poll-interval-seconds: "30"
+          github-token: \${{ secrets.GITHUB_TOKEN }}
+          openhands-api-key: \${{ secrets.OPENHANDS_API_KEY }}
