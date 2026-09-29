@@ -1,0 +1,34 @@
+name: Alfaeq AI Executor Scheduler
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alfaeq-ai-executor
+  cancel-in-progress: false
+
+jobs:
+  dispatch-and-reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch and reconcile AI engineering runs
+        env:
+          OH_KEY: ${{ secrets.OPENHANDS_API_KEY }}
+          SUPABASE_FUNCTION_URL: https://esvljorjykzgrpnrxnma.supabase.co/functions/v1/ai-executor-dispatcher
+        run: |
+          set -euo pipefail
+          test -n "${OH_KEY:-}" || {
+            echo "::error::The OpenHands provider secret is not configured in GitHub repository secrets."
+            exit 1
+          }
+          curl --fail-with-body --silent --show-error \
+            -X POST "${SUPABASE_FUNCTION_URL}" \
+            -H "content-type: application/json" \
+            -H "x-openhands-api-key: ${OH_KEY}" \
+            --data '{"action":"dispatch_and_reconcile"}'
