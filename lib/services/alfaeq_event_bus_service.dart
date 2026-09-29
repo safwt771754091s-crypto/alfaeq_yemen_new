@@ -24,8 +24,37 @@ class AlfaeqEventBusService {
   }
 
   Future<Map<String, dynamic>> publishOrderCreated(String orderId, {Map<String, dynamic> data = const {}}) =>
-      publish(eventType: 'order.created', data: {'aggregateId': orderId, ...data});
+      publish(
+        eventType: 'order.created',
+        eventId: 'order.created:${orderId}:v1',
+        data: {'aggregateId': orderId, ...data},
+      );
 
   Future<Map<String, dynamic>> publishInventoryChanged(String productId, {Map<String, dynamic> data = const {}}) =>
-      publish(eventType: 'inventory.changed', data: {'aggregateId': productId, ...data});
+      publish(
+        eventType: 'inventory.changed',
+        eventId: 'inventory.changed:${productId}:${data['stockBase'] ?? data['stock'] ?? 'changed'}',
+        data: {'aggregateId': productId, ...data},
+      );
+
+  Future<Map<String, dynamic>> publishMerchantUpdated(String merchantId, {Map<String, dynamic> data = const {}}) =>
+      publish(
+        eventType: 'merchant.updated',
+        eventId: 'merchant.updated:${merchantId}:${data['version'] ?? 'v1'}',
+        data: {'aggregateId': merchantId, ...data},
+      );
+
+  Future<Map<String, dynamic>> publishStoreUpdated(String storeId, {Map<String, dynamic> data = const {}}) =>
+      publish(
+        eventType: 'store.updated',
+        eventId: 'store.updated:${storeId}:${data['version'] ?? 'v1'}',
+        data: {'aggregateId': storeId, ...data},
+      );
+
+  Future<Map<String, dynamic>> publishProductCreated(String productId, {Map<String, dynamic> data = const {}}) =>
+      publish(
+        eventType: 'product.created',
+        eventId: 'product.created:${productId}:v1',
+        data: {'aggregateId': productId, ...data},
+      );
 }
