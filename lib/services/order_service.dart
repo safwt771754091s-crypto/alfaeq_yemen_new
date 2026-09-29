@@ -1,11 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
+import 'alfaeq_event_bus_service.dart';
 
 /// Supabase-backed order and catalog operations.
 class OrderService {
   final SupabaseClient supabase;
-  OrderService({SupabaseClient? client, bool preferSupabase = true})
-      : supabase = client ?? SupabaseService.client;
+  final AlfaeqEventBusService eventBus;
+  OrderService({SupabaseClient? client, bool preferSupabase = true, AlfaeqEventBusService? eventBus})
+      : supabase = client ?? SupabaseService.client,
+        eventBus = eventBus ?? AlfaeqEventBusService();
 
   Future<List<Map<String, dynamic>>> activeStores(String sectionId) async {
     final rows = await supabase.from('stores').select().eq('section_id', sectionId).eq('status', 'approved').order('name');
@@ -36,7 +39,13 @@ class OrderService {
       'p_latitude': latitude,
       'p_longitude': longitude,
     });
-    return id.toString();
+    final orderId = id.toString();
+    await eventBus.publishOrderCreated(orderId, data: {
+      'customerId': customerId,
+      'paymentMethod': paymentMethod,
+      'itemCount': normalized.length,
+    });
+    return orderId;
   }
 
   Future<void> clearCart(String uid) async {
