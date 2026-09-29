@@ -7,7 +7,6 @@ import '../services/auth_service.dart';
 import '../services/super_alfaeq_catalog_importer.dart';
 import 'admin_dashboard.dart';
 import 'customer_session_shell.dart';
-import 'developer_page.dart';
 import 'driver_center_page.dart';
 import 'login_page.dart';
 import 'merchant_portal_page.dart';
@@ -78,12 +77,12 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           case 'admin':
             SuperAlfaeqCatalogImporter().importIfNeeded().catchError((_) => 0);
             return const AdminDashboard();
-          case 'developer':
-            return const DeveloperPage();
           case 'merchant':
             return const MerchantPortalPage();
           case 'driver':
             return const DriverCenterPage();
+          case 'developer':
+            return const _CommercialOnlyNotice();
           case 'customer':
           case 'finance':
           case 'support':
@@ -93,4 +92,23 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       },
     );
   }
+}
+
+class _CommercialOnlyNotice extends StatelessWidget {
+  const _CommercialOnlyNotice();
+  @override
+  Widget build(BuildContext context) => const Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      body: Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'هذا الحساب مخصص لأدوات التطوير المستقبلية ولا يملك وصولاً إلى المنصة التجارية. منصة الصفوة ستعمل في مشروع مستقل.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    ),
+  );
 }
