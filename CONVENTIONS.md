@@ -34,5 +34,6 @@
 ## AI-assisted development
 - Use an architect/reviewer pass for cross-cutting changes.
 - Use a focused editor pass for implementation.
+- For bounded autonomous repository tasks, prefer a minimal linear agent loop: inspect -> command -> observation -> next command, with explicit step/cost/time limits and an isolated workspace.
 - Require lint/test/build evidence before calling a change production-ready.
 - Keep AI-generated changes reviewable through Git history and small commits.
