@@ -9,15 +9,15 @@ class AlfaeqAiToolRegistry {
   Future<Map<String,Object?>> execute(String name,Map<String,Object?> args,{required Future<void> Function({required String action,required String result,Map<String,dynamic>? details}) audit,bool userConfirmed=false}) async {
     try {
       switch(name){
-        case 'search_catalog': return _search(args);
-        case 'get_my_orders': return _orders(args);
-        case 'get_my_order': return _order(args);
-        case 'get_my_account_summary': return _account();
-        case 'get_my_cart': return _cart();
-        case 'add_to_cart': return _cartChange(args,'add',userConfirmed);
-        case 'update_cart_item': return _cartChange(args,'update',userConfirmed);
-        case 'remove_from_cart': return _cartChange(args,'remove',userConfirmed);
-        case 'create_order_draft': return _createOrder(args,userConfirmed);
+        case 'search_catalog': return await _search(args);
+        case 'get_my_orders': return await _orders(args);
+        case 'get_my_order': return await _order(args);
+        case 'get_my_account_summary': return await _account();
+        case 'get_my_cart': return await _cart();
+        case 'add_to_cart': return await _cartChange(args,'add',userConfirmed);
+        case 'update_cart_item': return await _cartChange(args,'update',userConfirmed);
+        case 'remove_from_cart': return await _cartChange(args,'remove',userConfirmed);
+        case 'create_order_draft': return await _createOrder(args,userConfirmed);
         default:return {'ok':false,'error':'الأداة غير مسموحة.'};
       }
     }catch(e){await audit(action:'ai_tool_$name',result:'failed',details:{'error':e.toString()});return {'ok':false,'error':'تعذر تنفيذ الأداة بأمان.'};}
