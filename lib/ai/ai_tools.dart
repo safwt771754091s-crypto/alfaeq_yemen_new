@@ -35,7 +35,7 @@ class AlfaeqAiToolRegistry {
   Future<Map<String,Object?>> _orders(Map<String,Object?> a) async {
     final u=_db.auth.currentUser;if(u==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
     final status=(a['status']??'all').toString();final rows=await _db.from('orders').select('id,status,total,currency,created_at').eq('customer_id',u.id).order('created_at',ascending:false).limit(20);
-    return {'ok':true,'orders':rows.where((r)=>status=='all'||r['status']==status).take(_max).map((r)=>Map<String,Object?>{'id':r['id'],'status':r['status'],'total':r['total'],'currency':r['currency']??'YER','createdAt':r['created_at']}).toList()};
+    return {'ok':true,'orders':rows.where((r)=>status=='all'||r['status']==status).take(_max).map((r)=>{'id':r['id'],'status':r['status'],'total':r['total'],'currency':r['currency']??'YER','createdAt':r['created_at']}).toList()};
   }
 
   Future<Map<String,Object?>> _order(Map<String,Object?> a) async {
