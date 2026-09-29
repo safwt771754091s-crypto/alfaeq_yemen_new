@@ -25,97 +25,139 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  execute-issue:
-    if: github.event_name == 'issues' && github.event.label.name == 'alfaeq-execute'
+  execute:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && github.event.label.name == 'alfaeq-execute')
     runs-on: ubuntu-latest
     env:
       OPENHANDS_API_KEY: ${{ secrets.OPENHANDS_API_KEY }}
+      OPENHANDS_BASE_URL: ${{ vars.OPENHANDS_BASE_URL || 'https://app.all-hands.dev' }}
     steps:
-      - name: Verify executor is configured
+      - name: Verify executor configuration
         shell: bash
         run: |
           set -euo pipefail
           if [ -z "${OPENHANDS_API_KEY:-}" ]; then
-            echo "::notice::OPENHANDS_API_KEY is not configured; execution is intentionally skipped."
-            exit 0
-          fi
-
-      - name: Run OpenHands on the issue
-        if: env.OPENHANDS_API_KEY != ''
-        uses: All-Hands-AI/openhands-github-action@v1
-        with:
-          prompt: |
-            You are the Alfaeq Yemen engineering executor.
-
-            Repository: ${{ github.repository }}
-            Issue: #${{ github.event.issue.number }}
-            Title: ${{ github.event.issue.title }}
-
-            Complete the requested project work end-to-end, but do not merge directly to main.
-            Work in an isolated workspace and create a focused PR.
-
-            Engineering contract:
-            - Supabase PostgreSQL is the production source of truth.
-            - Inspect existing migrations, RLS, RPCs, event bus, and Flutter services before changing them.
-            - Never commit secrets or service-role/secret keys.
-            - Critical order/inventory/payment mutations must be transactional and idempotent.
-            - Use reversible operations with prior-state/compensation metadata where external side effects exist.
-            - Prefer the existing Supabase event bus for business events.
-            - Keep agent runtime state separate from product state.
-            - Use typed/structured browser automation only when needed; revalidate targets before mutation and independently verify outcomes.
-            - Run formatter, Flutter analyze, tests, relevant builds, and security checks.
-            - Review the final diff for RLS, authorization, idempotency, migrations, backward compatibility, and Arabic/RTL behavior.
-            - Do not claim success without concrete command/test evidence.
-            - If a required external credential/service is unavailable, stop at a safe boundary and document the exact blocker instead of fabricating a result.
-
-            Issue body:
-            ${{ github.event.issue.body }}
-          repository: ${{ github.repository }}
-          selected-branch: main
-          poll: "true"
-          timeout-seconds: "1800"
-          poll-interval-seconds: "30"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          openhands-api-key: ${{ secrets.OPENHANDS_API_KEY }}
-
-  execute-manual:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    env:
-      OPENHANDS_API_KEY: ${{ secrets.OPENHANDS_API_KEY }}
-    steps:
-      - name: Verify executor is configured
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${OPENHANDS_API_KEY:-}" ]; then
-            echo "::error::OPENHANDS_API_KEY is required for manual execution."
+            echo "::error::OPENHANDS_API_KEY is required."
             exit 1
           fi
+          case "${OPENHANDS_BASE_URL}" in
+            https://*) ;;
+            *) echo "::error::OPENHANDS_BASE_URL must use HTTPS."; exit 1 ;;
+          esac
 
-      - name: Run OpenHands on the requested task
-        uses: All-Hands-AI/openhands-github-action@v1
-        with:
-          prompt: |
-            You are the Alfaeq Yemen engineering executor.
+      - name: Build bounded project brief
+        id: brief
+        shell: bash
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          MANUAL_TASK: ${{ inputs.task }}
+          SELECTED_BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+          task="${MANUAL_TASK:-}"
+          if [ -z "$task" ] && [ -n "${ISSUE_TITLE:-}" ]; then
+            task="${ISSUE_TITLE}"$'\n\n'"${ISSUE_BODY:-}"
+          fi
+          if [ -z "$task" ]; then
+            echo "::error::No project task supplied."
+            exit 1
+          fi
+          cat > project-task.md <<EOF
+# Alfaeq Project Execution Task
 
-            Execute this task end-to-end in the repository, then create a focused PR:
-            ${{ inputs.task }}
+Repository: ${GITHUB_REPOSITORY}
+Base branch: ${SELECTED_BRANCH:-main}
 
-            Branch requested by operator: ${{ inputs.branch }}
+## Task
+$task
 
-            Production contract:
-            - Supabase is the source of truth for product state.
-            - Inspect existing schema/migrations/RLS/RPCs/event bus before edits.
-            - Never commit secrets.
-            - Preserve transactionality, idempotency, compensation, and authorization.
-            - Run analyze/tests/relevant builds/security checks.
-            - Do not merge directly to main.
-            - Report concrete evidence and blockers only.
-          repository: ${{ github.repository }}
-          selected-branch: ${{ inputs.branch }}
-          poll: "true"
-          timeout-seconds: "1800"
-          poll-interval-seconds: "30"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          openhands-api-key: ${{ secrets.OPENHANDS_API_KEY }}
+## Required execution contract
+- Inspect the existing repository, migrations, RLS, RPCs, event bus and tests before editing.
+- Supabase PostgreSQL is the production source of truth.
+- Never request, print, commit, or store production service-role keys or other secrets.
+- Work only in an isolated workspace and create a focused PR; never merge directly to main.
+- Critical order, inventory, payment and ledger changes must be transactional and idempotent.
+- Preserve prior state/compensation metadata for reversible external side effects.
+- Use canonical Supabase events rather than creating a parallel business-state store.
+- Use typed/structured browser automation when browser work is required; revalidate targets before mutation and independently verify outcomes.
+- Run formatting, static analysis, tests, relevant builds and security checks.
+- Treat security findings as confirmed, needs_validation, or rejected; do not promote an unresolved lead to a vulnerability.
+- Do not claim completion without command/test evidence.
+- If a required service or credential is unavailable, stop safely and report the exact blocker.
+EOF
+          echo "brief=project-task.md" >> "$GITHUB_OUTPUT"
+
+      - name: Start OpenHands conversation
+        id: openhands
+        shell: bash
+        env:
+          BRANCH: ${{ inputs.branch || 'main' }}
+        run: |
+          set -euo pipefail
+          prompt="$(cat "${{ steps.brief.outputs.brief }}")"
+          payload="$(python - "$prompt" "${GITHUB_REPOSITORY}" "$BRANCH" <<'PY'
+          import json,sys
+          prompt,repo,branch=sys.argv[1:]
+          print(json.dumps({
+            "initial_user_msg": prompt,
+            "repository": repo,
+            "selected_branch": branch,
+          }))
+          PY
+          )"
+          response="$(curl --fail-with-body --silent --show-error --retry 3             -X POST "${OPENHANDS_BASE_URL%/}/api/conversations"             -H "Authorization: Bearer ${OPENHANDS_API_KEY}"             -H "Content-Type: application/json"             --data "$payload")"
+          python - "$response" "${OPENHANDS_BASE_URL%/}" <<'PY'
+          import json,sys
+          data=json.loads(sys.argv[1])
+          base=sys.argv[2]
+          cid=data.get("conversation_id") or data.get("id")
+          if not cid:
+              raise SystemExit("OpenHands returned no conversation id")
+          status=str(data.get("status","UNKNOWN"))
+          print(f"conversation_id={cid}")
+          print(f"status={status}")
+          print(f"url={base}/conversations/{cid}")
+          with open("openhands.json","w",encoding="utf-8") as f:
+              json.dump({"id":cid,"status":status,"url":f"{base}/conversations/{cid}"},f)
+          PY
+          {
+            echo "conversation-id=$(python -c 'import json;print(json.load(open("openhands.json"))["id"])')"
+            echo "status=$(python -c 'import json;print(json.load(open("openhands.json"))["status"])')"
+            echo "conversation-url=$(python -c 'import json;print(json.load(open("openhands.json"))["url"])')"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Poll OpenHands
+        shell: bash
+        env:
+          CONVERSATION_ID: ${{ steps.openhands.outputs.conversation-id }}
+        run: |
+          set -euo pipefail
+          deadline=$(($(date +%s) + 1800))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            response="$(curl --fail-with-body --silent --show-error --retry 3               -H "Authorization: Bearer ${OPENHANDS_API_KEY}"               "${OPENHANDS_BASE_URL%/}/api/conversations/${CONVERSATION_ID}")"
+            status="$(python - "$response" <<'PY'
+          import json,sys
+          print(str(json.loads(sys.argv[1]).get("status","UNKNOWN")).upper())
+          PY
+            )"
+            echo "OpenHands status: $status"
+            case "$status" in
+              STOPPED)
+                echo "OpenHands conversation stopped."
+                exit 0 ;;
+              FAILED|ERROR|CANCELLED)
+                echo "::error::OpenHands finished with status $status"
+                exit 1 ;;
+            esac
+            sleep 30
+          done
+          echo "::error::OpenHands execution timed out after 1800 seconds."
+          exit 1
+
+      - name: Emit execution handoff
+        if: success()
+        shell: bash
+        run: |
+          echo "OpenHands completed its conversation."
+          echo "A focused PR and GitHub Actions evidence are required before release."
