@@ -216,10 +216,20 @@ function redactForJev(value: unknown): unknown {
 }
 
 function roleForEvent(eventType: string): string {
-  if (eventType.startsWith("order.") || eventType.startsWith("merchant.") || eventType.startsWith("store.")) return "Operations";
+  const engineeringPrefixes = [
+    "engineering.", "code.", "build.", "test.", "security.", "repository.", "project.",
+  ];
+  if (engineeringPrefixes.some((prefix) => eventType.startsWith(prefix))) return "CTO";
+  if (
+    eventType.startsWith("order.") ||
+    eventType.startsWith("merchant.") ||
+    eventType.startsWith("store.") ||
+    eventType.startsWith("inventory.") ||
+    eventType.startsWith("delivery.") ||
+    eventType.startsWith("payment.")
+  ) return "Operations";
   if (eventType.startsWith("product.")) return "CTO";
-  if (eventType.startsWith("promotion.")) return "Marketing";
-  if (eventType.startsWith("site_update.")) return "Marketing";
+  if (eventType.startsWith("promotion.") || eventType.startsWith("site_update.")) return "Marketing";
   return "Automation";
 }
 
