@@ -202,8 +202,8 @@ function paNoul(answer: JevAnswer | undefined): number {
 
 function redactForJev(value: unknown): unknown {
   if (typeof value === "string") return value
-    .replace(/(bearer\\s+)[a-z0-9._-]+/gi, "$1[REDACTED]")
-    .replace(/([a-z0-9_]*(?:api[_-]?key|token|secret|password)[a-z0-9_]*\\s*[:=]\\s*)[^\\s,}]+/gi, "$1[REDACTED]")
+    .replace(/(bearer\s+)[a-z0-9._-]+/gi, "$1[REDACTED]")
+    .replace(/([a-z0-9_]*(?:api[_-]?key|token|secret|password)[a-z0-9_]*\s*[:=]\s*)[^\s,}]+/gi, "$1[REDACTED]")
     .slice(0, 4000);
   if (Array.isArray(value)) return value.slice(0, 30).map(redactForJev);
   if (value && typeof value === "object") {
