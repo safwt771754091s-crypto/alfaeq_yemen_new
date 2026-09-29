@@ -33,7 +33,3 @@ Deno.serve(async (req: Request) => {
 function json(data: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
 }
-
-function createClient(url: string, key: string, options: Record<string, unknown>) {
-  return (globalThis as any).SupabaseClient ? new (globalThis as any).SupabaseClient(url, key, options) : null;
-}
