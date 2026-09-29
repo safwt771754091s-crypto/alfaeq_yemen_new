@@ -47,3 +47,10 @@
 - Revalidate a target immediately before a browser mutation; never blindly retry a mutation.
 - Treat DONE as a request for independent postcondition verification, not proof of success.
 - Keep browser credentials in the secret environment and keep live paid-browser checks out of offline CI.
+
+
+## Project execution
+- Concrete engineering tasks may be delegated through the Alfaeq Project Executor to OpenHands.
+- Agent changes must land through a focused PR; do not auto-merge agent work into main.
+- The executor may read and modify repository source in its isolated workspace, but must not receive Supabase service-role/secret credentials or mutate production business data directly.
+- A successful agent conversation is not proof of correctness; GitHub Actions, security checks, migration verification, and PR review remain release gates.
