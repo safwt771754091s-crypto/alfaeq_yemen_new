@@ -38,7 +38,7 @@ jobs:
           test -d "$migrations"
           while IFS= read -r f; do
             if grep -qE 'create or replace function.*security definer|security definer' "$f"; then
-              if ! grep -qE 'set search_path[[:space:]]*=' "$f"; then
+              if ! grep -qE 'set[[:space:]]+search_path[[:space:]]*(=|to)[[:space:]]*' "$f"; then
                 echo "::error file=$f::SECURITY DEFINER function without explicit search_path."
                 exit 1
               fi
