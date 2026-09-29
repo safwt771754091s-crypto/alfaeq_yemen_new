@@ -65,7 +65,7 @@ jobs:
           done < <(find supabase/migrations -type f -name '*.sql' | sort)
           while IFS= read -r f; do
             if grep -qiE 'create (or replace )?function.*security definer|security definer' "$f"; then
-              grep -qiE 'set search_path[[:space:]]*=' "$f" || {
+              grep -qiE 'set search_path[[:space:]]*(=|to)[[:space:]]*' "$f" || {
                 echo "::error file=$f::SECURITY DEFINER migration requires explicit search_path."
                 exit 1
               }
