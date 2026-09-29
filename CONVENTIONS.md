@@ -49,6 +49,14 @@
 - Keep browser credentials in the secret environment and keep live paid-browser checks out of offline CI.
 
 
+## Security audit
+- Use the security-audit workflow for full/comprehensive security reviews and release-critical changes.
+- Separate discovery from validation: the verifier must independently try to disprove each candidate.
+- Treat confirmed, needs_validation, and rejected as distinct states; never promote an unresolved lead to a vulnerability.
+- Security severity requires demonstrated impact, not checklist deviation.
+- Do not run target-controlled code against production or shared infrastructure; use an OS-enforced sandbox for execution.
+- Preserve a deterministic coverage ledger so repeated audits improve coverage instead of restarting blindly.
+
 ## Project execution
 - Concrete engineering tasks may be delegated through the Alfaeq Project Executor to OpenHands.
 - Agent changes must land through a focused PR; do not auto-merge agent work into main.
