@@ -92,34 +92,41 @@ EOF
         id: openhands
         shell: bash
         env:
-          BRANCH: ${{ inputs.branch || 'main' }}
+          BRANCH: \${{ inputs.branch || 'main' }}
         run: |
           set -euo pipefail
-          prompt="$(cat "${{ steps.brief.outputs.brief }}")"
-          payload="$(python - "$prompt" "${GITHUB_REPOSITORY}" "$BRANCH" <<'PY'
+          prompt="$(cat "\${{ steps.brief.outputs.brief }}")"
+          payload="$(python - "$prompt" "\${GITHUB_REPOSITORY}" "$BRANCH" <<'PY'
           import json,sys
           prompt,repo,branch=sys.argv[1:]
           print(json.dumps({
-            "initial_user_msg": prompt,
-            "repository": repo,
+            "initial_message": {"role":"user","content":[{"type":"text","text":prompt}]},
+            "selected_repository": repo,
             "selected_branch": branch,
           }))
           PY
           )"
-          response="$(curl --fail-with-body --silent --show-error --retry 3             -X POST "${OPENHANDS_BASE_URL%/}/api/conversations"             -H "Authorization: Bearer ${OPENHANDS_API_KEY}"             -H "Content-Type: application/json"             --data "$payload")"
-          python - "$response" "${OPENHANDS_BASE_URL%/}" <<'PY'
-          import json,sys
-          data=json.loads(sys.argv[1])
-          base=sys.argv[2]
-          cid=data.get("conversation_id") or data.get("id")
-          if not cid:
-              raise SystemExit("OpenHands returned no conversation id")
-          status=str(data.get("status","UNKNOWN"))
-          print(f"conversation_id={cid}")
-          print(f"status={status}")
-          print(f"url={base}/conversations/{cid}")
-          with open("openhands.json","w",encoding="utf-8") as f:
-              json.dump({"id":cid,"status":status,"url":f"{base}/conversations/{cid}"},f)
+          response="$(curl --fail-with-body --silent --show-error --retry 3 \\
+            -X POST "\${OPENHANDS_BASE_URL%/}/api/v1/app-conversations" \\
+            -H "Authorization: Bearer \${OPENHANDS_API_KEY}" \\
+            -H "Content-Type: application/json" -H "Accept: application/json" \\
+            --data "$payload")"
+          python - "$response" "\${OPENHANDS_BASE_URL%/}" <<'PY'
+          import json,sys,os,urllib.parse,urllib.request
+          data=json.loads(sys.argv[1]); base=sys.argv[2]
+          cid=data.get("app_conversation_id") or data.get("conversation_id")
+          task_id=data.get("id") if not cid else None
+          if not cid and task_id:
+              url=f"{base}/api/v1/app-conversations/start-tasks?ids={urllib.parse.quote(str(task_id))}"
+              req=urllib.request.Request(url,headers={"Authorization":"Bearer "+os.environ["OPENHANDS_API_KEY"],"Accept":"application/json"})
+              with urllib.request.urlopen(req,timeout=60) as r: task_data=json.load(r)
+              items=task_data.get("items") if isinstance(task_data,dict) else None
+              if isinstance(items,list) and items: cid=items[0].get("app_conversation_id")
+              elif isinstance(task_data,dict): cid=task_data.get("app_conversation_id")
+          if not cid: raise SystemExit("OpenHands did not return an app_conversation_id")
+          status=str(data.get("execution_status") or data.get("status") or "STARTING")
+          print(f"conversation_id={cid}"); print(f"status={status}"); print(f"url={base}/conversations/{cid}")
+          with open("openhands.json","w",encoding="utf-8") as f: json.dump({"id":cid,"status":status,"url":f"{base}/conversations/{cid}"},f)
           PY
           {
             echo "conversation-id=$(python -c 'import json;print(json.load(open("openhands.json"))["id"])')"
@@ -130,25 +137,25 @@ EOF
       - name: Poll OpenHands
         shell: bash
         env:
-          CONVERSATION_ID: ${{ steps.openhands.outputs.conversation-id }}
+          CONVERSATION_ID: \${{ steps.openhands.outputs.conversation-id }}
         run: |
           set -euo pipefail
           deadline=$(($(date +%s) + 1800))
           while [ "$(date +%s)" -lt "$deadline" ]; do
-            response="$(curl --fail-with-body --silent --show-error --retry 3               -H "Authorization: Bearer ${OPENHANDS_API_KEY}"               "${OPENHANDS_BASE_URL%/}/api/conversations/${CONVERSATION_ID}")"
+            response="$(curl --fail-with-body --silent --show-error --retry 3 \\
+              -H "Authorization: Bearer \${OPENHANDS_API_KEY}" -H "Accept: application/json" \\
+              "\${OPENHANDS_BASE_URL%/}/api/v1/app-conversations?ids=\${CONVERSATION_ID}")"
             status="$(python - "$response" <<'PY'
           import json,sys
-          print(str(json.loads(sys.argv[1]).get("status","UNKNOWN")).upper())
+          data=json.loads(sys.argv[1]); items=data.get("items") if isinstance(data,dict) else None
+          item=items[0] if isinstance(items,list) and items else data
+          print(str(item.get("execution_status") or item.get("status") or "UNKNOWN").upper())
           PY
             )"
-            echo "OpenHands status: $status"
+            echo "OpenHands execution status: $status"
             case "$status" in
-              STOPPED)
-                echo "OpenHands conversation stopped."
-                exit 0 ;;
-              FAILED|ERROR|CANCELLED)
-                echo "::error::OpenHands finished with status $status"
-                exit 1 ;;
+              STOPPED|FINISHED|COMPLETED|COMPLETED_SUCCESSFULLY|PAUSED) exit 0 ;;
+              FAILED|ERROR|CANCELLED|RUNTIME_ERROR) echo "::error::OpenHands finished with status $status"; exit 1 ;;
             esac
             sleep 30
           done
