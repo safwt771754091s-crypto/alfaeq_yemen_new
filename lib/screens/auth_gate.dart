@@ -8,6 +8,7 @@ import '../services/super_alfaeq_catalog_importer.dart';
 import 'admin_dashboard.dart';
 import 'customer_session_shell.dart';
 import 'driver_center_page.dart';
+import 'developer_page.dart';
 import 'login_page.dart';
 import 'merchant_portal_page.dart';
 import 'world_home_page.dart';
@@ -82,7 +83,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           case 'driver':
             return const DriverCenterPage();
           case 'developer':
-            return const _CommercialOnlyNotice();
+            return const DeveloperPage();
           case 'customer':
           case 'finance':
           case 'support':
