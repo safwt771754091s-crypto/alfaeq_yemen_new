@@ -1,6 +1,14 @@
 name: Engineering Agent Verification
 
 on:
+  push:
+    paths:
+      - "lib/**"
+      - "test/**"
+      - "supabase/**"
+      - "docs/engineering/**"
+      - ".aider.conf.yml"
+      - ".github/workflows/**"
   pull_request:
     paths:
       - "lib/**"
