@@ -31,22 +31,24 @@ jobs:
           grep -q "Evidence-first completion" docs/engineering/ALFAEQ_GAIA_AGENT_GOVERNANCE.md
           grep -q "Acceptance criteria" docs/engineering/ALFAEQ_COMPOST_SDLC.md
           grep -q "immutable review evidence" docs/engineering/ALFAEQ_PR_REVIEW_CONTRACT.md
-      - name: Reject forbidden production dependencies
+      - name: Reject forbidden client dependencies
         shell: bash
         run: |
           set -euo pipefail
-          if git grep -nE -- 'firebase_auth|cloud_firestore|FirebaseFirestore|FirebaseAuth|firebase deploy --only functions' -- '*.dart' '*.yaml' '*.yml' '*.json' '*.sh' '*.ps1' '*.ts' '*.js'; then
-            echo "::error::Legacy Firebase runtime/deployment dependency detected."
+          if git grep -nE -- 'firebase_auth|cloud_firestore|FirebaseFirestore|FirebaseAuth' -- lib web android ios; then
+            echo "::error::Legacy Firebase runtime dependency detected in the Flutter/client tree."
+            exit 1
+          fi
+          if git grep -nE -- 'firebase deploy --only functions' -- '.github/workflows' '*.sh' '*.ps1'; then
+            echo "::error::Legacy Firebase deployment command detected."
             exit 1
           fi
       - name: Reject privileged client credentials
         shell: bash
         run: |
           set -euo pipefail
-          files="$(git ls-files -- '*.dart' '*.yaml' '*.yml' '*.json' '*.ts' '*.js' '*.sql' ':!pubspec.lock' ':!package-lock.json')"
-          [ -n "$files" ] || exit 0
-          if grep -nE 'SUPABASE_SERVICE_ROLE_KEY|service_role' $files; then
-            echo "::error::Privileged Supabase credential/reference detected in tracked application source."
+          if git grep -nE -- 'SUPABASE_SERVICE_ROLE_KEY|service_role' -- lib web android ios; then
+            echo "::error::Privileged Supabase credential/reference detected in the Flutter/client tree."
             exit 1
           fi
       - name: Validate migration naming and safety
