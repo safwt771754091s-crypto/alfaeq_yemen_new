@@ -1,0 +1,14 @@
+.dart_tool/
+build/
+.gradle/
+.idea/
+.vscode/
+coverage/
+*.iml
+android/.cxx/
+ios/Pods/
+web/.last_build_id
+.env
+.env.*
+!.env.example
+supabase/.temp/
