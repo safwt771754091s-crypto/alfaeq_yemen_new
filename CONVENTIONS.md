@@ -37,3 +37,5 @@
 - For bounded autonomous repository tasks, prefer a minimal linear agent loop: inspect -> command -> observation -> next command, with explicit step/cost/time limits and an isolated workspace.
 - Require lint/test/build evidence before calling a change production-ready.
 - Keep AI-generated changes reviewable through Git history and small commits.
+- Keep engineering-agent responsibilities separated into agent, conversation/state, tools/skills, workspace, and server/automation boundaries; do not create a monolithic agent layer.
+- Give each durable state domain one clear owner: Supabase for product state, the canonical event bus for event state, and the agent conversation for agent-run state.
