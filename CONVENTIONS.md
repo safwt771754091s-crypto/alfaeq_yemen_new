@@ -39,3 +39,11 @@
 - Keep AI-generated changes reviewable through Git history and small commits.
 - Keep engineering-agent responsibilities separated into agent, conversation/state, tools/skills, workspace, and server/automation boundaries; do not create a monolithic agent layer.
 - Give each durable state domain one clear owner: Supabase for product state, the canonical event bus for event state, and the agent conversation for agent-run state.
+
+
+## Browser automation
+- Prefer structured visible-control observations when browser automation can avoid screenshot-first reasoning.
+- Browser decisions use typed operations and targets derived from the latest observation.
+- Revalidate a target immediately before a browser mutation; never blindly retry a mutation.
+- Treat DONE as a request for independent postcondition verification, not proof of success.
+- Keep browser credentials in the secret environment and keep live paid-browser checks out of offline CI.
