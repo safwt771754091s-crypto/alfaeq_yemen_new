@@ -12,7 +12,7 @@ on:
     types: [completed]
 
 concurrency:
-  group: browser-qa-\${{ github.ref }}
+  group: browser-qa-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -33,12 +33,12 @@ jobs:
       - name: Resolve application URL
         id: url
         env:
-          INPUT_URL: \${{ inputs.app_url }}
+          INPUT_URL: ${{ inputs.app_url }}
         run: |
           if [ -n "$INPUT_URL" ]; then echo "app_url=$INPUT_URL" >> "$GITHUB_OUTPUT"; else echo "app_url=https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/" >> "$GITHUB_OUTPUT"; fi
       - name: Run non-destructive browser QA
         env:
-          APP_URL: \${{ steps.url.outputs.app_url }}
+          APP_URL: ${{ steps.url.outputs.app_url }}
         run: |
           node <<'NODE'
           const { chromium } = require('playwright');
