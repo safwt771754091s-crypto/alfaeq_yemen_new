@@ -47,8 +47,8 @@ Deno.serve(async (req: Request) => {
 
   // New durable ingress path.
   const { data: inboxRows, error: inboxError } = await admin.from("automation_event_inbox")
-    .select("*").eq("status", "received").lt("attempts", 10)
-    .order("received_at", { ascending: true }).limit(Math.ceil(limit / 2));
+    .select("*").eq("status", "received").lte("available_at", new Date().toISOString()).lt("attempts", 10)
+    .order("available_at", { ascending: true }).order("received_at", { ascending: true }).limit(Math.ceil(limit / 2));
 
   if (inboxError) return Response.json({ ok: false, error: "inbox_select_failed", detail: inboxError.message }, { status: 500 });
 
@@ -83,6 +83,7 @@ Deno.serve(async (req: Request) => {
         const delay = Math.min(3600, Math.max(15, Math.pow(2, nextAttempt) * 15));
         await admin.from("automation_event_inbox").update({
           status: nextAttempt >= 10 ? "failed" : "received",
+          available_at: new Date(Date.now() + delay * 1000).toISOString(),
           last_error: `HTTP ${response.status}: ${response.text.slice(0, 1000)}`.slice(0, 2000),
         }).eq("id", event.id);
         failed++;
@@ -93,6 +94,7 @@ Deno.serve(async (req: Request) => {
       errors.push({ eventId: String(event.event_id), detail: String(error).slice(0, 1000) });
       await admin.from("automation_event_inbox").update({
         status: nextAttempt >= 10 ? "failed" : "received",
+        available_at: new Date(Date.now() + Math.min(3600, Math.max(15, Math.pow(2, nextAttempt) * 15)) * 1000).toISOString(),
         last_error: String(error).slice(0, 2000),
       }).eq("id", event.id);
     }
