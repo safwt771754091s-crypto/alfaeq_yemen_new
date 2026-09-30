@@ -48,7 +48,7 @@ Deno.serve(async (req: Request) => {
   // New durable ingress path.
   const { data: inboxRows, error: inboxError } = await admin.from("automation_event_inbox")
     .select("*").eq("status", "received").lt("attempts", 10)
-    .order("received_at", { ascending: true }).limit(limit);
+    .order("received_at", { ascending: true }).limit(Math.ceil(limit / 2));
 
   if (inboxError) return Response.json({ ok: false, error: "inbox_select_failed", detail: inboxError.message }, { status: 500 });
 
