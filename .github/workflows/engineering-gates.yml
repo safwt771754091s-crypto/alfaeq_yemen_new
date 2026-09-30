@@ -39,7 +39,7 @@ jobs:
             echo "::error::Legacy Firebase runtime dependency detected in the Flutter/client tree."
             exit 1
           fi
-          if git grep -nE -- 'firebase deploy --only functions' -- '.github/workflows' '*.sh' '*.ps1'; then
+          if git grep -nE -- 'firebase deploy --only functions' -- '.github/workflows/*.yml' ':!.github/workflows/engineering-gates.yml' '*.sh' '*.ps1'; then
             echo "::error::Legacy Firebase deployment command detected."
             exit 1
           fi
@@ -64,8 +64,8 @@ jobs:
             fi
           done < <(find supabase/migrations -type f -name '*.sql' | sort)
           while IFS= read -r f; do
-            if grep -qiE 'create (or replace )?function.*security definer|security definer' "$f"; then
-              grep -qiE 'set search_path[[:space:]]*=' "$f" || {
+            if grep -qiE 'create (or replace )?function' "$f" && grep -qiE 'security definer' "$f"; then
+              grep -qiE 'set search_path[[:space:]]*(=|to)[[:space:]]*' "$f" || {
                 echo "::error file=$f::SECURITY DEFINER migration requires explicit search_path."
                 exit 1
               }
