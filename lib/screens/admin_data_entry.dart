@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../core/app_sections.dart';
 import '../core/product_units.dart';
 import '../services/auth_service.dart';
+import '../services/media_service.dart';
 import '../services/supabase_service.dart';
 import 'bulk_product_import_page.dart';
 import 'location_picker_page.dart';
+import 'store_map_page.dart';
 
 class AdminDataEntry extends StatefulWidget {
   const AdminDataEntry({super.key});
@@ -30,6 +33,7 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
   String? _selectedStoreSectionId;
   LatLng? _storeLocation;
   bool _saving = false;
+  String? _uploadedImageUrl;
 
   @override
   void dispose() {
@@ -43,6 +47,57 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
 
   Future<void> _openBulkImport() async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => const BulkProductImportPage()));
+  }
+
+  Future<void> _pickProductImage() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (result == null || result.files.single.bytes == null || !mounted) return;
+    final file = result.files.single;
+    final user = SupabaseService.client.auth.currentUser;
+    if (user == null) {
+      _message('يجب تسجيل الدخول أولاً.');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final ext = file.extension ?? 'jpg';
+      final url = await MediaService.uploadProductImage(
+        ownerId: user.id,
+        bytes: file.bytes!,
+        extension: ext,
+      );
+      if (!mounted) return;
+      setState(() {
+        _uploadedImageUrl = url;
+        _imageUrl.text = url;
+      });
+      _message('تم رفع صورة الصنف إلى قاعدة صور الفائق في Supabase.');
+    } catch (e) {
+      _message('تعذر رفع الصورة: $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _openStoreMap() async {
+    try {
+      final rows = await SupabaseService.client
+          .from('stores')
+          .select('id,name,latitude,longitude,status')
+          .order('created_at', ascending: false)
+          .limit(500);
+      if (!mounted) return;
+      final stores = (rows as List).whereType<Map<String, dynamic>>().toList();
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => StoreMapPage(stores: stores)),
+      );
+    } catch (e) {
+      _message('تعذر تحميل خريطة المتاجر: $e');
+    }
   }
 
   Future<void> _pickStoreLocation({LatLng? initial}) async {
@@ -130,14 +185,16 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
     setState(() => _saving = true);
     try {
       final unit = ProductUnit.fromId(_saleUnit);
+      final productId = _newId(user.id);
+      final imageUrl = _imageUrl.text.trim();
       await SupabaseService.client.from('products').insert({
-        'id': _newId(user.id),
+        'id': productId,
         'store_id': storeId,
         'section_id': _selectedStoreSectionId ?? _sectionId,
         'owner_id': user.id,
         'name': name,
         'description': _description.text.trim(),
-        'image_url': _imageUrl.text.trim(),
+        'image_url': imageUrl,
         'price': price,
         'currency': 'YER',
         'stock': stock,
@@ -153,11 +210,20 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
         'status': 'active',
         'metadata': {'created_by': user.id, 'source': 'admin_data_entry'},
       });
+      if (imageUrl.isNotEmpty) {
+        await SupabaseService.client
+            .from('media_assets')
+            .update({'entity_id': productId})
+            .eq('owner_id', user.id)
+            .eq('public_url', imageUrl)
+            .isFilter('entity_id', null);
+      }
       _productName.clear();
       _description.clear();
       _price.clear();
       _stock.clear();
       _imageUrl.clear();
+      _uploadedImageUrl = null;
       _message('تم حفظ الصنف الحقيقي في Supabase.');
     } catch (e) {
       _message('تعذر حفظ الصنف: $e');
@@ -187,6 +253,11 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
             appBar: AppBar(
               title: const Text('البيانات الحقيقية — Supabase'),
               actions: [
+                IconButton(
+                  tooltip: 'خريطة المتاجر',
+                  onPressed: _saving ? null : _openStoreMap,
+                  icon: const Icon(Icons.map_outlined),
+                ),
                 IconButton(
                   tooltip: 'استيراد أصناف بالجملة',
                   onPressed: _saving ? null : _openBulkImport,
@@ -299,6 +370,15 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
                           onChanged: (v) => setState(() => _saleUnit = v ?? _saleUnit),
                         ),
                         TextField(controller: _imageUrl, decoration: const InputDecoration(labelText: 'رابط صورة الصنف (اختياري)')),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _saving ? null : _pickProductImage,
+                            icon: const Icon(Icons.photo_library_outlined),
+                            label: Text(_uploadedImageUrl == null ? 'رفع صورة من الجهاز إلى قاعدة الصور' : 'تم رفع صورة المنتج'),
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
