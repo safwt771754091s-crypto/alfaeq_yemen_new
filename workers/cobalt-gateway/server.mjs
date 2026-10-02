@@ -1,4 +1,4 @@
-import express from "express";
+// Gateway identity is derived from a verified Supabase access token; request user_id is never authoritative.\nimport express from "express";
 import { createClient } from "@supabase/supabase-js";
 
 const app = express();
