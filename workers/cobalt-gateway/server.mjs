@@ -113,21 +113,23 @@ app.post("/media/resolve", async (req, res) => {
   }
 
   const eventId = `media.resolved:${asset.id}:v1`;
-  const { error: eventError } = await supabase.rpc("accept_automation_event", {
-    p_event_id: eventId,
-    p_source: "cobalt",
-    p_version: 1,
-    p_event_type: "media.resolved",
-    p_occurred_at: new Date().toISOString(),
-    p_data: {
-      media_asset_id: asset.id,
-      user_id,
-      entity_type,
-      entity_id,
-      cobalt_status: result.status,
-      filename: result.filename ?? null,
-    },
-  });
+  const { error: eventError } = await supabase
+    .from("automation_event_inbox")
+    .upsert({
+      event_id: eventId,
+      source: "cobalt",
+      version: 1,
+      event_type: "media.resolved",
+      occurred_at: new Date().toISOString(),
+      data: {
+        media_asset_id: asset.id,
+        user_id,
+        entity_type,
+        entity_id,
+        cobalt_status: result.status,
+        filename: result.filename ?? null,
+      },
+    }, { onConflict: "event_id", ignoreDuplicates: true });
 
   if (eventError) {
     return res.status(500).json({ error: "automation_event_failed", media_asset: asset });
