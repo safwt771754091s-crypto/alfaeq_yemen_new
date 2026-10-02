@@ -1,0 +1,130 @@
+{
+  "name": "Alfaeq Yemen — Unified Operations Plane v1",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alfaeq-events",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "alfaeq-unified-webhook",
+      "name": "Alfaeq Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "alfaeq-events-unified-v1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input=$input.first()?.json??{}; const body=input.body&&typeof input.body==='object'?input.body:input; const headers=Object.fromEntries(Object.entries(input.headers??{}).map(([k,v])=>[String(k).toLowerCase(),String(v??'')])); for(const k of ['eventId','eventType','occurredAt']) if(!body[k]) throw new Error('Missing event field: '+k); if(!/^[a-z0-9_]+(?:\\.[a-z0-9_]+)+$/i.test(String(body.eventType))) throw new Error('Invalid eventType: '+body.eventType); return [{json:{source:String(body.source||'supabase'),version:Number(body.version||1),eventId:String(body.eventId),eventType:String(body.eventType),occurredAt:String(body.occurredAt),data:body.data??body.payload??{},_automationSecret:headers['x-alfaeq-automation-secret']||''}}];"
+      },
+      "id": "alfaeq-unified-validate",
+      "name": "Validate & Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const e=$input.first().json; const family=e.eventType.split('.')[0]; const commercial=['section','store','product','promotion','order','inventory','driver','delivery_event','payment','invoice','settlement','wallet_operation','wallet_transaction','wallet_ledger','account_member','platform_account','review','notification']; const chat=['chat_thread','chat_member','chat_message']; const target=chat.includes(family)?'chat':commercial.includes(family)?'commercial':e.eventType.startsWith('ai.')?'ai':'platform'; return [{json:{...e,target,domain:family}}];"
+      },
+      "id": "alfaeq-unified-router",
+      "name": "Unified Event Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "typeValidation": "strict"},
+                "conditions": [{"leftValue": "={{$json.target}}", "rightValue": "commercial", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "commercial"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "typeValidation": "strict"},
+                "conditions": [{"leftValue": "={{$json.target}}", "rightValue": "chat", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "chat"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "typeValidation": "strict"},
+                "conditions": [{"leftValue": "={{$json.target}}", "rightValue": "ai", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ai"
+            }
+          ]
+        },
+        "options": {"fallbackOutput": "extra"}
+      },
+      "id": "alfaeq-unified-switch",
+      "name": "Route Domain",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [700, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://esvljorjykzgrpnrxnma.supabase.co/functions/v1/ai-event-worker",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type", "value": "application/json"},
+            {"name": "x-alfaeq-automation-secret", "value": "={{$json._automationSecret}}"}
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{JSON.stringify({eventId:$json.eventId,eventType:$json.eventType,occurredAt:$json.occurredAt,data:$json.data})}}",
+        "options": {"response": {"response": {"neverError": true}}}
+      },
+      "id": "alfaeq-unified-ai",
+      "name": "AI Control Plane",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 160]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{JSON.stringify({ok:true,source:'alfaeq_yemen_new',version:'unified-operations-v1',eventId:$json.eventId,eventType:$json.eventType,target:$json.target,domain:$json.domain})}}",
+        "options": {}
+      },
+      "id": "alfaeq-unified-response",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [1180, 0]
+    }
+  ],
+  "connections": {
+    "Alfaeq Event Webhook": {"main": [[{"node": "Validate & Normalize", "type": "main", "index": 0}]]},
+    "Validate & Normalize": {"main": [[{"node": "Unified Event Router", "type": "main", "index": 0}]]},
+    "Unified Event Router": {"main": [[{"node": "Route Domain", "type": "main", "index": 0}]]},
+    "Route Domain": {"main": [
+      [{"node": "Respond", "type": "main", "index": 0}],
+      [{"node": "AI Control Plane", "type": "main", "index": 0}],
+      [{"node": "AI Control Plane", "type": "main", "index": 0}],
+      [{"node": "Respond", "type": "main", "index": 0}]
+    ]},
+    "AI Control Plane": {"main": [[{"node": "Respond", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1"},
+  "versionId": "alfaeq-unified-operations-plane-v1",
+  "meta": {"templateCredsSetupCompleted": true}
+}
