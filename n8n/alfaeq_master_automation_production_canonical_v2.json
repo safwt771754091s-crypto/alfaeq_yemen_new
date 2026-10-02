@@ -1,0 +1,85 @@
+{
+  "name": "Alfaeq Yemen Master Automation — Production Canonical v2",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "alfaeq-events",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Alfaeq Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-900, 0],
+      "webhookId": "alfaeq-events"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input=$input.first()?.json??{}; const body=input.body&&typeof input.body==='object'?input.body:input; for(const k of ['eventId','eventType','occurredAt']) if(!body[k]) throw new Error('Missing event field: '+k); return [{json:{source:body.source||'alfaeq_yemen_new',version:body.version||1,eventId:String(body.eventId),eventType:String(body.eventType),occurredAt:body.occurredAt,data:body.data??body.payload??{}}}];"
+      },
+      "id": "normalize",
+      "name": "Validate & Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-680, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://esvljorjykzgrpnrxnma.supabase.co/functions/v1/ai-event-worker",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-alfaeq-automation-secret",
+              "value": "={{$('Alfaeq Event Webhook').first().json.headers['x-alfaeq-automation-secret'] || $('Alfaeq Event Webhook').first().json.headers['X-Alfaeq-Automation-Secret'] || ''}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {"name":"eventId","value":"={{$json.eventId}}"},
+            {"name":"eventType","value":"={{$json.eventType}}"},
+            {"name":"occurredAt","value":"={{$json.occurredAt}}"},
+            {"name":"data","value":"={{JSON.stringify($json.data)}}"}
+          ]
+        }
+      },
+      "id": "ai",
+      "name": "AI Control Plane — Create Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-450, 0],
+      "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{JSON.stringify({ok:true,source:'alfaeq_yemen_new',eventId:$('Validate & Normalize').first().json.eventId,eventType:$('Validate & Normalize').first().json.eventType,ai:$json})}}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [-200, 0]
+    }
+  ],
+  "connections": {
+    "Alfaeq Event Webhook": {"main":[[{"node":"Validate & Normalize","type":"main","index":0}]]},
+    "Validate & Normalize": {"main":[[{"node":"AI Control Plane — Create Task","type":"main","index":0}]]},
+    "AI Control Plane — Create Task": {"main":[[{"node":"Respond","type":"main","index":0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder":"v1"},
+  "versionId": "alfaeq-n8n-production-canonical-v2",
+  "meta": {"templateCredsSetupCompleted": false}
+}
