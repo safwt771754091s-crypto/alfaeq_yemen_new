@@ -1,0 +1,73 @@
+{
+  "name": "Alfaeq Yemen — Unified Operations Plane v2",
+  "nodes": [
+    {
+      "parameters": {"httpMethod":"POST","path":"alfaeq-events","responseMode":"responseNode","options":{}},
+      "id":"alfaeq-v2-webhook","name":"Alfaeq Event Webhook","type":"n8n-nodes-base.webhook","typeVersion":2.1,
+      "position":[-900,0],"webhookId":"alfaeq-events-v2"
+    },
+    {
+      "parameters":{"jsCode":"const input=$input.first()?.json??{}; const body=input.body&&typeof input.body==='object'?input.body:input; const headers=Object.fromEntries(Object.entries(input.headers??{}).map(([k,v])=>[String(k).toLowerCase(),String(v??'')])); const supplied=headers['x-alfaeq-automation-secret']||''; const expected=$vars.ALFAEQ_N8N_SHARED_SECRET||''; if(!expected) throw new Error('ALFAEQ_N8N_SHARED_SECRET variable is missing'); if(supplied!==expected) throw new Error('Invalid Alfaeq automation secret'); for(const k of ['eventId','eventType','occurredAt']) if(!body[k]) throw new Error('Missing event field: '+k); return [{json:{source:String(body.source||'supabase'),version:Number(body.version||1),eventId:String(body.eventId),eventType:String(body.eventType),occurredAt:String(body.occurredAt),data:body.data??body.payload??{}}}];"},
+      "id":"alfaeq-v2-normalize","name":"Validate & Normalize","type":"n8n-nodes-base.code","typeVersion":2,"position":[-680,0]
+    },
+    {
+      "parameters":{"jsCode":"const e=$input.first().json; const t=e.eventType; const target=t.startsWith('ai.')?'ai':/^(whatsapp|notification|chat_message)\\./i.test(t)?'communication':/^(product|store|merchant|customer|catalog)\\./i.test(t)?'sheets':/^(order|inventory|driver|delivery_event|payment|invoice|settlement|wallet_|account_|promotion|review|section)\\./i.test(t)?'commercial':'platform'; return [{json:{...e,target}}];"},
+      "id":"alfaeq-v2-router","name":"Unified Event Router","type":"n8n-nodes-base.code","typeVersion":2,"position":[-460,0]
+    },
+    {
+      "parameters":{"method":"POST","url":"https://esvljorjykzgrpnrxnma.supabase.co/functions/v1/ai-event-worker","sendHeaders":true,"headerParameters":{"parameters":[{"name":"Content-Type","value":"application/json"},{"name":"x-alfaeq-automation-secret","value":"={{$vars.ALFAEQ_N8N_SHARED_SECRET}}"}]},"sendBody":true,"contentType":"json","jsonBody":"={{JSON.stringify({eventId:$json.eventId,eventType:$json.eventType,occurredAt:$json.occurredAt,data:$json.data})}}","options":{"response":{"response":{"neverError":true}}}},
+      "id":"alfaeq-v2-ai","name":"AI Control Plane","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,"position":[-180,220]
+    },
+    {
+      "parameters":{"rules":{"values":[
+        {"conditions":{"options":{"caseSensitive":false,"typeValidation":"strict"},"conditions":[{"leftValue":"={{$json.eventType}}","rightValue":"whatsapp.","operator":{"type":"string","operation":"startsWith"}}]},"renameOutput":true,"outputKey":"whatsapp"},
+        {"conditions":{"options":{"caseSensitive":false,"typeValidation":"strict"},"conditions":[{"leftValue":"={{$json.eventType}}","rightValue":"notification.","operator":{"type":"string","operation":"startsWith"}}]},"renameOutput":true,"outputKey":"notification"},
+        {"conditions":{"options":{"caseSensitive":false,"typeValidation":"strict"},"conditions":[{"leftValue":"={{$json.eventType}}","rightValue":"chat_message.","operator":{"type":"string","operation":"startsWith"}}]},"renameOutput":true,"outputKey":"chat"},
+        {"conditions":{"options":{"caseSensitive":false,"typeValidation":"strict"},"conditions":[{"leftValue":"={{$json.target}}","rightValue":"sheets","operator":{"type":"string","operation":"equals"}}]},"renameOutput":true,"outputKey":"sheets"}
+      ]},"options":{"fallbackOutput":"extra"}},
+      "id":"alfaeq-v2-channel-router","name":"External Channel Router","type":"n8n-nodes-base.switch","typeVersion":3.2,"position":[-180,-20]
+    },
+    {
+      "parameters":{"method":"POST","url":"={{$vars.ALFAEQ_WHATSAPP_AUTOMATION_URL}}","sendHeaders":true,"headerParameters":{"parameters":[{"name":"x-alfaeq-automation-secret","value":"={{$vars.ALFAEQ_N8N_SHARED_SECRET}}"},{"name":"Content-Type","value":"application/json"}]},"sendBody":true,"contentType":"json","bodyParameters":{"parameters":[{"name":"eventId","value":"={{$json.eventId}}"},{"name":"eventType","value":"={{$json.eventType}}"},{"name":"occurredAt","value":"={{$json.occurredAt}}"},{"name":"data","value":"={{JSON.stringify($json.data)}}"}]},"options":{"response":{"response":{"neverError":true}}}},
+      "id":"alfaeq-v2-whatsapp","name":"WhatsApp Automation","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,"position":[80,-220]
+    },
+    {
+      "parameters":{"method":"POST","url":"={{$vars.ALFAEQ_GOOGLE_CHAT_WEBHOOK_URL}}","sendHeaders":true,"headerParameters":{"parameters":[{"name":"Content-Type","value":"application/json"}]},"sendBody":true,"contentType":"json","jsonBody":"={{JSON.stringify({text:'Alfaeq event: '+$json.eventType+' | '+$json.eventId})}}","options":{"response":{"response":{"neverError":true}}}},
+      "id":"alfaeq-v2-google-chat","name":"Google Chat Notifications","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,"position":[80,-60]
+    },
+    {
+      "parameters":{"method":"POST","url":"={{$vars.ALFAEQ_NOTIFICATION_WEBHOOK_URL}}","sendHeaders":true,"headerParameters":{"parameters":[{"name":"Content-Type","value":"application/json"},{"name":"x-alfaeq-automation-secret","value":"={{$vars.ALFAEQ_N8N_SHARED_SECRET}}"}]},"sendBody":true,"contentType":"json","jsonBody":"={{JSON.stringify({eventId:$json.eventId,eventType:$json.eventType,occurredAt:$json.occurredAt,data:$json.data})}}","options":{"response":{"response":{"neverError":true}}}},
+      "id":"alfaeq-v2-notifications","name":"Notification Dispatcher","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,"position":[80,100]
+    },
+    {
+      "parameters":{"operation":"append","documentId":"={{$vars.ALFAEQ_GOOGLE_SHEETS_DOCUMENT_ID}}","sheetName":"={{$vars.ALFAEQ_GOOGLE_SHEETS_TAB || 'Automation Events'}}","columns":{"mappingMode":"defineBelow","value":{"eventId":"={{$json.eventId}}","eventType":"={{$json.eventType}}","occurredAt":"={{$json.occurredAt}}","source":"={{$json.source}}","data":"={{JSON.stringify($json.data)}}"}},"options":{}},
+      "id":"alfaeq-v2-sheets","name":"Google Sheets — Automation Events","type":"n8n-nodes-base.googleSheets","typeVersion":4.5,"position":[80,260],
+      "credentials":{"googleSheetsOAuth2Api":{"id":"","name":"Alfaeq Google Sheets"}}
+    },
+    {
+      "parameters":{"respondWith":"json","responseBody":"={{JSON.stringify({ok:true,source:'alfaeq_yemen_new',version:'unified-operations-v2',eventId:$('Validate & Normalize').first().json.eventId,eventType:$('Validate & Normalize').first().json.eventType})}}","options":{}},
+      "id":"alfaeq-v2-response","name":"Respond","type":"n8n-nodes-base.respondToWebhook","typeVersion":1.4,"position":[360,0]
+    }
+  ],
+  "connections":{
+    "Alfaeq Event Webhook":{"main":[[{"node":"Validate & Normalize","type":"main","index":0}]]},
+    "Validate & Normalize":{"main":[[{"node":"Unified Event Router","type":"main","index":0}]]},
+    "Unified Event Router":{"main":[[{"node":"AI Control Plane","type":"main","index":0},{"node":"External Channel Router","type":"main","index":0}]]},
+    "AI Control Plane":{"main":[[{"node":"Respond","type":"main","index":0}]]},
+    "External Channel Router":{"main":[
+      [{"node":"WhatsApp Automation","type":"main","index":0}],
+      [{"node":"Google Chat Notifications","type":"main","index":0}],
+      [{"node":"Notification Dispatcher","type":"main","index":0}],
+      [{"node":"Google Sheets — Automation Events","type":"main","index":0}],
+      [{"node":"Respond","type":"main","index":0}]
+    ]},
+    "WhatsApp Automation":{"main":[[{"node":"Respond","type":"main","index":0}]]},
+    "Google Chat Notifications":{"main":[[{"node":"Respond","type":"main","index":0}]]},
+    "Notification Dispatcher":{"main":[[{"node":"Respond","type":"main","index":0}]]},
+    "Google Sheets — Automation Events":{"main":[[{"node":"Respond","type":"main","index":0}]]}
+  },
+  "active":false,
+  "settings":{"executionOrder":"v1"},
+  "versionId":"alfaeq-unified-operations-plane-v2",
+  "meta":{"templateCredsSetupCompleted":false}
+}
