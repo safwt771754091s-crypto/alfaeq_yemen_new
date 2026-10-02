@@ -32,6 +32,23 @@ function safeId(value) {
   return typeof value === "string" && value.length > 0 && value.length <= 200 ? value : null;
 }
 
+function bearerToken(req) {
+  const header = req.get("authorization");
+  if (!header) return null;
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() || null;
+}
+
+async function authenticatedUser(req) {
+  const token = bearerToken(req);
+  if (!token) return { error: "missing_bearer_token" };
+
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user?.id) return { error: "invalid_bearer_token" };
+
+  return { user: data.user };
+}
+
 function cobaltPayload(body) {
   return {
     url: body.url,
@@ -54,8 +71,19 @@ app.post("/media/resolve", async (req, res) => {
     return res.status(401).json({ error: "unauthorized" });
   }
 
-  const { user_id, url, entity_type = null, entity_id = null } = req.body ?? {};
-  if (!safeId(user_id) || !validSourceUrl(url)) {
+  const auth = await authenticatedUser(req);
+  if (auth.error) {
+    return res.status(401).json({ error: auth.error });
+  }
+
+  const { url, user_id: requestedUserId = null, entity_type = null, entity_id = null } = req.body ?? {};
+  const userId = auth.user.id;
+
+  if (requestedUserId !== null && requestedUserId !== userId) {
+    return res.status(403).json({ error: "user_id_mismatch" });
+  }
+
+  if (!validSourceUrl(url)) {
     return res.status(400).json({ error: "invalid_request" });
   }
 
@@ -84,7 +112,7 @@ app.post("/media/resolve", async (req, res) => {
     return res.status(502).json({ error: "unsupported_cobalt_response", result });
   }
 
-  const sourceId = `cobalt:${user_id}:${Buffer.from(url).toString("base64url").slice(0, 180)}`;
+  const sourceId = `cobalt:${userId}:${Buffer.from(url).toString("base64url").slice(0, 180)}`;
   const metadata = {
     provider: "cobalt",
     cobalt_status: result.status,
@@ -95,7 +123,7 @@ app.post("/media/resolve", async (req, res) => {
   const { data: asset, error: assetError } = await supabase
     .from("media_assets")
     .upsert({
-      owner_id: user_id,
+      owner_id: userId,
       entity_type: safeId(entity_type),
       entity_id: safeId(entity_id),
       source: "external_url",
@@ -123,7 +151,7 @@ app.post("/media/resolve", async (req, res) => {
       occurred_at: new Date().toISOString(),
       data: {
         media_asset_id: asset.id,
-        user_id,
+        user_id: userId,
         entity_type,
         entity_id,
         cobalt_status: result.status,
