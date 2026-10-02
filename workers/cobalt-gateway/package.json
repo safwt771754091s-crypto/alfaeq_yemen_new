@@ -6,7 +6,7 @@
   "engines": { "node": ">=20" },
   "scripts": { "start": "node server.mjs" },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.4",
-    "express": "^4.22.1"
+    "@supabase/supabase-js": "2.57.4",
+    "express": "4.22.1"
   }
 }
