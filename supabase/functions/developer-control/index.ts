@@ -5,7 +5,7 @@ const URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const OH_KEY = Deno.env.get("OPENHANDS_CLOUD_API_KEY") ?? Deno.env.get("OPENHANDS_API_KEY") ?? "";
 const OH_BASE = (Deno.env.get("OPENHANDS_BASE_URL") ?? "https://app.all-hands.dev").replace(/\/$/, "");
-const WORKER_SECRET = Deno.env.get("ALFAEQ_AUTOMATION_WORKER_SECRET") ?? "";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,8 +51,10 @@ Deno.serve(async(req)=>{
     return json({ok:true,inbox:inbox??[],legacy:legacy??[]});
   }
   if(action==="run_automation_worker"){
-    if(!WORKER_SECRET)throw new Error("automation_worker_not_configured");
-    const r=await fetch(URL+"/functions/v1/automation-worker",{method:"POST",headers:{"content-type":"application/json","x-alfaeq-worker-secret":WORKER_SECRET},body:JSON.stringify({limit:1,includeLegacy:false})});
+    const {data:endpoint,error:endpointError}=await admin.from("automation_endpoints").select("shared_secret,enabled").eq("id","n8n").maybeSingle();
+    if(endpointError)throw new Error("automation_endpoint_lookup_failed: "+endpointError.message);
+    if(!endpoint?.enabled||!endpoint.shared_secret)throw new Error("automation_worker_not_configured");
+    const r=await fetch(URL+"/functions/v1/automation-worker",{method:"POST",headers:{"content-type":"application/json","x-alfaeq-worker-secret":endpoint.shared_secret},body:JSON.stringify({limit:1,includeLegacy:false})});
     const text=await r.text(); let data:any={}; try{data=JSON.parse(text)}catch{data={raw:text}};
     return json({ok:r.ok,status:r.status,worker:data},r.ok?202:500);
   }
