@@ -26,8 +26,9 @@ Deno.serve(async (req: Request) => {
   else return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const requestedLimit = Number(body?.limit ?? 10);
-  const limit = Number.isFinite(requestedLimit) ? Math.min(10, Math.max(1, Math.floor(requestedLimit))) : 10;
+  const requestedLimit = Number(body?.limit ?? 5);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(5, Math.max(1, Math.floor(requestedLimit))) : 5;
+  const includeLegacy = body?.includeLegacy === true;
 
   const send = async (payload: Record<string, unknown>) => {
     const response = await fetch(endpoint.endpoint_url, {
@@ -101,9 +102,11 @@ Deno.serve(async (req: Request) => {
   }
 
   // Legacy queue remains supported so existing events can drain safely.
-  const { data: legacyRows, error: legacyError } = await admin.from("automation_events").select("*")
+  const legacyRows = includeLegacy ? (await admin.from("automation_events").select("*")
     .eq("status", "pending").lte("available_at", new Date().toISOString())
-    .lt("attempts", 10).order("id", { ascending: true }).limit(Math.max(0, limit - claimed));
+    .lt("attempts", 10).not("event_type", "in", "('test.ping','system.test','system.automation_drain_kick')")
+    .order("id", { ascending: true }).limit(Math.max(0, limit - claimed))).data : [];
+  const legacyError = includeLegacy ? (await admin.from("automation_events").select("id").eq("status", "pending").limit(0)).error : null;
 
   if (legacyError) return Response.json({ ok: false, error: "legacy_select_failed", detail: legacyError.message }, { status: 500 });
 
