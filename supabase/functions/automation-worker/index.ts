@@ -102,11 +102,16 @@ Deno.serve(async (req: Request) => {
   }
 
   // Legacy queue remains supported so existing events can drain safely.
-  const legacyRows = includeLegacy ? (await admin.from("automation_events").select("*")
-    .eq("status", "pending").lte("available_at", new Date().toISOString())
-    .lt("attempts", 10).not("event_type", "in", "('test.ping','system.test','system.automation_drain_kick')")
-    .order("id", { ascending: true }).limit(Math.max(0, limit - claimed))).data : [];
-  const legacyError = includeLegacy ? (await admin.from("automation_events").select("id").eq("status", "pending").limit(0)).error : null;
+  let legacyRows: any[] = [];
+  let legacyError: any = null;
+  if (includeLegacy) {
+    const legacyResult = await admin.from("automation_events").select("*")
+      .eq("status", "pending").lte("available_at", new Date().toISOString())
+      .lt("attempts", 10).not("event_type", "in", "('test.ping','system.test','system.automation_drain_kick')")
+      .order("id", { ascending: true }).limit(Math.max(0, limit - claimed));
+    legacyRows = legacyResult.data ?? [];
+    legacyError = legacyResult.error;
+  }
 
   if (legacyError) return Response.json({ ok: false, error: "legacy_select_failed", detail: legacyError.message }, { status: 500 });
 
