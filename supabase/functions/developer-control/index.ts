@@ -52,7 +52,7 @@ Deno.serve(async(req)=>{
   }
   if(action==="run_automation_worker"){
     if(!WORKER_SECRET)throw new Error("automation_worker_not_configured");
-    const r=await fetch(URL+"/functions/v1/automation-worker",{method:"POST",headers:{"content-type":"application/json","x-alfaeq-worker-secret":WORKER_SECRET},body:JSON.stringify({limit:10})});
+    const r=await fetch(URL+"/functions/v1/automation-worker",{method:"POST",headers:{"content-type":"application/json","x-alfaeq-worker-secret":WORKER_SECRET},body:JSON.stringify({limit:1,includeLegacy:false})});
     const text=await r.text(); let data:any={}; try{data=JSON.parse(text)}catch{data={raw:text}};
     return json({ok:r.ok,status:r.status,worker:data},r.ok?202:500);
   }
