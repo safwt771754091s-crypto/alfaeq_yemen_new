@@ -7,7 +7,16 @@ const OH_KEY = Deno.env.get("OPENHANDS_CLOUD_API_KEY") ?? Deno.env.get("OPENHAND
 const OH_BASE = (Deno.env.get("OPENHANDS_BASE_URL") ?? "https://app.all-hands.dev").replace(/\/$/, "");
 const WORKER_SECRET = Deno.env.get("ALFAEQ_AUTOMATION_WORKER_SECRET") ?? "";
 
-const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json"}});
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{
+  status,
+  headers:{"content-type":"application/json",...corsHeaders},
+});
 async function auth(req:Request,admin:any){
   const h=req.headers.get("authorization")??"";
   const token=h.replace(/^Bearer\s+/i,"").trim();
@@ -28,6 +37,7 @@ async function oh(path:string,method:"GET"|"POST",body?:unknown){
   return data;
 }
 Deno.serve(async(req)=>{
+ if(req.method==="OPTIONS")return new Response("ok",{status:200,headers:corsHeaders});
  if(req.method!=="POST")return json({ok:false,error:"method_not_allowed"},405);
  if(!URL||!SERVICE)return json({ok:false,error:"server_configuration_missing"},500);
  const admin=createClient(URL,SERVICE,{auth:{autoRefreshToken:false,persistSession:false}});
