@@ -17,11 +17,22 @@ class _CartPageState extends State<CartPage> {
   bool _busy = false;
   String? _error;
   List<Map<String, dynamic>> _items = [];
+  Map<String, dynamic> _metadata = {};
   String _currency = 'YER';
+  num _walletBalance = 0;
+  String _walletCurrency = 'YER';
   String get _uid => SupabaseService.client.auth.currentUser?.id ?? '';
 
   @override
-  void initState() { super.initState(); _loadCart(); }
+  void initState() { super.initState(); _loadCart(); _loadWallet(); }
+
+  Future<void> _loadWallet() async {
+    if (_uid.isEmpty) return;
+    try {
+      final info = await OrderService(preferSupabase: true).walletInfo();
+      if (mounted) setState(() { _walletBalance = info.balance; _walletCurrency = info.currency; });
+    } catch (_) {/* wallet display is best-effort */}
+  }
 
   Future<void> _loadCart() async {
     if (_uid.isEmpty) { if (mounted) setState(() => _loading = false); return; }
@@ -34,7 +45,8 @@ class _CartPageState extends State<CartPage> {
       final raw = row?['items'];
       _items = raw is List ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
       final meta = row?['metadata'];
-      _currency = meta is Map && meta['currency'] != null ? meta['currency'].toString() : (_items.isNotEmpty ? (_items.first['currency'] ?? 'YER').toString() : 'YER');
+      _metadata = meta is Map ? Map<String, dynamic>.from(meta) : <String, dynamic>{};
+      _currency = _metadata['currency'] != null ? _metadata['currency'].toString() : (_items.isNotEmpty ? (_items.first['currency'] ?? 'YER').toString() : 'YER');
     } catch (e) {
       _error = 'تعذر تحميل السلة من الخادم: $e';
     } finally {
@@ -60,16 +72,21 @@ class _CartPageState extends State<CartPage> {
     return total;
   }
 
-  Future<void> _saveItems(List<Map<String, dynamic>> items) async {
+  Future<void> _saveItems(List<Map<String, dynamic>> items, {String? checkoutKey}) async {
     if (!SupabaseService.isInitialized || _uid.isEmpty) return;
+    final metadata = <String, dynamic>{
+      'currency': items.isNotEmpty ? (items.first['currency'] ?? _currency) : _currency,
+      // A new cart shape invalidates the previous checkout idempotency key.
+      if (checkoutKey != null) 'checkout_key': checkoutKey,
+    };
     await SupabaseService.client.from('carts').upsert({
       'uid': _uid,
       'owner_id': _uid,
       'items': items,
-      'metadata': {'currency': items.isNotEmpty ? (items.first['currency'] ?? _currency) : _currency},
+      'metadata': metadata,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }, onConflict: 'uid');
-    if (mounted) setState(() => _items = items);
+    if (mounted) setState(() { _items = items; _metadata = metadata; });
   }
 
   Future<void> _changeQuantity(int index, int direction) async {
@@ -109,22 +126,32 @@ class _CartPageState extends State<CartPage> {
     final addressController = TextEditingController();
     String paymentMethod = 'cash_on_delivery';
     LatLng? deliveryPoint;
+    final walletCovers = _walletBalance >= _total;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('إتمام الطلب'),
-          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             TextField(controller: addressController, maxLines: 3, decoration: const InputDecoration(labelText: 'عنوان التوصيل', hintText: 'الحي، الشارع، معلم قريب')),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: paymentMethod,
               decoration: const InputDecoration(labelText: 'طريقة الدفع'),
-              items: const [
-                DropdownMenuItem(value: 'cash_on_delivery', child: Text('الدفع عند الاستلام')),
+              items: [
+                const DropdownMenuItem(value: 'cash_on_delivery', child: Text('الدفع عند الاستلام')),
+                DropdownMenuItem(
+                  value: 'wallet',
+                  child: Text('محفظة الفائق (رصيدك: ${_walletBalance.toStringAsFixed(0)} $_walletCurrency)'),
+                ),
               ],
               onChanged: (v) => setDialogState(() => paymentMethod = v ?? 'cash_on_delivery'),
             ),
+            if (paymentMethod == 'wallet' && !walletCovers) ...[
+              const SizedBox(height: 8),
+              Text('رصيد المحفظة غير كافٍ لهذا الطلب. اشحن المحفظة أو اختر الدفع عند الاستلام.',
+                  style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700)),
+            ],
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () async {
@@ -140,7 +167,10 @@ class _CartPageState extends State<CartPage> {
           ])),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
-            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('تأكيد الطلب')),
+            FilledButton(
+              onPressed: (paymentMethod == 'wallet' && !walletCovers) ? null : () => Navigator.pop(dialogContext, true),
+              child: const Text('تأكيد الطلب'),
+            ),
           ],
         ),
       ),
@@ -155,26 +185,54 @@ class _CartPageState extends State<CartPage> {
     }
     setState(() => _busy = true);
     try {
-      final orderId = await OrderService(preferSupabase: true).createOrder(
-        customerId: _uid, items: _items, address: address, paymentMethod: paymentMethod,
-        latitude: deliveryPoint?.latitude, longitude: deliveryPoint?.longitude,
-      );
-      // Stage 3 checkout clears the Supabase cart atomically inside create_order.
+      final service = OrderService(preferSupabase: true);
+      final orderId = paymentMethod == 'wallet'
+          ? await service.createPaidOrder(
+              items: _items,
+              address: address,
+              idempotencyKey: await _ensureCheckoutKey(),
+              currency: _walletCurrency,
+              latitude: deliveryPoint?.latitude,
+              longitude: deliveryPoint?.longitude,
+            )
+          : await service.createOrder(
+              customerId: _uid,
+              items: _items,
+              address: address,
+              paymentMethod: paymentMethod,
+              latitude: deliveryPoint?.latitude,
+              longitude: deliveryPoint?.longitude,
+            );
+      // Checkout clears the Supabase cart atomically inside create_order.
       if (mounted) setState(() => _items = []);
       if (!mounted) return;
       await showDialog<void>(
         context: context,
         builder: (_) => AlertDialog(
           title: const Text('تم إنشاء الطلب'),
-          content: Text('رقم الطلب: $orderId\nتم التحقق من المنتجات والمخزون وتسعير الطلب من الخادم.'),
+          content: Text('رقم الطلب: $orderId\n'
+              '${paymentMethod == 'wallet' ? 'تم الخصم من محفظة الفائق.' : 'الدفع عند الاستلام.'}\n'
+              'تم التحقق من المنتجات والمخزون وتسعير الطلب من الخادم.'),
           actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
         ),
       );
+      _loadWallet();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء الطلب: $e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// A stable key for the current cart contents. It is persisted in the cart
+  /// metadata so a retry after a dropped response returns the same order
+  /// instead of charging twice; the next cart change generates a fresh key.
+  Future<String> _ensureCheckoutKey() async {
+    final existing = _metadata['checkout_key']?.toString();
+    if (existing != null && existing.isNotEmpty) return existing;
+    final key = 'co_${_uid}_${DateTime.now().microsecondsSinceEpoch}';
+    await _saveItems(_items, checkoutKey: key);
+    return key;
   }
 
   @override
