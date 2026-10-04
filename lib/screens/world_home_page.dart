@@ -15,6 +15,7 @@ import 'conversations_page.dart';
 import 'mini_programs_page.dart';
 import 'moments_page.dart';
 import 'products_page.dart';
+import 'product_detail_page.dart';
 import 'search_page.dart';
 import 'support_chat_page.dart';
 import 'wallet_qr_page.dart';
@@ -860,7 +861,7 @@ class _StoreCard extends StatelessWidget {
                     Text(priceText, style: const TextStyle(fontWeight: FontWeight.w900)),
                     IconButton(onPressed: () => _addProductToCart(context, product), tooltip: 'أضف للسلة', icon: const Icon(Icons.add_shopping_cart, color: _blue)),
                   ]),
-                  onTap: () => _addProductToCart(context, product),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: product))),
                 );
               }).toList());
             },

@@ -47,7 +47,7 @@ class CatalogService {
     return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
   }
 
-  Future<void> addToCart(String uid, CatalogDocument product) async {
+  Future<void> addToCart(String uid, CatalogDocument product, {num? saleQuantity}) async {
     if (!useSupabase || !SupabaseService.isInitialized) {
       throw StateError('خدمة السلة الجديدة غير مفعلة.');
     }
@@ -72,24 +72,30 @@ class CatalogService {
       (item) => item['productId'] == product.id || item['product_id'] == product.id,
     );
 
+    // Quantity requested from a product page, in sale units (e.g. 2 كجم).
+    final requestedBase = saleQuantity == null ? null : unit.toBase(saleQuantity).round();
+
     if (index >= 0) {
       final rawBase = items[index]['quantityBase'] ?? items[index]['quantity_base'];
       final currentBase = rawBase is num
           ? rawBase.round()
           : (((items[index]['quantity'] as num?) ?? 1) * unit.scale).round();
-      final nextBase = currentBase + stepBase;
+      final nextBase = requestedBase ?? (currentBase + stepBase);
       if (stockBase > 0 && nextBase > stockBase) throw StateError('لا يمكن تجاوز الكمية المتوفرة.');
       if (nextBase > unit.scale * 100) throw StateError('الحد الأقصى للكمية المطلوبة هو 100 وحدة بيع.');
       items[index]['quantityBase'] = nextBase;
       items[index]['quantity'] = unit.fromBase(nextBase);
     } else {
+      final base = requestedBase ?? unit.scale;
+      if (stockBase > 0 && base > stockBase) throw StateError('لا يمكن تجاوز الكمية المتوفرة.');
+      if (base > unit.scale * 100) throw StateError('الحد الأقصى للكمية المطلوبة هو 100 وحدة بيع.');
       items.add({
         'productId': product.id,
         'name': (p['name'] ?? p['title'] ?? 'صنف').toString(),
         'price': price,
         'currency': p['currency'] ?? 'YER',
-        'quantity': unit.fromBase(unit.scale),
-        'quantityBase': unit.scale,
+        'quantity': unit.fromBase(base),
+        'quantityBase': base,
         'unitScale': unit.scale,
         'saleUnit': unit.id,
         'unitLabel': unit.label,
