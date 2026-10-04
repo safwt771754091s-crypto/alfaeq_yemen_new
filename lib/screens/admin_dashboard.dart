@@ -5,6 +5,7 @@ import '../core/app_sections.dart';
 import '../services/auth_service.dart';
 import 'admin_data_entry.dart';
 import 'admin_user_management_page.dart';
+import 'ai_assistant_page.dart';
 import 'cart_page.dart';
 import 'bulk_product_import_page.dart';
 import 'developer_page.dart';
@@ -88,6 +89,7 @@ class AdminDashboard extends StatelessWidget {
                 _ActionCard(icon: Icons.table_view_outlined, title: 'استيراد Excel بالجملة', subtitle: 'رفع Excel/CSV ومعاينة الأصناف ثم اعتمادها دفعة واحدة', onTap: () => _open(context, const BulkProductImportPage())),
                 _ActionCard(icon: Icons.local_shipping_outlined, title: 'التوزيع والمندوبون', subtitle: 'تشغيل التوزيع ومتابعة الطلبات', onTap: () => _open(context, DispatchCenterPage())),
                 _ActionCard(icon: Icons.code_outlined, title: 'مركز المطور والأمن', subtitle: 'الفحص، سجل التدقيق، وتقارير الحماية', onTap: () => _open(context, DeveloperPage())),
+                _ActionCard(icon: Icons.auto_awesome, title: 'ذكاء الفائق', subtitle: 'مساعد المنصة: بحث، طلبات، سلة، وتنفيذ خدمات بتأكيدك', onTap: () => _open(context, const AiAssistantPage())),
                 const SizedBox(height: 18),
                 const Text('الأقسام الحالية', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 8),

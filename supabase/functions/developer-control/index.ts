@@ -3,7 +3,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const OH_KEY = Deno.env.get("OPENHANDS_CLOUD_API_KEY") ?? Deno.env.get("OPENHANDS_API_KEY") ?? "";
+// Both variables may be present; prefer the plain key and fall back to the
+// cloud key so a stale/invalid one does not disable agent execution.
+const OH_KEYS = [Deno.env.get("OPENHANDS_API_KEY"), Deno.env.get("OPENHANDS_CLOUD_API_KEY")]
+  .map((k) => (k ?? "").trim())
+  .filter((k) => k.length > 0);
 const OH_BASE = (Deno.env.get("OPENHANDS_BASE_URL") ?? "https://app.all-hands.dev").replace(/\/$/, "");
 
 
@@ -30,11 +34,16 @@ async function auth(req:Request,admin:any){
   return {user:data.user,profile};
 }
 async function oh(path:string,method:"GET"|"POST",body?:unknown){
-  if(!OH_KEY)throw new Error("openhands_provider_not_configured");
-  const r=await fetch(OH_BASE+path,{method,headers:{authorization:"Bearer "+OH_KEY,"content-type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)});
-  const text=await r.text(); let data:any={}; try{data=JSON.parse(text)}catch{data={raw:text.slice(0,2000)}}
-  if(!r.ok)throw new Error("OpenHands HTTP "+r.status+": "+JSON.stringify(data).slice(0,1500));
-  return data;
+  if(OH_KEYS.length===0)throw new Error("openhands_provider_not_configured");
+  let lastError="openhands_provider_not_configured";
+  for(let i=0;i<OH_KEYS.length;i++){
+    const r=await fetch(OH_BASE+path,{method,headers:{authorization:"Bearer "+OH_KEYS[i],"content-type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)});
+    const text=await r.text(); let data:any={}; try{data=JSON.parse(text)}catch{data={raw:text.slice(0,2000)}}
+    if(r.ok)return data;
+    lastError="OpenHands HTTP "+r.status+": "+JSON.stringify(data).slice(0,1500);
+    if(r.status!==401)break;
+  }
+  throw new Error(lastError);
 }
 Deno.serve(async(req)=>{
  if(req.method==="OPTIONS")return new Response("ok",{status:200,headers:corsHeaders});
