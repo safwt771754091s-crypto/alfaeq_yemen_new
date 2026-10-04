@@ -11,6 +11,7 @@ import 'location_picker_page.dart';
 import 'my_orders_page.dart';
 import 'notifications_page.dart';
 import 'ai_assistant_page.dart';
+import 'conversations_page.dart';
 import 'support_chat_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
@@ -34,7 +35,7 @@ class _WorldHomePageState extends State<WorldHomePage> {
     final pages = <Widget>[
       _HomeTab(onOpen: _open),
       const _StoresTab(),
-      const AiAssistantPage(),
+      const ConversationsPage(),
       const CartPage(),
       const MyOrdersPage(),
       const _AccountTab(),
@@ -60,7 +61,7 @@ class _MainBottomBar extends StatelessWidget {
     const items = [
       (Icons.home_outlined, Icons.home, 'الرئيسية'),
       (Icons.storefront_outlined, Icons.storefront, 'المتاجر'),
-      (Icons.auto_awesome_outlined, Icons.auto_awesome, 'ذكاء'),
+      (Icons.chat_bubble_outline, Icons.chat_bubble, 'المحادثات'),
       (Icons.shopping_cart_outlined, Icons.shopping_cart, 'السلة'),
       (Icons.receipt_long_outlined, Icons.receipt_long, 'طلباتي'),
       (Icons.person_outline, Icons.person, 'حسابي'),
@@ -441,8 +442,8 @@ class _ServicesEntry extends StatelessWidget {
         (Icons.receipt_long_outlined, 'طلباتي', () => const MyOrdersPage()),
         (Icons.account_balance_wallet_outlined, 'المحفظة', () => const WalletCenterPage()),
         (Icons.auto_awesome, 'ذكاء الفائق', () => const AiAssistantPage()),
+        (Icons.chat_bubble_outline, 'المحادثات', () => const ConversationsPage()),
         (Icons.support_agent_outlined, 'الدعم', () => const SupportChatPage()),
-        (Icons.notifications_none, 'الإشعارات', () => const NotificationsPage()),
         (Icons.grid_view_outlined, 'كل الخدمات', () => const ServicesHubPage()),
       ];
 
@@ -874,6 +875,7 @@ class ServicesHubPage extends StatelessWidget {
           (Icons.account_balance_wallet_outlined, 'المحفظة', () => const WalletCenterPage()),
         ]),
         ('الخدمات الذكية', [
+          (Icons.chat_bubble_outline, 'المحادثات', () => const ConversationsPage()),
           (Icons.auto_awesome, 'ذكاء الفائق', () => const AiAssistantPage()),
           (Icons.support_agent_outlined, 'دعم الفائق', () => const SupportChatPage()),
           (Icons.notifications_none, 'الإشعارات', () => const NotificationsPage()),

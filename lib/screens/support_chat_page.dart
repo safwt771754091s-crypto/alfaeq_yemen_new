@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 
 class SupportChatPage extends StatefulWidget {
-  const SupportChatPage({super.key});
+  final String? initialThreadId;
+  const SupportChatPage({super.key, this.initialThreadId});
   @override State<SupportChatPage> createState() => _SupportChatPageState();
 }
 
@@ -11,6 +12,12 @@ class _SupportChatPageState extends State<SupportChatPage> {
   String? _threadId;
   bool _creating = false, _sending = false;
   String? get _uid => SupabaseService.client.auth.currentUser?.id;
+
+  @override
+  void initState() {
+    super.initState();
+    _threadId = widget.initialThreadId;
+  }
 
   Future<void> _createThread() async {
     if (_uid == null || _creating) return;
