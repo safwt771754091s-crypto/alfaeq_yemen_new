@@ -69,6 +69,15 @@ Flutter (AlfaeqAiService)
 - **مدخل الذكاء للمالك:** أُضيفت بطاقة «ذكاء الفائق» إلى لوحة الإدارة لأن المالك لا يصل إلى `WorldHomePage`.
 - **الكتالوج:** 1000 منتج `active` لكن `stock_base = 0` لكلها تقريباً (وبعض الأسعار 0.00). إدخال المخزون مقصود ألا يتم من الاستيراد؛ يجب إدخاله عبر مسار المخزون/الدفتر. `create_order` لا يمنع الطلب بسبب المخزون (يُثبّته عند 0)، لذا البيع ممكن لكن المخزون يبقى صفراً حتى يُغذّى فعلياً.
 
+### أداة النشر الجاهزة
+`tools/deploy-ai.sh` تضبط الأسرار وتعيد نشر الدوال الأربع (`ai-gateway`، `developer-control`، `ai-event-worker`، `sheets-catalog-sync`) بأمر واحد، دون طباعة أي سر:
+
+```bash
+SUPABASE_ACCESS_TOKEN=sbp_... PROJECT_REF=<ref> tools/deploy-ai.sh
+```
+
+تُقرأ أسرار المزوّد من `.env.ai` (مُستثنى من Git) أو من متغيّرات البيئة.
+
 ### قائمة الإجراءات على الخادم (خارج نطاق الكود)
 1. ضبط `AI_BASE_URL` و`AI_API_KEY` و`AI_MODEL` ثم إعادة نشر `ai-gateway`.
 2. تصحيح `OPENHANDS_CLOUD_API_KEY` (أو إزالته) ثم إعادة نشر `developer-control`.
