@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
 import 'ai_assistant_page.dart';
+import 'group_chat_page.dart';
 import 'support_chat_page.dart';
 
 /// WeChat-style "Chats" tab: a unified conversation list where the first entry
@@ -38,6 +39,18 @@ class _ConversationsPageState extends State<ConversationsPage> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('المحادثات', style: TextStyle(fontWeight: FontWeight.w900)),
+          actions: [
+            IconButton(
+              tooltip: 'مجموعة جديدة',
+              icon: const Icon(Icons.group_add_outlined),
+              onPressed: () async {
+                final id = await showCreateGroupSheet(context);
+                if (id != null && context.mounted) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => GroupChatPage(threadId: id, title: 'مجموعة جديدة')));
+                }
+              },
+            ),
+          ],
         ),
         body: ListView(
           padding: const EdgeInsets.only(bottom: 24),
@@ -118,18 +131,23 @@ class _ThreadTile extends StatelessWidget {
     final id = row['id'].toString();
     final title = (row['title'] ?? 'محادثة').toString();
     final type = (row['thread_type'] ?? '').toString();
+    final isGroup = type == 'group';
     final isSupport = type == 'support' || title.contains('دعم');
     return Column(
       children: [
         ListTile(
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => SupportChatPage(initialThreadId: id)),
+            MaterialPageRoute(
+              builder: (_) => isGroup
+                  ? GroupChatPage(threadId: id, title: title)
+                  : SupportChatPage(initialThreadId: id),
+            ),
           ),
           leading: CircleAvatar(
             radius: 26,
             backgroundColor: const Color(0xFFF1F6FF),
-            child: Icon(isSupport ? Icons.support_agent_outlined : Icons.forum_outlined, color: const Color(0xFF0B63CE)),
+            child: Icon(isGroup ? Icons.groups_outlined : isSupport ? Icons.support_agent_outlined : Icons.forum_outlined, color: const Color(0xFF0B63CE)),
           ),
           title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900), maxLines: 1, overflow: TextOverflow.ellipsis),
           subtitle: StreamBuilder<List<Map<String, dynamic>>>(
