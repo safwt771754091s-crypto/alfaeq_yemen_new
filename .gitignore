@@ -5,3 +5,9 @@ build/
 android/.gradle/
 android/local.properties
 web/
+
+# AI provider secrets (local deploy helper)
+.env.ai
+
+# Supabase CLI scratch
+supabase/.temp/

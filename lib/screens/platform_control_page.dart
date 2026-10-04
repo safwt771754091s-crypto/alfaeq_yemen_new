@@ -1,4 +1,3 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
@@ -36,7 +35,6 @@ class _PlatformControlPageState extends State<PlatformControlPage> {
     try {
       await SupabaseService.client.functions.invoke('admin-users', body: const {'action': 'list'});
       // listManagedUsers is owner/admin gated; the backend remains the source of truth.
-      final data = <String, dynamic>{};
       final role = await _auth.role();
       if (!mounted) return;
       setState(() {

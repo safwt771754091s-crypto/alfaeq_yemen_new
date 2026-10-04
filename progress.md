@@ -29,3 +29,14 @@ Connect order, inventory, and merchant through the production Event Bus without 
 - Event producer migration committed at `e2e2da0407d06fe2fb6cdc676a8ec8dde52cefc3`.
 - Event contract documentation committed.
 - Fresh CI evidence is still required before marking the integration complete.
+
+## Interactive AI (ذكاء الفائق) — 2026-10-04
+- Scope: make the interactive AI path operational, fix runtime defects, and expose the assistant in the customer UI.
+- Fixes: pending tool-call lifecycle, AI gateway provider config/URL normalization, Arabic error mapping, home/account/services entries, live cart badge, `ServicesHubPage` scaffold, 11 analyzer warnings.
+- Added `test/ai_service_test.dart` covering the dangling tool-call regression.
+- Docs: `docs/architecture/ALFAEQ_AI_OPERATIONS_V1.md`.
+- Evidence (local, Flutter 3.47.6 / Dart 3.13.5):
+  - `flutter analyze` -> No issues found.
+  - `flutter test` -> All tests passed (8).
+  - `flutter build web --release` -> Built build/web.
+- Server action still required: set `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` in Supabase and redeploy `ai-gateway`; without them the gateway returns `ai_provider_not_configured` (shown to the user in Arabic).

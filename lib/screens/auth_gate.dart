@@ -94,22 +94,3 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     );
   }
 }
-
-class _CommercialOnlyNotice extends StatelessWidget {
-  const _CommercialOnlyNotice();
-  @override
-  Widget build(BuildContext context) => const Directionality(
-    textDirection: TextDirection.rtl,
-    child: Scaffold(
-      body: Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'هذا الحساب مخصص لأدوات التطوير المستقبلية ولا يملك وصولاً إلى المنصة التجارية. منصة الصفوة ستعمل في مشروع مستقل.',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
-    ),
-  );
-}

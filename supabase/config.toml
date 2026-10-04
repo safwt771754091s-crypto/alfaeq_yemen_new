@@ -1,2 +1,10 @@
 [functions.automation-worker]
 verify_jwt = false
+
+# These functions authenticate with shared secrets (x-alfaeq-*), not a JWT,
+# so they must be callable without an Authorization header.
+[functions.ai-event-worker]
+verify_jwt = false
+
+[functions.sheets-catalog-sync]
+verify_jwt = false

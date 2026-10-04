@@ -16,6 +16,16 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   ];
   bool _busy = false;
 
+  // One-tap entry points so the assistant feels like a super-app hub.
+  static const _shortcuts = <(IconData, String, String)>[
+    (Icons.search, 'ابحث عن منتج', 'ابحث عن منتج أرز في المتجر'),
+    (Icons.receipt_long_outlined, 'تابع طلبي', 'ما حالة طلبي الأخير؟'),
+    (Icons.shopping_cart_outlined, 'سلتي', 'ماذا يوجد في سلتي الآن؟'),
+    (Icons.account_balance_wallet_outlined, 'المحفظة', 'ما رصيد محفظتي؟'),
+    (Icons.storefront_outlined, 'أقرب متجر', 'ما أقرب المتاجر إليّ؟'),
+    (Icons.support_agent, 'الدعم', 'أريد التواصل مع الدعم'),
+  ];
+
   @override
   void dispose() {
     _input.dispose();
@@ -27,15 +37,30 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     final text = _input.text.trim();
     if (text.isEmpty || _busy) return;
     _input.clear();
+    await _dispatch(text);
+  }
+
+  Future<void> _dispatch(String text) async {
     setState(() {
       _messages.add({'text': text, 'user': true});
       _busy = true;
     });
+    _scrollToEnd();
     final answer = await _ai.sendMessage(text);
     if (!mounted) return;
     setState(() {
       _messages.add({'text': answer, 'user': false});
       _busy = false;
+    });
+    _scrollToEnd();
+  }
+
+  void _scrollToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.animateTo(_scroll.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      }
     });
   }
 
@@ -158,6 +183,24 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                   ),
                 ),
               ),
+            SizedBox(
+              height: 46,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                reverse: true,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: _shortcuts.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, i) {
+                  final s = _shortcuts[i];
+                  return ActionChip(
+                    avatar: Icon(s.$1, size: 18),
+                    label: Text(s.$2, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    onPressed: _busy ? null : () => _dispatch(s.$3),
+                  );
+                },
+              ),
+            ),
             SafeArea(
               top: false,
               child: Padding(

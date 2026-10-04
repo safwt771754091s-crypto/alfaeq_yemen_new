@@ -1,4 +1,3 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
@@ -12,7 +11,9 @@ import 'location_picker_page.dart';
 import 'my_orders_page.dart';
 import 'notifications_page.dart';
 import 'ai_assistant_page.dart';
+import 'conversations_page.dart';
 import 'support_chat_page.dart';
+import 'wallet_qr_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
 const _yellow = Color(0xFFFFC107);
@@ -35,6 +36,7 @@ class _WorldHomePageState extends State<WorldHomePage> {
     final pages = <Widget>[
       _HomeTab(onOpen: _open),
       const _StoresTab(),
+      const ConversationsPage(),
       const CartPage(),
       const MyOrdersPage(),
       const _AccountTab(),
@@ -60,6 +62,7 @@ class _MainBottomBar extends StatelessWidget {
     const items = [
       (Icons.home_outlined, Icons.home, 'الرئيسية'),
       (Icons.storefront_outlined, Icons.storefront, 'المتاجر'),
+      (Icons.chat_bubble_outline, Icons.chat_bubble, 'المحادثات'),
       (Icons.shopping_cart_outlined, Icons.shopping_cart, 'السلة'),
       (Icons.receipt_long_outlined, Icons.receipt_long, 'طلباتي'),
       (Icons.person_outline, Icons.person, 'حسابي'),
@@ -71,8 +74,8 @@ class _MainBottomBar extends StatelessWidget {
         child: Row(children: List.generate(items.length, (i) {
           final selected = selectedIndex == i;
           final item = items[i];
-          final icon = i == 2
-              ? _CartBadgeIcon(icon: selected ? item.$2 : item.$1, count: 0, color: selected ? _blue : _navy)
+          final icon = i == 3
+              ? _LiveCartBadge(icon: selected ? item.$2 : item.$1, color: selected ? _blue : _navy)
               : Icon(selected ? item.$2 : item.$1, color: selected ? _blue : _navy, size: 24);
           return Expanded(child: InkWell(
             onTap: () => onSelected(i),
@@ -90,6 +93,40 @@ class _MainBottomBar extends StatelessWidget {
     );
   }
 }
+class _LiveCartBadge extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  const _LiveCartBadge({required this.icon, required this.color});
+
+  int _count(List<Map<String, dynamic>> rows) {
+    if (rows.isEmpty) return 0;
+    final raw = rows.first['items'];
+    var count = 0;
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is Map) {
+          final quantity = item['quantity'];
+          if (quantity is num) count += quantity.round();
+        }
+      }
+    }
+    return count;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = SupabaseService.client.auth.currentUser;
+    if (user == null || !SupabaseService.isInitialized) {
+      return _CartBadgeIcon(icon: icon, count: 0, color: color);
+    }
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: SupabaseService.client.from('carts').stream(primaryKey: ['uid']).eq('uid', user.id),
+      builder: (context, snapshot) =>
+          _CartBadgeIcon(icon: icon, count: _count(snapshot.data ?? const []), color: color),
+    );
+  }
+}
+
 class _CartBadgeIcon extends StatelessWidget {
   final IconData icon;
   final int count;
@@ -155,6 +192,10 @@ class _HomeTabState extends State<_HomeTab> {
               const _BannerDots(),
               const SizedBox(height: 18),
               _CategoriesSection(onOpen: widget.onOpen),
+              const SizedBox(height: 18),
+              _AiAssistantEntry(onOpen: widget.onOpen),
+              const SizedBox(height: 10),
+              _ServicesEntry(onOpen: widget.onOpen),
               const SizedBox(height: 22),
               _OffersSection(onAddToCart: (product) => _addProductToCart(context, product)),
               const SizedBox(height: 20),
@@ -243,7 +284,7 @@ class _HomeHeader extends StatelessWidget {
                 ),
               ),
               IconButton(onPressed: onNotifications, icon: const Icon(Icons.notifications_none, color: Colors.white)),
-              IconButton(onPressed: onCart, icon: _CartBadgeIcon(icon: Icons.shopping_cart_outlined, count: 0, color: Colors.white)),
+              IconButton(onPressed: onCart, icon: const _LiveCartBadge(icon: Icons.shopping_cart_outlined, color: Colors.white)),
             ],
           ),
           const SizedBox(height: 12),
@@ -345,6 +386,104 @@ class _BannerDots extends StatelessWidget {
             height: i == 0 ? 9 : 7,
             margin: const EdgeInsets.symmetric(horizontal: 4),
             decoration: BoxDecoration(color: i == 0 ? _blue : const Color(0xFFD4D9DF), shape: BoxShape.circle),
+          ),
+        ),
+      );
+}
+
+class _AiAssistantEntry extends StatelessWidget {
+  final void Function(BuildContext, Widget) onOpen;
+  const _AiAssistantEntry({required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => onOpen(context, const AiAssistantPage()),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF0B6E4F), Color(0xFF0A2540)], begin: Alignment.topRight, end: Alignment.bottomLeft),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(15)),
+                child: const Icon(Icons.auto_awesome, color: Colors.white, size: 26),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('ذكاء الفائق', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                    SizedBox(height: 3),
+                    Text('ابحث، تابع طلبك، أو أدر سلتك بالمحادثة', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 16),
+            ],
+          ),
+        ),
+      );
+}
+
+
+class _ServicesEntry extends StatelessWidget {
+  final void Function(BuildContext, Widget) onOpen;
+  const _ServicesEntry({required this.onOpen});
+
+  // WeChat-style quick-services grid on the home screen.
+  List<(IconData, String, Widget Function())> get _items => [
+        (Icons.search, 'البحث', () => const _StoresTab()),
+        (Icons.shopping_cart_outlined, 'السلة', () => const CartPage()),
+        (Icons.receipt_long_outlined, 'طلباتي', () => const MyOrdersPage()),
+        (Icons.account_balance_wallet_outlined, 'المحفظة', () => const WalletCenterPage()),
+        (Icons.auto_awesome, 'ذكاء الفائق', () => const AiAssistantPage()),
+        (Icons.chat_bubble_outline, 'المحادثات', () => const ConversationsPage()),
+        (Icons.support_agent_outlined, 'الدعم', () => const SupportChatPage()),
+        (Icons.grid_view_outlined, 'كل الخدمات', () => const ServicesHubPage()),
+      ];
+
+  @override
+  Widget build(BuildContext context) => Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: Color(0xFFE3E8EF))),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 14, 10, 8),
+          child: Column(
+            children: [
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _items.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, crossAxisSpacing: 4, mainAxisSpacing: 14, childAspectRatio: .82),
+                itemBuilder: (context, i) {
+                  final tile = _items[i];
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => onOpen(context, tile.$3()),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(color: const Color(0xFFF1F6FF), borderRadius: BorderRadius.circular(16)),
+                          child: Icon(tile.$1, color: _blue, size: 26),
+                        ),
+                        const SizedBox(height: 7),
+                        Text(tile.$2, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontSize: 11.5, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ),
       );
@@ -723,40 +862,81 @@ class _StoreCard extends StatelessWidget {
 }
 class ServicesHubPage extends StatelessWidget {
   const ServicesHubPage({super.key});
+
+  // WeChat-style "discover" hub: one grid grouping every super-app service.
+  List<(String, List<(IconData, String, Widget Function())>)> _groups() => [
+        ('الطلب والشراء', [
+          (Icons.search, 'البحث', () => const _StoresTab()),
+          (Icons.shopping_cart_outlined, 'السلة', () => const CartPage()),
+          (Icons.local_offer_outlined, 'العروض', () => const _OffersPage()),
+          (Icons.storefront_outlined, 'المتاجر', () => const _StoresTab()),
+        ]),
+        ('طلباتي والمال', [
+          (Icons.receipt_long_outlined, 'طلباتي', () => const MyOrdersPage()),
+          (Icons.account_balance_wallet_outlined, 'المحفظة', () => const WalletCenterPage()),
+        ]),
+        ('الخدمات الذكية', [
+          (Icons.chat_bubble_outline, 'المحادثات', () => const ConversationsPage()),
+          (Icons.auto_awesome, 'ذكاء الفائق', () => const AiAssistantPage()),
+          (Icons.support_agent_outlined, 'دعم الفائق', () => const SupportChatPage()),
+          (Icons.notifications_none, 'الإشعارات', () => const NotificationsPage()),
+        ]),
+      ];
+
   @override
   Widget build(BuildContext context) => Directionality(
         textDirection: TextDirection.rtl,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text('الخدمات', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 8),
-            const Text('الوصول السريع إلى خدمات الفائق يمن.', style: TextStyle(color: Colors.black54)),
-            const SizedBox(height: 18),
-            _ServiceTile(icon: Icons.shopping_cart_outlined, title: 'السلة', subtitle: 'مراجعة الأصناف قبل الطلب', page: const CartPage()),
-            _ServiceTile(icon: Icons.local_shipping_outlined, title: 'طلباتي', subtitle: 'متابعة الطلبات والتوصيل', page: const MyOrdersPage()),
-            _ServiceTile(icon: Icons.account_balance_wallet_outlined, title: 'المحافظ', subtitle: 'مركز المحافظ والخدمات المالية', page: const WalletCenterPage()),
-            _ServiceTile(icon: Icons.auto_awesome, title: 'ذكاء الفائق', subtitle: 'اطلب من الذكاء تنفيذ خدماتك', page: const AiAssistantPage()),
-          ],
-        ),
-      );
-}
-
-class _ServiceTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Widget page;
-  const _ServiceTile({required this.icon, required this.title, required this.subtitle, required this.page});
-  @override
-  Widget build(BuildContext context) => Card(
-        elevation: 0,
-        child: ListTile(
-          leading: CircleAvatar(backgroundColor: const Color(0xFFF1F6FF), child: Icon(icon, color: _blue)),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
-          subtitle: Text(subtitle),
-          trailing: const Icon(Icons.chevron_left),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page)),
+        child: Scaffold(
+          appBar: AppBar(title: const Text('كل الخدمات', style: TextStyle(fontWeight: FontWeight.w900))),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              const Text('كل الخدمات', style: TextStyle(color: _navy, fontSize: 26, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              const Text('منصة الفائق يمن: تسوّق، اطلب، تابع، وادفع من مكان واحد.', style: TextStyle(color: Colors.black54)),
+              const SizedBox(height: 18),
+              for (final group in _groups()) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10, right: 4),
+                  child: Text(group.$1, style: const TextStyle(color: _navy, fontSize: 17, fontWeight: FontWeight.w900)),
+                ),
+                Card(
+                  elevation: 0,
+                  margin: const EdgeInsets.only(bottom: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: Color(0xFFE3E8EF))),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: group.$2.length,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, crossAxisSpacing: 4, mainAxisSpacing: 14, childAspectRatio: .82),
+                      itemBuilder: (context, i) {
+                        final tile = group.$2[i];
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => tile.$3())),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(color: const Color(0xFFF1F6FF), borderRadius: BorderRadius.circular(16)),
+                                child: Icon(tile.$1, color: _blue, size: 26),
+                              ),
+                              const SizedBox(height: 7),
+                              Text(tile.$2, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontSize: 12, fontWeight: FontWeight.w800)),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       );
 }
@@ -799,6 +979,12 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
                   const SizedBox(height: 8),
                   Text(data['status'] == 'active' ? 'المحفظة نشطة' : 'حالة المحفظة: ' + (data['status']?.toString() ?? 'غير معروفة'), style: const TextStyle(color: Colors.white70)),
                 ])),
+                ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletQrPage())),
+                  icon: const Icon(Icons.qr_code_2),
+                  label: const Text('رمز الدفع والاستلام'),
                 ),
                 const SizedBox(height: 14),
                 if (walletMissing)
@@ -873,6 +1059,8 @@ class _AccountTab extends StatelessWidget {
         ListTile(leading: const Icon(Icons.account_balance_wallet_outlined, color: _blue), title: const Text('محفظتي', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletCenterPage()))),
         ListTile(leading: const Icon(Icons.notifications_none, color: _blue), title: const Text('الإشعارات', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()))),
         ListTile(leading: const Icon(Icons.support_agent_outlined, color: _blue), title: const Text('دعم الفائق', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatPage()))),
+        ListTile(leading: const Icon(Icons.auto_awesome, color: _blue), title: const Text('ذكاء الفائق', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()))),
+        ListTile(leading: const Icon(Icons.grid_view_outlined, color: _blue), title: const Text('كل الخدمات', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServicesHubPage()))),
         const Divider(height: 24),
         FilledButton.icon(onPressed: () => _logout(context), icon: const Icon(Icons.logout), label: const Text('تسجيل الخروج'), style: FilledButton.styleFrom(backgroundColor: _navy)),
       ],
