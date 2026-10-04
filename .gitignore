@@ -11,3 +11,7 @@ web/
 
 # Supabase CLI scratch
 supabase/.temp/
+
+# Local tooling artifacts
+.flutter-plugins-dependencies
+.openhands/

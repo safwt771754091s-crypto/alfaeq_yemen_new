@@ -13,6 +13,7 @@ import 'notifications_page.dart';
 import 'ai_assistant_page.dart';
 import 'conversations_page.dart';
 import 'mini_programs_page.dart';
+import 'moments_page.dart';
 import 'products_page.dart';
 import 'support_chat_page.dart';
 import 'wallet_qr_page.dart';
@@ -39,6 +40,7 @@ class _WorldHomePageState extends State<WorldHomePage> {
       _HomeTab(onOpen: _open),
       const _StoresTab(),
       const ConversationsPage(),
+      const MomentsPage(),
       const CartPage(),
       const MyOrdersPage(),
       const _AccountTab(),
@@ -65,6 +67,7 @@ class _MainBottomBar extends StatelessWidget {
       (Icons.home_outlined, Icons.home, 'الرئيسية'),
       (Icons.storefront_outlined, Icons.storefront, 'المتاجر'),
       (Icons.chat_bubble_outline, Icons.chat_bubble, 'المحادثات'),
+      (Icons.auto_awesome_outlined, Icons.auto_awesome, 'اللحظات'),
       (Icons.shopping_cart_outlined, Icons.shopping_cart, 'السلة'),
       (Icons.receipt_long_outlined, Icons.receipt_long, 'طلباتي'),
       (Icons.person_outline, Icons.person, 'حسابي'),
@@ -76,7 +79,7 @@ class _MainBottomBar extends StatelessWidget {
         child: Row(children: List.generate(items.length, (i) {
           final selected = selectedIndex == i;
           final item = items[i];
-          final icon = i == 3
+          final icon = i == 4
               ? _LiveCartBadge(icon: selected ? item.$2 : item.$1, color: selected ? _blue : _navy)
               : Icon(selected ? item.$2 : item.$1, color: selected ? _blue : _navy, size: 24);
           return Expanded(child: InkWell(
@@ -86,7 +89,7 @@ class _MainBottomBar extends StatelessWidget {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 icon,
                 const SizedBox(height: 3),
-                Text(item.$3, style: TextStyle(color: selected ? _blue : _navy, fontSize: 11, fontWeight: selected ? FontWeight.w900 : FontWeight.w600)),
+                Text(item.$3, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: selected ? _blue : _navy, fontSize: 10, fontWeight: selected ? FontWeight.w900 : FontWeight.w600)),
               ]),
             ),
           ));
@@ -445,6 +448,7 @@ class _ServicesEntry extends StatelessWidget {
         (Icons.receipt_long_outlined, 'طلباتي', () => const MyOrdersPage()),
         (Icons.account_balance_wallet_outlined, 'المحفظة', () => const WalletCenterPage()),
         (Icons.auto_awesome, 'ذكاء الفائق', () => const AiAssistantPage()),
+        (Icons.auto_awesome_outlined, 'اللحظات', () => const MomentsPage()),
         (Icons.chat_bubble_outline, 'المحادثات', () => const ConversationsPage()),
         (Icons.widgets_outlined, 'البرامج المصغّرة', () => const MiniProgramsPage()),
         (Icons.grid_view_outlined, 'كل الخدمات', () => const ServicesHubPage()),
@@ -885,6 +889,9 @@ class ServicesHubPage extends StatelessWidget {
           (Icons.support_agent_outlined, 'دعم الفائق', () => const SupportChatPage()),
           (Icons.notifications_none, 'الإشعارات', () => const NotificationsPage()),
         ]),
+        ('المجتمع', [
+          (Icons.auto_awesome_outlined, 'اللحظات', () => const MomentsPage()),
+        ]),
       ];
 
   @override
@@ -1064,6 +1071,7 @@ class _AccountTab extends StatelessWidget {
         ListTile(leading: const Icon(Icons.notifications_none, color: _blue), title: const Text('الإشعارات', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()))),
         ListTile(leading: const Icon(Icons.support_agent_outlined, color: _blue), title: const Text('دعم الفائق', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatPage()))),
         ListTile(leading: const Icon(Icons.auto_awesome, color: _blue), title: const Text('ذكاء الفائق', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()))),
+        ListTile(leading: const Icon(Icons.auto_awesome_outlined, color: _blue), title: const Text('اللحظات', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MomentsPage()))),
         ListTile(leading: const Icon(Icons.grid_view_outlined, color: _blue), title: const Text('كل الخدمات', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServicesHubPage()))),
         const Divider(height: 24),
         FilledButton.icon(onPressed: () => _logout(context), icon: const Icon(Icons.logout), label: const Text('تسجيل الخروج'), style: FilledButton.styleFrom(backgroundColor: _navy)),
