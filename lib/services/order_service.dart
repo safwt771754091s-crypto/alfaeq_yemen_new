@@ -25,10 +25,7 @@ class OrderService {
     double? latitude,
     double? longitude,
   }) async {
-    final normalized = items.map((item) => {
-      'product_id': item['productId'] ?? item['product_id'],
-      'quantity': item['quantity'],
-    }).toList();
+    final normalized = _normalize(items);
     final id = await supabase.rpc('create_order', params: {
       'p_items': normalized,
       'p_address': address,
@@ -38,6 +35,58 @@ class OrderService {
     });
     return id.toString();
   }
+
+  /// Wallet balance for the signed-in user (creates the wallet on first use).
+  Future<num> walletBalance({String currency = 'YER'}) async =>
+      (await walletInfo(currency: currency)).balance;
+
+  /// Wallet balance plus its actual currency. Wallets are keyed by user, so the
+  /// returned currency is authoritative and may differ from the requested one.
+  Future<({num balance, String currency})> walletInfo({String currency = 'YER'}) async {
+    final row = await supabase.rpc('ensure_my_wallet', params: {
+      'p_currency': currency,
+      'p_account_type': 'customer',
+    });
+    if (row is Map) {
+      final balance = row['available_balance'];
+      return (
+        balance: balance is num ? balance : 0,
+        currency: (row['currency'] ?? currency).toString(),
+      );
+    }
+    return (balance: 0, currency: currency);
+  }
+
+  /// Pays for an order from the in-app wallet. The order and the wallet debit
+  /// happen in one server-side transaction, so a failed payment (e.g. an
+  /// insufficient balance) leaves no order behind. [idempotencyKey] makes
+  /// retries safe.
+  Future<String> createPaidOrder({
+    required List<Map<String, dynamic>> items,
+    required String address,
+    required String idempotencyKey,
+    String currency = 'YER',
+    double? latitude,
+    double? longitude,
+  }) async {
+    final normalized = _normalize(items);
+    final id = await supabase.rpc('create_order_paid', params: {
+      'p_items': normalized,
+      'p_address': address,
+      'p_idempotency_key': idempotencyKey,
+      'p_currency': currency,
+      'p_latitude': latitude,
+      'p_longitude': longitude,
+    });
+    return id.toString();
+  }
+
+  List<Map<String, dynamic>> _normalize(List<Map<String, dynamic>> items) => items
+      .map((item) => {
+            'product_id': item['productId'] ?? item['product_id'],
+            'quantity': item['quantity'],
+          })
+      .toList();
 
   Future<void> clearCart(String uid) async {
     await supabase.from('carts').upsert({
