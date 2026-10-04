@@ -34,6 +34,7 @@ class _WorldHomePageState extends State<WorldHomePage> {
     final pages = <Widget>[
       _HomeTab(onOpen: _open),
       const _StoresTab(),
+      const AiAssistantPage(),
       const CartPage(),
       const MyOrdersPage(),
       const _AccountTab(),
@@ -59,6 +60,7 @@ class _MainBottomBar extends StatelessWidget {
     const items = [
       (Icons.home_outlined, Icons.home, 'الرئيسية'),
       (Icons.storefront_outlined, Icons.storefront, 'المتاجر'),
+      (Icons.auto_awesome_outlined, Icons.auto_awesome, 'ذكاء'),
       (Icons.shopping_cart_outlined, Icons.shopping_cart, 'السلة'),
       (Icons.receipt_long_outlined, Icons.receipt_long, 'طلباتي'),
       (Icons.person_outline, Icons.person, 'حسابي'),
@@ -70,7 +72,7 @@ class _MainBottomBar extends StatelessWidget {
         child: Row(children: List.generate(items.length, (i) {
           final selected = selectedIndex == i;
           final item = items[i];
-          final icon = i == 2
+          final icon = i == 3
               ? _LiveCartBadge(icon: selected ? item.$2 : item.$1, color: selected ? _blue : _navy)
               : Icon(selected ? item.$2 : item.$1, color: selected ? _blue : _navy, size: 24);
           return Expanded(child: InkWell(
