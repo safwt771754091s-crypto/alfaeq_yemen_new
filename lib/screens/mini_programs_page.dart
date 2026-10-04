@@ -256,7 +256,7 @@ class _ProgramProductCard extends StatelessWidget {
     final p = product.data;
     final imageUrl = (p['image_url'] ?? '').toString();
     final price = p['price'];
-    final priceText = price is num ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}' : 'عند الطلب';
+    final priceText = (price is num && price > 0) ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}' : 'عند الطلب';
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
