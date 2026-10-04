@@ -27,6 +27,10 @@ class UnslothAiService{
         return 'انتهت الجلسة أو غير مصرح. سجّل الدخول مرة أخرى ثم أعد المحاولة.';
       case 'ai_provider_unreachable':
         return 'تعذر الوصول إلى مزود الذكاء من الخادم. تحقق من AI_BASE_URL واتصال الشبكة.';
+      case 'ai_provider_rate_limited':
+        return 'مزود الذكاء المجاني مشغول الآن (تجاوز حد الطلبات). أعد المحاولة بعد قليل.';
+      case 'ai_provider_unavailable':
+        return 'مزود الذكاء غير متاح مؤقتاً بسبب الضغط. أعد المحاولة بعد قليل.';
       default:
         return raw.isNotEmpty ? raw : 'فشل طلب بوابة الذكاء.';
     }

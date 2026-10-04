@@ -108,24 +108,65 @@ Deno.serve(async (req) => {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (aiApiKey) headers.Authorization = `Bearer ${aiApiKey}`;
 
-  try {
-    const upstream = await fetch(chatCompletionsUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-    });
-
-    return new Response(await upstream.text(), {
-      status: upstream.status,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": upstream.headers.get("Content-Type") ?? "application/json",
-      },
-    });
-  } catch {
-    return json({ error: "ai_provider_unreachable" }, 502);
-  }
+  const result = await callUpstream(payload, headers);
+  return new Response(result.body, {
+    status: result.status,
+    headers: { ...corsHeaders, "Content-Type": result.contentType },
+  });
 });
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Free/community providers (e.g. the Gemini free tier) frequently answer 429
+// or 503 under load. Retry a few times with backoff before surfacing an error.
+async function callUpstream(payload: unknown, headers: Record<string, string>) {
+  const attempts = 3;
+  let lastStatus = 502;
+  let lastBody = JSON.stringify({ error: "ai_provider_unreachable" });
+  let lastContentType = "application/json";
+
+  for (let i = 0; i < attempts; i++) {
+    let upstream: Response;
+    try {
+      upstream = await fetch(chatCompletionsUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      lastStatus = 502;
+      lastBody = JSON.stringify({ error: "ai_provider_unreachable" });
+      lastContentType = "application/json";
+      if (i < attempts - 1) await delay(400 * (i + 1));
+      continue;
+    }
+
+    const text = await upstream.text();
+    const contentType = upstream.headers.get("Content-Type") ?? "application/json";
+    const transient = upstream.status === 429 || upstream.status === 502 ||
+      upstream.status === 503 || upstream.status === 504;
+
+    if (!transient) return { status: upstream.status, body: text, contentType };
+
+    lastStatus = upstream.status;
+    lastBody = text;
+    lastContentType = contentType;
+    if (i < attempts - 1) await delay(500 * Math.pow(2, i));
+  }
+
+  const code = lastStatus === 429 ? "ai_provider_rate_limited" : "ai_provider_unavailable";
+  let detail: unknown;
+  try {
+    detail = JSON.parse(lastBody);
+  } catch {
+    detail = lastBody.slice(0, 500);
+  }
+  return {
+    status: lastStatus === 429 ? 429 : 503,
+    body: JSON.stringify({ error: code, upstream_status: lastStatus, detail }),
+    contentType: "application/json",
+  };
+}
 
 function json(data: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(data), {
