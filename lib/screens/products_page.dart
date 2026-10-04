@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
 import '../services/catalog_service.dart';
+import '../services/review_service.dart';
 import '../services/supabase_service.dart';
 import 'cart_page.dart';
 import 'mini_programs_page.dart';
+import 'product_detail_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
 const _navy = Color(0xFF0A2540);
@@ -26,6 +28,15 @@ class _ProductsPageState extends State<ProductsPage> {
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  Future<({List<CatalogDocument> products, Map<String, ({double average, int count})> ratings})> _loadCatalog() async {
+    final products = await const CatalogService().activeProducts(limit: 500);
+    Map<String, ({double average, int count})> ratings = const {};
+    try {
+      ratings = await const ReviewService().summary(products.map((p) => p.id).toList());
+    } catch (_) {/* rating badges are best-effort */}
+    return (products: products, ratings: ratings);
   }
 
   Future<void> _addToCart(CatalogDocument product) async {
@@ -92,14 +103,15 @@ class _ProductsPageState extends State<ProductsPage> {
                 ),
               ),
               const SizedBox(height: 18),
-              FutureBuilder<List<CatalogDocument>>(
-                future: const CatalogService().activeProducts(limit: 500),
+              FutureBuilder<({List<CatalogDocument> products, Map<String, ({double average, int count})> ratings})>(
+                future: _loadCatalog(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()));
                   }
                   if (snapshot.hasError) return const Text('تعذر تحميل المنتجات.');
-                  var products = snapshot.data ?? const <CatalogDocument>[];
+                  var products = snapshot.data?.products ?? const <CatalogDocument>[];
+                  final ratings = snapshot.data?.ratings ?? const <String, ({double average, int count})>{};
                   if (_sectionId != 'all') {
                     products = products.where((p) => (p.data['section_id'] ?? '').toString() == _sectionId).toList();
                   }
@@ -114,7 +126,12 @@ class _ProductsPageState extends State<ProductsPage> {
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: products.length,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .78),
-                    itemBuilder: (context, i) => _ProductCard(product: products[i], onAdd: () => _addToCart(products[i])),
+                    itemBuilder: (context, i) => _ProductCard(
+                      product: products[i],
+                      rating: ratings[products[i].id],
+                      onOpen: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: products[i]))),
+                      onAdd: () => _addToCart(products[i]),
+                    ),
                   );
                 },
               ),
@@ -127,7 +144,9 @@ class _ProductsPageState extends State<ProductsPage> {
 class _ProductCard extends StatelessWidget {
   final CatalogDocument product;
   final VoidCallback onAdd;
-  const _ProductCard({required this.product, required this.onAdd});
+  final VoidCallback onOpen;
+  final ({double average, int count})? rating;
+  const _ProductCard({required this.product, required this.onAdd, required this.onOpen, this.rating});
 
   @override
   Widget build(BuildContext context) {
@@ -137,40 +156,50 @@ class _ProductCard extends StatelessWidget {
     final priceText = (price is num && price > 0) ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}' : 'عند الطلب';
     return Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE3E8EF))),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: imageUrl.isEmpty
-                  ? Container(color: const Color(0xFFF1F6FF), child: const Icon(Icons.inventory_2_outlined, color: _blue, size: 34))
-                  : Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF1F6FF), child: const Icon(Icons.broken_image_outlined))),
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: imageUrl.isEmpty
+                    ? Container(color: const Color(0xFFF1F6FF), child: const Icon(Icons.inventory_2_outlined, color: _blue, size: 34))
+                    : Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF1F6FF), child: const Icon(Icons.broken_image_outlined))),
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(9),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(p['name']?.toString() ?? 'منتج', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontWeight: FontWeight.w800, fontSize: 13)),
-                const SizedBox(height: 3),
-                Text(priceText, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
-                const SizedBox(height: 5),
-                SizedBox(
-                  width: double.infinity,
-                  height: 30,
-                  child: FilledButton.icon(
-                    onPressed: onAdd,
-                    icon: const Icon(Icons.add_shopping_cart, size: 15),
-                    label: const Text('أضف', style: TextStyle(fontSize: 12)),
-                    style: FilledButton.styleFrom(padding: EdgeInsets.zero),
+            Padding(
+              padding: const EdgeInsets.all(9),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(p['name']?.toString() ?? 'منتج', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontWeight: FontWeight.w800, fontSize: 13)),
+                  const SizedBox(height: 3),
+                  if (rating != null && rating!.count > 0)
+                    Row(children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 13),
+                      const SizedBox(width: 2),
+                      Text('${rating!.average.toStringAsFixed(1)} (${rating!.count})', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.black54)),
+                    ]),
+                  Text(priceText, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+                  const SizedBox(height: 5),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 30,
+                    child: FilledButton.icon(
+                      onPressed: onAdd,
+                      icon: const Icon(Icons.add_shopping_cart, size: 15),
+                      label: const Text('أضف', style: TextStyle(fontSize: 12)),
+                      style: FilledButton.styleFrom(padding: EdgeInsets.zero),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
