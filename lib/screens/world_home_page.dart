@@ -434,22 +434,55 @@ class _ServicesEntry extends StatelessWidget {
   final void Function(BuildContext, Widget) onOpen;
   const _ServicesEntry({required this.onOpen});
 
+  // WeChat-style quick-services grid on the home screen.
+  List<(IconData, String, Widget Function())> get _items => [
+        (Icons.search, 'البحث', () => const _StoresTab()),
+        (Icons.shopping_cart_outlined, 'السلة', () => const CartPage()),
+        (Icons.receipt_long_outlined, 'طلباتي', () => const MyOrdersPage()),
+        (Icons.account_balance_wallet_outlined, 'المحفظة', () => const WalletCenterPage()),
+        (Icons.auto_awesome, 'ذكاء الفائق', () => const AiAssistantPage()),
+        (Icons.support_agent_outlined, 'الدعم', () => const SupportChatPage()),
+        (Icons.notifications_none, 'الإشعارات', () => const NotificationsPage()),
+        (Icons.grid_view_outlined, 'كل الخدمات', () => const ServicesHubPage()),
+      ];
+
   @override
   Widget build(BuildContext context) => Card(
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: Color(0xFFE3E8EF))),
-        child: ListTile(
-          onTap: () => onOpen(context, const ServicesHubPage()),
-          leading: Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(color: const Color(0xFFF1F6FF), borderRadius: BorderRadius.circular(14)),
-            child: const Icon(Icons.grid_view_outlined, color: _blue),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 14, 10, 8),
+          child: Column(
+            children: [
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _items.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, crossAxisSpacing: 4, mainAxisSpacing: 14, childAspectRatio: .82),
+                itemBuilder: (context, i) {
+                  final tile = _items[i];
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => onOpen(context, tile.$3()),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(color: const Color(0xFFF1F6FF), borderRadius: BorderRadius.circular(16)),
+                          child: Icon(tile.$1, color: _blue, size: 26),
+                        ),
+                        const SizedBox(height: 7),
+                        Text(tile.$2, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontSize: 11.5, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
-          title: const Text('كل خدمات الفائق', style: TextStyle(fontWeight: FontWeight.w900)),
-          subtitle: const Text('السلة • الطلبات • المحفظة • الدعم • الذكاء'),
-          trailing: const Icon(Icons.chevron_left),
         ),
       );
 }
@@ -827,6 +860,26 @@ class _StoreCard extends StatelessWidget {
 }
 class ServicesHubPage extends StatelessWidget {
   const ServicesHubPage({super.key});
+
+  // WeChat-style "discover" hub: one grid grouping every super-app service.
+  List<(String, List<(IconData, String, Widget Function())>)> _groups() => [
+        ('الطلب والشراء', [
+          (Icons.search, 'البحث', () => const _StoresTab()),
+          (Icons.shopping_cart_outlined, 'السلة', () => const CartPage()),
+          (Icons.local_offer_outlined, 'العروض', () => const _OffersPage()),
+          (Icons.storefront_outlined, 'المتاجر', () => const _StoresTab()),
+        ]),
+        ('طلباتي والمال', [
+          (Icons.receipt_long_outlined, 'طلباتي', () => const MyOrdersPage()),
+          (Icons.account_balance_wallet_outlined, 'المحفظة', () => const WalletCenterPage()),
+        ]),
+        ('الخدمات الذكية', [
+          (Icons.auto_awesome, 'ذكاء الفائق', () => const AiAssistantPage()),
+          (Icons.support_agent_outlined, 'دعم الفائق', () => const SupportChatPage()),
+          (Icons.notifications_none, 'الإشعارات', () => const NotificationsPage()),
+        ]),
+      ];
+
   @override
   Widget build(BuildContext context) => Directionality(
         textDirection: TextDirection.rtl,
@@ -835,37 +888,52 @@ class ServicesHubPage extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              const Text('الخدمات', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 8),
-              const Text('الوصول السريع إلى خدمات الفائق يمن.', style: TextStyle(color: Colors.black54)),
+              const Text('كل الخدمات', style: TextStyle(color: _navy, fontSize: 26, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              const Text('منصة الفائق يمن: تسوّق، اطلب، تابع، وادفع من مكان واحد.', style: TextStyle(color: Colors.black54)),
               const SizedBox(height: 18),
-              _ServiceTile(icon: Icons.shopping_cart_outlined, title: 'السلة', subtitle: 'مراجعة الأصناف قبل الطلب', page: const CartPage()),
-              _ServiceTile(icon: Icons.local_shipping_outlined, title: 'طلباتي', subtitle: 'متابعة الطلبات والتوصيل', page: const MyOrdersPage()),
-              _ServiceTile(icon: Icons.account_balance_wallet_outlined, title: 'المحافظ', subtitle: 'مركز المحافظ والخدمات المالية', page: const WalletCenterPage()),
-              _ServiceTile(icon: Icons.notifications_none, title: 'الإشعارات', subtitle: 'آخر تحديثات حسابك', page: const NotificationsPage()),
-              _ServiceTile(icon: Icons.support_agent_outlined, title: 'دعم الفائق', subtitle: 'محادثة مباشرة مع فريق الدعم', page: const SupportChatPage()),
-              _ServiceTile(icon: Icons.auto_awesome, title: 'ذكاء الفائق', subtitle: 'اطلب من الذكاء تنفيذ خدماتك', page: const AiAssistantPage()),
+              for (final group in _groups()) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10, right: 4),
+                  child: Text(group.$1, style: const TextStyle(color: _navy, fontSize: 17, fontWeight: FontWeight.w900)),
+                ),
+                Card(
+                  elevation: 0,
+                  margin: const EdgeInsets.only(bottom: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: Color(0xFFE3E8EF))),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: group.$2.length,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, crossAxisSpacing: 4, mainAxisSpacing: 14, childAspectRatio: .82),
+                      itemBuilder: (context, i) {
+                        final tile = group.$2[i];
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => tile.$3())),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(color: const Color(0xFFF1F6FF), borderRadius: BorderRadius.circular(16)),
+                                child: Icon(tile.$1, color: _blue, size: 26),
+                              ),
+                              const SizedBox(height: 7),
+                              Text(tile.$2, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontSize: 12, fontWeight: FontWeight.w800)),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
-        ),
-      );
-}
-
-class _ServiceTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Widget page;
-  const _ServiceTile({required this.icon, required this.title, required this.subtitle, required this.page});
-  @override
-  Widget build(BuildContext context) => Card(
-        elevation: 0,
-        child: ListTile(
-          leading: CircleAvatar(backgroundColor: const Color(0xFFF1F6FF), child: Icon(icon, color: _blue)),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
-          subtitle: Text(subtitle),
-          trailing: const Icon(Icons.chevron_left),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page)),
         ),
       );
 }
