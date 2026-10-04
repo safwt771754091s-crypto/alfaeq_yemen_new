@@ -877,6 +877,7 @@ class ServicesHubPage extends StatelessWidget {
         ('طلباتي والمال', [
           (Icons.receipt_long_outlined, 'طلباتي', () => const MyOrdersPage()),
           (Icons.account_balance_wallet_outlined, 'المحفظة', () => const WalletCenterPage()),
+          (Icons.qr_code_2, 'الدفع والاستلام', () => const WalletQrPage()),
         ]),
         ('الخدمات الذكية', [
           (Icons.chat_bubble_outline, 'المحادثات', () => const ConversationsPage()),
@@ -987,7 +988,7 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
                 OutlinedButton.icon(
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletQrPage())),
                   icon: const Icon(Icons.qr_code_2),
-                  label: const Text('رمز الدفع والاستلام'),
+                  label: const Text('الدفع والاستلام (QR)'),
                 ),
                 const SizedBox(height: 14),
                 if (walletMissing)
