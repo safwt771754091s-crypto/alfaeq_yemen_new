@@ -31,6 +31,8 @@ class UnslothAiService{
         return 'مزود الذكاء المجاني مشغول الآن (تجاوز حد الطلبات). أعد المحاولة بعد قليل.';
       case 'ai_provider_unavailable':
         return 'مزود الذكاء غير متاح مؤقتاً بسبب الضغط. أعد المحاولة بعد قليل.';
+      case 'ai_provider_auth_failed':
+        return 'مفتاح مزود الذكاء مرفوض من الخادم (خطأ مصادقة 401). تحقق من صلاحية AI_API_KEY: مفاتيح Google الجديدة ببادئة AQ. قد تُرفض حتى بعد التفعيل؛ أنشئ مفتاحاً جديداً من Google AI Studio أو استخدم مزوداً متوافقاً آخر ثم حدّث الأسرار وأعد نشر ai-gateway.';
       default:
         return raw.isNotEmpty ? raw : 'فشل طلب بوابة الذكاء.';
     }
