@@ -39,8 +39,23 @@ class ReviewService {
     };
   }
 
+  /// Store-level rating summary + latest reviews.
+  Future<({double average, int count, List<Map<String, dynamic>> items})> storeReviews(
+    String storeId, {
+    int limit = 50,
+  }) async {
+    final data = await _db.rpc('store_reviews', params: {'p_store_id': storeId, 'p_limit': limit});
+    final map = data is Map ? Map<String, dynamic>.from(data) : const <String, dynamic>{};
+    final items = (map['items'] as List?)?.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() ?? const [];
+    return (
+      average: (map['average'] as num?)?.toDouble() ?? 0,
+      count: (map['count'] as num?)?.toInt() ?? 0,
+      items: items,
+    );
+  }
+
   Future<void> submit({
-    required String productId,
+    String? productId,
     required int rating,
     String body = '',
     String? storeId,
@@ -48,6 +63,7 @@ class ReviewService {
     final uid = currentUserId;
     if (uid == null) throw StateError('يجب تسجيل الدخول لإضافة تقييم.');
     if (rating < 1 || rating > 5) throw StateError('التقييم يجب أن يكون بين 1 و5 نجوم.');
+    if (productId == null && storeId == null) throw StateError('لا يوجد هدف للتقييم.');
     try {
       await _db.from('reviews').insert({
         'user_id': uid,
@@ -57,7 +73,7 @@ class ReviewService {
         'body': body.trim(),
       });
     } on PostgrestException catch (e) {
-      if (e.code == '23505') throw StateError('لقد قيّمت هذا المنتج مسبقاً.');
+      if (e.code == '23505') throw StateError('لقد قيّمت هذا مسبقاً.');
       rethrow;
     }
   }

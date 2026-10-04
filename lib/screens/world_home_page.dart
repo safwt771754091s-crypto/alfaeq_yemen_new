@@ -16,6 +16,7 @@ import 'mini_programs_page.dart';
 import 'moments_page.dart';
 import 'products_page.dart';
 import 'product_detail_page.dart';
+import 'store_detail_page.dart';
 import 'search_page.dart';
 import 'support_chat_page.dart';
 import 'wallet_qr_page.dart';
@@ -836,6 +837,17 @@ class _StoreCard extends StatelessWidget {
         title: Text(data['name']?.toString() ?? 'متجر', style: const TextStyle(fontWeight: FontWeight.w900)),
         subtitle: Text(data['address']?.toString() ?? 'عنوان غير محدد'),
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreDetailPage(store: store))),
+                icon: const Icon(Icons.storefront_outlined, size: 18),
+                label: const Text('صفحة المتجر والتقييمات'),
+              ),
+            ),
+          ),
           Container(height: 1, color: const Color(0xFFE8ECEA)),
           FutureBuilder<List<CatalogDocument>>(
             future: CatalogService().activeProducts(storeId: store.id, limit: 5000),
