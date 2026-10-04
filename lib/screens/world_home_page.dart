@@ -15,6 +15,7 @@ import 'conversations_page.dart';
 import 'mini_programs_page.dart';
 import 'moments_page.dart';
 import 'products_page.dart';
+import 'search_page.dart';
 import 'support_chat_page.dart';
 import 'wallet_qr_page.dart';
 
@@ -312,6 +313,8 @@ class _SearchBar extends StatelessWidget {
   const _SearchBar();
   @override
   Widget build(BuildContext context) => TextField(
+        readOnly: true,
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchPage())),
         decoration: InputDecoration(
           hintText: 'ابحث عن منتجات أو خدمات...',
           prefixIcon: const Icon(Icons.search, color: _navy),
@@ -443,7 +446,8 @@ class _ServicesEntry extends StatelessWidget {
 
   // WeChat-style quick-services grid on the home screen.
   List<(IconData, String, Widget Function())> get _items => [
-        (Icons.search, 'المنتجات', () => const ProductsPage()),
+        (Icons.search, 'البحث', () => const SearchPage()),
+        (Icons.storefront_outlined, 'المنتجات', () => const ProductsPage()),
         (Icons.shopping_cart_outlined, 'السلة', () => const CartPage()),
         (Icons.receipt_long_outlined, 'طلباتي', () => const MyOrdersPage()),
         (Icons.account_balance_wallet_outlined, 'المحفظة', () => const WalletCenterPage()),
@@ -872,7 +876,8 @@ class ServicesHubPage extends StatelessWidget {
   // WeChat-style "discover" hub: one grid grouping every super-app service.
   List<(String, List<(IconData, String, Widget Function())>)> _groups() => [
         ('الطلب والشراء', [
-          (Icons.search, 'المنتجات', () => const ProductsPage()),
+          (Icons.search, 'البحث الموحّد', () => const SearchPage()),
+          (Icons.storefront_outlined, 'المنتجات', () => const ProductsPage()),
           (Icons.shopping_cart_outlined, 'السلة', () => const CartPage()),
           (Icons.local_offer_outlined, 'العروض', () => const _OffersPage()),
           (Icons.storefront_outlined, 'المتاجر', () => const _StoresTab()),
