@@ -13,6 +13,7 @@ import 'notifications_page.dart';
 import 'ai_assistant_page.dart';
 import 'conversations_page.dart';
 import 'support_chat_page.dart';
+import 'wallet_qr_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
 const _yellow = Color(0xFFFFC107);
@@ -978,6 +979,12 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
                   const SizedBox(height: 8),
                   Text(data['status'] == 'active' ? 'المحفظة نشطة' : 'حالة المحفظة: ' + (data['status']?.toString() ?? 'غير معروفة'), style: const TextStyle(color: Colors.white70)),
                 ])),
+                ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletQrPage())),
+                  icon: const Icon(Icons.qr_code_2),
+                  label: const Text('رمز الدفع والاستلام'),
                 ),
                 const SizedBox(height: 14),
                 if (walletMissing)
