@@ -190,6 +190,8 @@ class _HomeTabState extends State<_HomeTab> {
               _CategoriesSection(onOpen: widget.onOpen),
               const SizedBox(height: 18),
               _AiAssistantEntry(onOpen: widget.onOpen),
+              const SizedBox(height: 10),
+              _ServicesEntry(onOpen: widget.onOpen),
               const SizedBox(height: 22),
               _OffersSection(onAddToCart: (product) => _addProductToCart(context, product)),
               const SizedBox(height: 20),
@@ -425,6 +427,30 @@ class _AiAssistantEntry extends StatelessWidget {
       );
 }
 
+
+class _ServicesEntry extends StatelessWidget {
+  final void Function(BuildContext, Widget) onOpen;
+  const _ServicesEntry({required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) => Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: Color(0xFFE3E8EF))),
+        child: ListTile(
+          onTap: () => onOpen(context, const ServicesHubPage()),
+          leading: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(color: const Color(0xFFF1F6FF), borderRadius: BorderRadius.circular(14)),
+            child: const Icon(Icons.grid_view_outlined, color: _blue),
+          ),
+          title: const Text('كل خدمات الفائق', style: TextStyle(fontWeight: FontWeight.w900)),
+          subtitle: const Text('السلة • الطلبات • المحفظة • الدعم • الذكاء'),
+          trailing: const Icon(Icons.chevron_left),
+        ),
+      );
+}
 
 class _CategoriesSection extends StatelessWidget {
   final void Function(BuildContext, Widget) onOpen;
