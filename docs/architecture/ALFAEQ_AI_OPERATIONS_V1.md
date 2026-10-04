@@ -79,9 +79,20 @@ SUPABASE_ACCESS_TOKEN=sbp_... PROJECT_REF=<ref> tools/deploy-ai.sh
 تُقرأ أسرار المزوّد من `.env.ai` (مُستثنى من Git) أو من متغيّرات البيئة.
 
 ### قائمة الإجراءات على الخادم (خارج نطاق الكود)
-1. ضبط `AI_BASE_URL` و`AI_API_KEY` و`AI_MODEL` ثم إعادة نشر `ai-gateway`.
-2. تصحيح `OPENHANDS_CLOUD_API_KEY` (أو إزالته) ثم إعادة نشر `developer-control`.
-3. تغذية المخزون والأسعار الحقيقية للمنتجات عبر مسار المخزون المعتمد.
+1. ضبط `AI_BASE_URL` و`AI_API_KEY` و`AI_MODEL` ثم إعادة نشر `ai-gateway`. ✅ **تم**
+2. تصحيح `OPENHANDS_CLOUD_API_KEY` (أو إزالته) ثم إعادة نشر `developer-control`. ✅ **تم** (بضبط `OPENHANDS_API_KEY` الصالح)
+3. تغذية المخزون والأسعار الحقيقية للمنتجات عبر مسار المخزون المعتمد. ⚠️ **مؤقت**: ضُبط `stock = 100` لكل المنتجات النشطة لإلغاء حجب السلة؛ يجب استبداله بمخزون فعلي.
+
+### نتيجة التنفيذ الحي (2026-10-04)
+- نُشرت الدوال الأربع بنجاح: `ai-gateway`، `developer-control`، `ai-event-worker`، `sheets-catalog-sync`.
+- ضُبطت الأسرار: `AI_BASE_URL` = `https://generativelanguage.googleapis.com/v1beta/openai`، `AI_MODEL` = `gemini-flash-lite-latest`، `AI_API_KEY`، `OPENHANDS_API_KEY` (وأسماء `UNSLOTH_*` للتوافق).
+- **اختبار حي ناجح**:
+  - محادثة عادية: رد عربي `مرحباً` (HTTP 200).
+  - استدعاء أداة قراءة: `search_catalog(query="أرز")` ثم إرجاع 8 منتجات حقيقية ورد عربي مُفصّل.
+  - استدعاء أداة تغيير: `add_to_cart(productId, quantity)` بتأكيد المستخدم.
+  - `developer-control` يستجيب `ok: true` بدون خطأ 401.
+- ملاحظة: النموذج الافتراضي هو `gemini-flash-lite-latest` لأن `gemini-2.5-flash` و`gemini-2.0-flash` غير متاحين للمفاتيح الجديدة، و`gemini-flash-latest` مضغوط في الطبقة المجانية.
+- ⚠️ إجراء أمني مطلوب من المالك: حذف (Revoke) رمز Supabase ومفاتيح المزوّد التي ظهرت أثناء الإعداد، وإصدار بدائل.
 
 ### عدم تطابق الدوال بين المستودع والإنتاج (يحتاج معالجة)
 فُحصت كل الدوال المشار إليها من التطبيق على الإنتاج:
