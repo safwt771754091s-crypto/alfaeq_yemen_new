@@ -12,6 +12,8 @@ import 'my_orders_page.dart';
 import 'notifications_page.dart';
 import 'ai_assistant_page.dart';
 import 'conversations_page.dart';
+import 'mini_programs_page.dart';
+import 'products_page.dart';
 import 'support_chat_page.dart';
 import 'wallet_qr_page.dart';
 
@@ -438,13 +440,13 @@ class _ServicesEntry extends StatelessWidget {
 
   // WeChat-style quick-services grid on the home screen.
   List<(IconData, String, Widget Function())> get _items => [
-        (Icons.search, 'البحث', () => const _StoresTab()),
+        (Icons.search, 'المنتجات', () => const ProductsPage()),
         (Icons.shopping_cart_outlined, 'السلة', () => const CartPage()),
         (Icons.receipt_long_outlined, 'طلباتي', () => const MyOrdersPage()),
         (Icons.account_balance_wallet_outlined, 'المحفظة', () => const WalletCenterPage()),
         (Icons.auto_awesome, 'ذكاء الفائق', () => const AiAssistantPage()),
         (Icons.chat_bubble_outline, 'المحادثات', () => const ConversationsPage()),
-        (Icons.support_agent_outlined, 'الدعم', () => const SupportChatPage()),
+        (Icons.widgets_outlined, 'البرامج المصغّرة', () => const MiniProgramsPage()),
         (Icons.grid_view_outlined, 'كل الخدمات', () => const ServicesHubPage()),
       ];
 
@@ -866,10 +868,11 @@ class ServicesHubPage extends StatelessWidget {
   // WeChat-style "discover" hub: one grid grouping every super-app service.
   List<(String, List<(IconData, String, Widget Function())>)> _groups() => [
         ('الطلب والشراء', [
-          (Icons.search, 'البحث', () => const _StoresTab()),
+          (Icons.search, 'المنتجات', () => const ProductsPage()),
           (Icons.shopping_cart_outlined, 'السلة', () => const CartPage()),
           (Icons.local_offer_outlined, 'العروض', () => const _OffersPage()),
           (Icons.storefront_outlined, 'المتاجر', () => const _StoresTab()),
+          (Icons.widgets_outlined, 'البرامج المصغّرة', () => const MiniProgramsPage()),
         ]),
         ('طلباتي والمال', [
           (Icons.receipt_long_outlined, 'طلباتي', () => const MyOrdersPage()),
