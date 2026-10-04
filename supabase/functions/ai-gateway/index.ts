@@ -146,7 +146,18 @@ async function callUpstream(payload: unknown, headers: Record<string, string>) {
     const transient = upstream.status === 429 || upstream.status === 502 ||
       upstream.status === 503 || upstream.status === 504;
 
-    if (!transient) return { status: upstream.status, body: text, contentType };
+    if (!transient) {
+      // Surface provider auth failures as a stable, client-friendly code so the
+      // app can show Arabic guidance instead of the raw upstream error body.
+      if (upstream.status === 401 || upstream.status === 403) {
+        return {
+          status: 502,
+          body: JSON.stringify({ error: "ai_provider_auth_failed", upstream_status: upstream.status }),
+          contentType: "application/json",
+        };
+      }
+      return { status: upstream.status, body: text, contentType };
+    }
 
     lastStatus = upstream.status;
     lastBody = text;
