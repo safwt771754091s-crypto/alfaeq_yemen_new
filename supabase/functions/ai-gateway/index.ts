@@ -9,16 +9,25 @@ const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const aiBaseUrl = (
   Deno.env.get("AI_BASE_URL") ??
   Deno.env.get("UNSLOTH_BASE_URL") ??
+  Deno.env.get("OPENAI_BASE_URL") ??
   ""
 ).replace(/\/$/, "");
 const aiApiKey =
   Deno.env.get("AI_API_KEY") ??
   Deno.env.get("UNSLOTH_API_KEY") ??
+  Deno.env.get("OPENAI_API_KEY") ??
   "";
 const defaultModel =
   Deno.env.get("AI_MODEL") ??
   Deno.env.get("UNSLOTH_MODEL") ??
+  Deno.env.get("OPENAI_MODEL") ??
   "";
+
+// Accept both `https://host` and `https://host/v1` so the OpenAI-compatible
+// endpoint is never requested as `/v1/v1/chat/completions`.
+const chatCompletionsUrl = aiBaseUrl.endsWith("/v1")
+  ? `${aiBaseUrl}/chat/completions`
+  : `${aiBaseUrl}/v1/chat/completions`;
 
 const MAX_MESSAGES = 80;
 const MAX_MESSAGE_CHARS = 120_000;
@@ -33,8 +42,13 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-  if (!supabaseUrl || !serviceRoleKey || !aiBaseUrl || !defaultModel) {
-    return json({ error: "ai_gateway_not_configured" }, 503);
+  if (!supabaseUrl || !serviceRoleKey) {
+    return json({ error: "server_configuration_missing" }, 503);
+  }
+  if (!aiBaseUrl || !defaultModel) {
+    // The AI provider must be configured with server-side secrets:
+    // AI_BASE_URL, AI_MODEL and AI_API_KEY.
+    return json({ error: "ai_provider_not_configured" }, 503);
   }
 
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -95,7 +109,7 @@ Deno.serve(async (req) => {
   if (aiApiKey) headers.Authorization = `Bearer ${aiApiKey}`;
 
   try {
-    const upstream = await fetch(`${aiBaseUrl}/v1/chat/completions`, {
+    const upstream = await fetch(chatCompletionsUrl, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),

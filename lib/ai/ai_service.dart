@@ -19,11 +19,23 @@ class AlfaeqAiService {
   String get pendingActionDescription=>_pending==null?'':'العملية: '+_pending!.name+'\nالبيانات: '+jsonEncode(_pending!.args);
   void resetConversation(){_messages..clear()..add({'role':'system','content':AlfaeqPromptLibrary.baseSystem});_pending=null;}
   Future<void> _audit({required String action,required String result,Map<String,dynamic>? details}) async {final u=_client.auth.currentUser;if(u==null)return;try{await _client.from('ai_tool_audit_logs').insert({'actor_uid':u.id,'tool_name':action.replaceFirst('ai_tool_',''),'result':result,'confirmed':details?['confirmed']==true,'details':details??{}});}catch(_){}}
-  Future<Map<String,Object?>> _execute(String name,Map<String,Object?> args,{bool confirmed=false}) async {final d=await _permissions.authorize(name,userConfirmed:confirmed);if(!d.allowed)return {'ok':false,'error':d.message,'permission':d.requiresConfirmation?'confirmation_required':'denied'};return _tools.execute(name,args,audit:_audit,userConfirmed:confirmed);}
+  Future<Map<String,Object?>> _execute(String name,Map<String,Object?> args,{bool confirmed=false}) async {
+    final d=await _permissions.authorize(name,userConfirmed:confirmed);
+    if(!d.allowed){
+      final denied=d.requiresConfirmation?'confirmation_required':'denied';
+      await _audit(action:'ai_tool_$name',result:denied,details:{'confirmed':confirmed});
+      return {'ok':false,'error':d.message,'permission':denied};
+    }
+    final result=await _tools.execute(name,args,audit:_audit,userConfirmed:confirmed);
+    if(result['ok']==true)await _audit(action:'ai_tool_$name',result:'success',details:{'confirmed':confirmed});
+    return result;
+  }
   Future<String> _run() async {for(var round=0;round<6;round++){final data=await _ai.chatCompletion(messages:List<Map<String,dynamic>>.from(_messages),tools:_schemas,maxTokens:1400);final assistant=_ai.extractAssistantMessage(data);final calls=_ai.extractToolCalls(data);_messages.add(assistant);if(calls.isEmpty){final text=_ai.extractContent(data);return text.isEmpty?'لم يصل رد نصي من خدمة الذكاء.':text;}for(final call in calls){final fn=call['function'];if(fn is! Map)continue;final name=(fn['name']??'').toString();Map<String,dynamic> args={};try{final raw=fn['arguments'];final decoded=raw is String?jsonDecode(raw):raw;if(decoded is Map)args=Map<String,dynamic>.from(decoded);}catch(_){}final result=await _execute(name,Map<String,Object?>.from(args));if(result['permission']=='confirmation_required'){_pending=_PendingAiAction(name:name,args:Map<String,Object?>.from(args),id:(call['id']??'').toString());return 'هذه العملية تحتاج تأكيدك. راجع التفاصيل ثم اضغط «تأكيد التنفيذ».';}_messages.add({'role':'tool','tool_call_id':call['id']??'','name':name,'content':jsonEncode(result)});}}return 'توقفت العملية بعد الحد الآمن للاستدعاءات.';}
-  Future<String> sendMessage(String text) async {final t=text.trim();if(t.isEmpty)return '';_messages.add({'role':'user','content':t});try{return await _run();}catch(e){return 'تعذر الاتصال بخدمة ذكاء الفائق يمن حالياً. '+e.toString();}}
+  Future<String> sendMessage(String text) async {final t=text.trim();if(t.isEmpty)return '';if(_pending!=null)cancelPendingAction();_messages.add({'role':'user','content':t});try{return await _run();}catch(e){return 'تعذر الاتصال بخدمة ذكاء الفائق يمن حالياً. '+e.toString();}}
   Future<String> confirmPendingAction() async {final p=_pending;if(p==null)return 'لا توجد عملية معلقة.';_pending=null;final result=await _execute(p.name,p.args,confirmed:true);_messages.add({'role':'tool','tool_call_id':p.id,'name':p.name,'content':jsonEncode(result)});try{return await _run();}catch(_){return result['message']?.toString()??'تم التنفيذ لكن تعذر الحصول على الرد النهائي.';}}
-  void cancelPendingAction()=>_pending=null;
+  // A pending tool call must always receive a matching tool result, otherwise the
+  // next request carries a dangling tool_call and the provider rejects the history.
+  void cancelPendingAction(){final p=_pending;_pending=null;if(p!=null){_messages.add({'role':'tool','tool_call_id':p.id,'name':p.name,'content':jsonEncode({'ok':false,'error':'cancelled_by_user'})});}}
   List<Map<String,dynamic>> get _schemas=>[
     _tool('search_catalog','البحث الحقيقي في المنتجات والمتاجر.',{'query':{'type':'string'},'type':{'type':'string','enum':['products','stores','both']}},['query']),
     _tool('get_my_orders','قراءة طلبات المستخدم الحالية.',{'status':{'type':'string','enum':['all','pending','confirmed','preparing','shipped','delivered','cancelled']}}),

@@ -72,8 +72,6 @@ class _MerchantInvitePageState extends State<MerchantInvitePage> {
     } on PostgrestException catch (e) {
       setState(() => _message = e.message.isNotEmpty ? e.message : 'تعذر تفعيل رابط التاجر.');
     } catch (e) {
-      setState(() => _message = 'تعذر تسجيل الدخول عبر Google: $e');
-    } catch (e) {
       setState(() => _message = 'تعذر إكمال الدخول: $e');
     } finally {
       if (mounted) setState(() => _busy = false);

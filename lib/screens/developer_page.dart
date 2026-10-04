@@ -30,14 +30,14 @@ class _DeveloperPageState extends State<DeveloperPage>{
       final rows=await SupabaseService.client.from('users').select().eq('uid',u.id).limit(1);
       final data=rows.isEmpty?<String,dynamic>{}:Map<String,dynamic>.from(rows.first);
       final role=await _auth.role();final allowed=await _auth.canOpenDeveloperCenter();
-      if(mounted)setState(()=>{_role=role,_profile=data,_allowed=allowed,_loading=false});
+      if(mounted)setState((){_role=role;_profile=data;_allowed=allowed;_loading=false;});
       if(allowed){await _audit('developer_center_access','success');await _loadRuns();}
-    }catch(e){if(mounted)setState(()=>{_loading=false,_status='تعذر تحميل المركز: '+e.toString()});}
+    }catch(e){if(mounted)setState((){_loading=false;_status='تعذر تحميل المركز: '+e.toString();});}
   }
   Future<void> _executeTask()async{
     final title=_title.text.trim(),description=_description.text.trim();
     if(title.isEmpty||description.isEmpty){setState(()=>_status='اكتب عنوان المهمة ووصفها.');return;}
-    setState(()=>{_busy=true,_status='جارٍ بدء التنفيذ الآمن...'});
+    setState((){_busy=true;_status='جارٍ بدء التنفيذ الآمن...';});
     try{
       final r=await SupabaseService.client.functions.invoke('developer-control',body:{'action':'execute_task','title':title,'description':description,'branch':'main'});
       if(r.status<200||r.status>=300)throw StateError(r.data.toString());
@@ -84,7 +84,7 @@ class _DeveloperPageState extends State<DeveloperPage>{
       final uid=c.auth.currentUser?.id;if(uid!=null)await c.from('security_reports').insert({'actor_uid':uid,'role':_role,'findings':findings,'counts':counts,'type':'automated_security_scan'});
       await _audit('security_scan','success',details:{'counts':counts});
     }catch(e){findings.add('تعذر الفحص: '+e.toString());}
-    if(mounted)setState(()=>{_findings=findings,_counts=counts,_scanning=false});
+    if(mounted)setState((){_findings=findings;_counts=counts;_scanning=false;});
   }
   @override Widget build(BuildContext context){
     if(_loading)return const Scaffold(body:Center(child:CircularProgressIndicator()));
