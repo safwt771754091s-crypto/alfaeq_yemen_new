@@ -23,12 +23,13 @@ class CatalogService {
 
   const CatalogService({this.useSupabase = true});
 
-  Future<List<CatalogDocument>> activeProducts({String? storeId, int limit = 100}) async {
+  Future<List<CatalogDocument>> activeProducts({String? storeId, String? sectionId, int limit = 100}) async {
     if (!useSupabase || !SupabaseService.isInitialized) {
       throw StateError('خدمة الكتالوج الجديدة غير مفعلة.');
     }
     var query = SupabaseService.client.from('products').select().eq('status', 'active');
     if (storeId != null && storeId.isNotEmpty) query = query.eq('store_id', storeId);
+    if (sectionId != null && sectionId.isNotEmpty) query = query.eq('section_id', sectionId);
     final rows = await query.order('name').limit(limit);
     return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
   }
