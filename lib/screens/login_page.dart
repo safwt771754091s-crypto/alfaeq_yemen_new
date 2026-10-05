@@ -72,17 +72,34 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   String _authMessage(String error) {
+    // Supabase Auth error codes.
+    if (error.contains('invalid_credentials') || error.contains('Invalid login credentials')) {
+      return 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
+    }
+    if (error.contains('email_not_confirmed')) {
+      return 'الحساب موجود، لكن البريد الإلكتروني غير مؤكد. افتح رسالة التأكيد في بريدك ثم حاول تسجيل الدخول.';
+    }
+    if (error.contains('user_already_exists') || error.contains('already been registered')) {
+      return 'هذا البريد مسجل بالفعل. استخدم تسجيل الدخول أو استعادة كلمة المرور.';
+    }
+    if (error.contains('email_address_invalid') || error.contains('invalid format')) {
+      return 'أدخل بريدًا إلكترونيًا صحيحًا (مثال: name@gmail.com).';
+    }
+    if (error.contains('weak_password')) return 'كلمة المرور ضعيفة. استخدم 6 أحرف أو أكثر.';
+    if (error.contains('over_email_send_rate_limit') || error.contains('rate limit')) {
+      return 'محاولات كثيرة. انتظر قليلاً ثم حاول مرة أخرى.';
+    }
+    if (error.contains('signup_disabled')) return 'إنشاء الحسابات معطّل حالياً. تواصل مع الدعم.';
+    if (error.contains('provider is not enabled') || error.contains('validation_failed')) {
+      return 'تسجيل الدخول بحساب Google غير مفعّل حالياً. استخدم البريد وكلمة المرور.';
+    }
     if (error.contains('popup-closed-by-user')) return 'تم إغلاق نافذة Google قبل إكمال الدخول.';
     if (error.contains('cancelled') || error.contains('canceled')) return 'تم إلغاء تسجيل الدخول بحساب Google.';
     if (error.contains('account-exists-with-different-credential')) return 'يوجد حساب بهذا البريد بطريقة دخول أخرى. استخدم البريد وكلمة المرور أولاً.';
-    if (error.contains('email not confirmed') ||
-        error.contains('email_not_confirmed') ||
-        error.contains('user not confirmed')) {
+    if (error.contains('email not confirmed') || error.contains('user not confirmed')) {
       return 'الحساب موجود، لكن البريد الإلكتروني غير مؤكد. افتح رسالة التأكيد في بريدك ثم حاول تسجيل الدخول.';
     }
-    if (error.contains('user already registered') ||
-        error.contains('user_already_exists') ||
-        error.contains('already registered')) {
+    if (error.contains('user already registered') || error.contains('already registered')) {
       return 'هذا البريد مسجل بالفعل. استخدم تسجيل الدخول أو استعادة كلمة المرور.';
     }
     if (error.contains('permission-denied')) return 'تم تسجيل الدخول، لكن الحساب لا يملك الصلاحيات المطلوبة.';
@@ -91,8 +108,8 @@ class _LoginPageState extends State<LoginPage> {
     if (error.contains('email-already-in-use')) return 'البريد الإلكتروني مستخدم بالفعل.';
     if (error.contains('weak-password')) return 'كلمة المرور ضعيفة. استخدم 6 أحرف أو أكثر.';
     if (error.contains('invalid-email')) return 'أدخل بريدًا إلكترونيًا صحيحًا.';
-    if (error.contains('network-request-failed')) return 'تحقق من اتصال الإنترنت.';
-    final normalized = error.replaceAll(RegExp(r'\\s+'), ' ').trim();
+    if (error.contains('network-request-failed') || error.contains('Failed to fetch') || error.contains('SocketException')) return 'تحقق من اتصال الإنترنت.';
+    final normalized = error.replaceAll(RegExp(r'\s+'), ' ').trim();
     return 'تعذر إتمام العملية: $normalized';
   }
 
