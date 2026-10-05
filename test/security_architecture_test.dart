@@ -86,5 +86,11 @@ void main() {
       expect(program, contains('activeProducts(sectionId: widget.section.id'));
       expect(program, isNot(contains('activeProducts(limit: 500)')));
     });
+
+    test('public update CTA opens its real link', () {
+      final home = File('lib/screens/world_home_page.dart').readAsStringSync();
+      expect(home, contains("import 'package:url_launcher/url_launcher.dart';"));
+      expect(home, contains('launchUrl(uri'));
+    });
   });
 }

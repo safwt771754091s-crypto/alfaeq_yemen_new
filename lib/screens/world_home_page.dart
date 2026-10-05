@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_sections.dart';
 import '../services/auth_service.dart';
@@ -689,10 +690,13 @@ class _PublicUpdatesSection extends StatelessWidget {
               ),
               title: Text(item.data['title']?.toString() ?? 'تحديث جديد', style: const TextStyle(fontWeight: FontWeight.w900)),
               subtitle: Text(item.data['summary']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis),
-              onTap: () {
-                final url = item.data['cta_url']?.toString();
-                if (url != null && url.isNotEmpty) {
-                  // The full destination can be opened by the existing URL launcher layer.
+              onTap: () async {
+                final url = item.data['cta_url']?.toString() ?? '';
+                if (url.isEmpty) return;
+                final uri = Uri.tryParse(url);
+                if (uri == null || !uri.hasScheme) return;
+                final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                if (!ok && context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(item.data['cta_label']?.toString() ?? 'تفاصيل التحديث')),
                   );
