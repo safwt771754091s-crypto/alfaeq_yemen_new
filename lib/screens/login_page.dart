@@ -16,6 +16,25 @@ class _LoginPageState extends State<LoginPage> {
   bool _register = false, _loading = false, _obscure = true;
 
   @override
+  void initState() {
+    super.initState();
+    _register = _routeRequestsRegister();
+  }
+
+  /// Supports deep links like `.../#/signup` or `.../?mode=register` from any
+  /// host, so a customer can land directly on the create-account form.
+  bool _routeRequestsRegister() {
+    try {
+      final route = Uri.base.fragment.toLowerCase();
+      final query = Uri.base.queryParameters['mode']?.toLowerCase();
+      return route.contains('signup') || route.contains('register') ||
+          route.contains('create') || query == 'register' || query == 'signup';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
   void dispose() { _name.dispose(); _email.dispose(); _password.dispose(); super.dispose(); }
 
   Future<void> _submit() async {
