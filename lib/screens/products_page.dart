@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
+import '../core/money.dart';
 import '../services/catalog_service.dart';
 import '../services/review_service.dart';
 import '../services/supabase_service.dart';
@@ -153,7 +154,7 @@ class _ProductCard extends StatelessWidget {
     final p = product.data;
     final imageUrl = (p['image_url'] ?? '').toString();
     final price = p['price'];
-    final priceText = (price is num && price > 0) ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}' : 'عند الطلب';
+    final priceText = formatMoney(price is num ? price : null, p['currency']?.toString());
     return Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE3E8EF))),
       child: InkWell(

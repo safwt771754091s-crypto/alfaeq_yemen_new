@@ -37,12 +37,12 @@ class OrderService {
   }
 
   /// Wallet balance for the signed-in user (creates the wallet on first use).
-  Future<num> walletBalance({String currency = 'YER'}) async =>
+  Future<num> walletBalance({String currency = 'USD'}) async =>
       (await walletInfo(currency: currency)).balance;
 
   /// Wallet balance plus its actual currency. Wallets are keyed by user, so the
   /// returned currency is authoritative and may differ from the requested one.
-  Future<({num balance, String currency})> walletInfo({String currency = 'YER'}) async {
+  Future<({num balance, String currency})> walletInfo({String currency = 'USD'}) async {
     final row = await supabase.rpc('ensure_my_wallet', params: {
       'p_currency': currency,
       'p_account_type': 'customer',
@@ -65,7 +65,7 @@ class OrderService {
     required List<Map<String, dynamic>> items,
     required String address,
     required String idempotencyKey,
-    String currency = 'YER',
+    String currency = 'USD',
     double? latitude,
     double? longitude,
   }) async {

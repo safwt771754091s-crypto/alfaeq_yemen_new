@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../core/money.dart';
 import '../core/product_units.dart';
 import '../services/order_service.dart';
 import '../services/supabase_service.dart';
@@ -126,7 +127,8 @@ class _CartPageState extends State<CartPage> {
     final addressController = TextEditingController();
     String paymentMethod = 'cash_on_delivery';
     LatLng? deliveryPoint;
-    final walletCovers = _walletBalance >= _total;
+    // The wallet holds one currency; only offer wallet payment when it matches the cart.
+    final walletCovers = _walletBalance >= _total && _walletCurrency == _currency;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -142,7 +144,7 @@ class _CartPageState extends State<CartPage> {
                 const DropdownMenuItem(value: 'cash_on_delivery', child: Text('الدفع عند الاستلام')),
                 DropdownMenuItem(
                   value: 'wallet',
-                  child: Text('محفظة الفائق (رصيدك: ${_walletBalance.toStringAsFixed(0)} $_walletCurrency)'),
+                  child: Text('محفظة الفائق (رصيدك: ${formatAmount(_walletBalance)} $_walletCurrency)'),
                 ),
               ],
               onChanged: (v) => setDialogState(() => paymentMethod = v ?? 'cash_on_delivery'),
@@ -163,7 +165,7 @@ class _CartPageState extends State<CartPage> {
             ),
             if (deliveryPoint != null) Text('${deliveryPoint!.latitude.toStringAsFixed(6)}, ${deliveryPoint!.longitude.toStringAsFixed(6)}', textDirection: TextDirection.ltr),
             const SizedBox(height: 8),
-            Text('الإجمالي: $_total $_currency', style: const TextStyle(fontWeight: FontWeight.w900)),
+            Text('الإجمالي: ${formatMoney(_total, _currency)}', style: const TextStyle(fontWeight: FontWeight.w900)),
           ])),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),

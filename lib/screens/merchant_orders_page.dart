@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/money.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 
@@ -54,7 +55,7 @@ class _OrderCard extends StatelessWidget{
   return Card(elevation:0,margin:const EdgeInsets.only(bottom:12),child:ExpansionTile(
    leading:CircleAvatar(child:Icon(_icon(status))),title:Text('طلب #${id.length>8?id.substring(0,8):id}',style:const TextStyle(fontWeight:FontWeight.w900)),subtitle:Text('$status • $delivery'),
    children:[Padding(padding:const EdgeInsets.fromLTRB(16,0,16,16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-    Text('${order['total']??0} ${order['currency']??'YER'}',style:const TextStyle(fontSize:17,fontWeight:FontWeight.w900)),
+    Text(formatMoney(num.tryParse('${order['total']??0}'), order['currency']?.toString(), fallback: '0'),style:const TextStyle(fontSize:17,fontWeight:FontWeight.w900)),
     Text('عدد الأصناف: ${items.length}'),Text('العنوان: ${order['address']??'—'}'),Text('الدفع: ${order['payment_method']??'—'}'),const SizedBox(height:8),
     ...items.whereType<Map>().map((x)=>ListTile(dense:true,contentPadding:EdgeInsets.zero,title:Text('${x['name']??'صنف'}'),subtitle:Text('الكمية: ${x['quantity']??0}'),trailing:Text('${x['line_total']??x['unit_price']??0}'))),
     Wrap(spacing:8,children:[

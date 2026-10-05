@@ -13,6 +13,7 @@ import 'services/auth_service.dart';
 import 'services/supabase_service.dart';
 import 'services/catalog_service.dart';
 
+import 'core/money.dart';
 import 'core/product_units.dart';
 
 Future<void> main() async {
@@ -453,7 +454,7 @@ class _StoreCatalogCard extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text('$price $currency / ${unit.label}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                          Text('${formatAmount(num.tryParse('$price') ?? 0)} $currency / ${unit.label}', style: const TextStyle(fontWeight: FontWeight.w900)),
                           const SizedBox(height: 5),
                           SizedBox(
                             height: 34,

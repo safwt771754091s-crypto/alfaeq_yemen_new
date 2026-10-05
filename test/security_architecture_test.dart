@@ -38,6 +38,29 @@ void main() {
       expect(page, contains("read_at"));
     });
 
+    test('wallet money movement stays server-side and currency-aware', () {
+      final qr = File('lib/screens/wallet_qr_page.dart').readAsStringSync();
+      // Transfers run in the RPC; the client never edits balances directly.
+      expect(qr, contains("rpc('wallet_transfer'"));
+      expect(qr, isNot(contains("from('wallets').update")));
+      // The transfer currency comes from the user's real wallet, not a literal.
+      expect(qr, contains('walletInfo()'));
+      expect(qr, isNot(contains("'p_currency': 'YER'")));
+    });
+
+    test('wallet checkout only offered when the wallet currency matches the cart', () {
+      final cart = File('lib/screens/cart_page.dart').readAsStringSync();
+      expect(cart, contains('_walletCurrency == _currency'));
+    });
+
+    test('wallet currency integrity migration guards relabelling and duplicates', () {
+      final migration = File('supabase/migrations/20261005120000_wallet_currency_integrity_v1.sql').readAsStringSync();
+      expect(migration, contains('create or replace function private.wallet_credit_internal'));
+      expect(migration, contains('create or replace function private.wallet_debit_internal'));
+      expect(migration, contains('wallet_currency_mismatch'));
+      expect(migration, contains('on conflict (uid) do nothing'));
+    });
+
 
     test('commercial support chat uses server-side RPCs', () {
       final page = File('lib/screens/support_chat_page.dart').readAsStringSync();
