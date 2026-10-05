@@ -24,6 +24,7 @@ class OrderService {
     required String paymentMethod,
     double? latitude,
     double? longitude,
+    String displayCurrency = 'YER',
   }) async {
     final normalized = _normalize(items);
     final id = await supabase.rpc('create_order', params: {
@@ -32,6 +33,7 @@ class OrderService {
       'p_payment_method': paymentMethod,
       'p_latitude': latitude,
       'p_longitude': longitude,
+      'p_display_currency': displayCurrency,
     });
     return id.toString();
   }
@@ -68,6 +70,7 @@ class OrderService {
     String currency = 'USD',
     double? latitude,
     double? longitude,
+    String displayCurrency = 'YER',
   }) async {
     final normalized = _normalize(items);
     final id = await supabase.rpc('create_order_paid', params: {
@@ -77,6 +80,7 @@ class OrderService {
       'p_currency': currency,
       'p_latitude': latitude,
       'p_longitude': longitude,
+      'p_display_currency': displayCurrency,
     });
     return id.toString();
   }

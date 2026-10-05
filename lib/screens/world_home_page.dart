@@ -6,6 +6,7 @@ import '../core/money.dart';
 import '../core/product_units.dart';
 import '../services/auth_service.dart';
 import '../services/catalog_service.dart';
+import '../services/currency_service.dart';
 import '../services/order_service.dart';
 import '../services/supabase_service.dart';
 import '../services/wallet_service.dart';
@@ -19,6 +20,7 @@ import 'conversations_page.dart';
 import 'mini_programs_page.dart';
 import 'moments_page.dart';
 import 'products_page.dart';
+import '../widgets/currency_selector.dart';
 import 'product_detail_page.dart';
 import 'store_detail_page.dart';
 import 'search_page.dart';
@@ -57,7 +59,7 @@ class _WorldHomePageState extends State<WorldHomePage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: _surface,
-        body: SafeArea(child: IndexedStack(index: index, children: pages)),
+        body: SafeArea(child: AnimatedBuilder(animation: CurrencyService.instance, builder: (context, _) => IndexedStack(index: index, children: pages))),
         bottomNavigationBar: _MainBottomBar(selectedIndex: index, onSelected: (v) => setState(() => index = v)),
       ),
     );
@@ -296,6 +298,7 @@ class _HomeHeader extends StatelessWidget {
                   ],
                 ),
               ),
+              const CurrencySelector(dark: true),
               IconButton(onPressed: onNotifications, icon: const Icon(Icons.notifications_none, color: Colors.white)),
               IconButton(onPressed: onCart, icon: const _LiveCartBadge(icon: Icons.shopping_cart_outlined, color: Colors.white)),
             ],
@@ -610,13 +613,13 @@ class _OfferCard extends StatelessWidget {
   const _OfferCard({required this.product, required this.discount, required this.onAdd});
   @override
   Widget build(BuildContext context) {
-    final data = product.data; final price = data['price']; final original = data['originalPrice'] ?? data['original_price'];
+    final data = product.data; final original = data['originalPrice'] ?? data['original_price'];
     final imageUrl = (data['imageUrl'] ?? data['image_url'] ?? data['image'] ?? '').toString();
     return Container(width: 178, padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE3E8EF))), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       ClipRRect(borderRadius: BorderRadius.circular(11), child: imageUrl.isEmpty ? Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.image_outlined, size: 42, color: Colors.black26)) : Image.network(imageUrl, height: 108, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.broken_image_outlined)))),
       const SizedBox(height: 7), Text(data['name']?.toString() ?? 'صنف', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontWeight: FontWeight.w800)),
       const SizedBox(height: 3), Row(children: [
-        Expanded(child: Text(formatMoney(price is num ? price : null, data['currency']?.toString()), style: const TextStyle(color: _navy, fontWeight: FontWeight.w900))),
+        Expanded(child: Text(CurrencyService.instance.formatProduct(data), style: const TextStyle(color: _navy, fontWeight: FontWeight.w900))),
         if (original is num) Text(formatAmount(original), style: const TextStyle(color: Colors.grey, decoration: TextDecoration.lineThrough, fontSize: 10)),
       ]),
       const Spacer(), SizedBox(height: 34, child: FilledButton.icon(onPressed: onAdd, icon: const Icon(Icons.add_shopping_cart, size: 16), label: const Text('أضف'), style: FilledButton.styleFrom(backgroundColor: _blue, padding: EdgeInsets.zero))),
@@ -720,8 +723,7 @@ class _FeaturedProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = product.data;
     final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
-    final price = p['price'];
-    final priceText = formatMoney(price is num ? price : null, p['currency']?.toString());
+    final priceText = CurrencyService.instance.formatProduct(p);
     return InkWell(
       borderRadius: BorderRadius.circular(15),
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: product))),
@@ -992,8 +994,7 @@ class _SectionProductTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = product.data;
     final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
-    final price = p['price'];
-    final priceText = formatMoney(price is num ? price : null, p['currency']?.toString());
+    final priceText = CurrencyService.instance.formatProduct(p);
     final stock = p['stock_base'] ?? p['stock'];
     final leading = imageUrl.isEmpty
         ? const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.inventory_2_outlined, color: _blue))
@@ -1057,11 +1058,10 @@ class _StoreCard extends StatelessWidget {
               return Column(children: products.map((product) {
                 final p = product.data;
                 final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
-                final price = p['price'];
-                final leading = imageUrl.isEmpty
+                            final leading = imageUrl.isEmpty
                     ? const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.inventory_2_outlined, color: _blue))
                     : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(imageUrl, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(child: Icon(Icons.broken_image_outlined))));
-                final priceText = formatMoney(price is num ? price : null, p['currency']?.toString());
+                final priceText = CurrencyService.instance.formatProduct(p);
                 final stock = p['stock_base'] ?? p['stock'];
                 return ListTile(
                   leading: leading,
@@ -1298,6 +1298,7 @@ class _AccountTab extends StatelessWidget {
         ListTile(leading: const Icon(Icons.auto_awesome, color: _blue), title: const Text('ذكاء الفائق', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()))),
         ListTile(leading: const Icon(Icons.auto_awesome_outlined, color: _blue), title: const Text('اللحظات', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MomentsPage()))),
         ListTile(leading: const Icon(Icons.grid_view_outlined, color: _blue), title: const Text('كل الخدمات', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServicesHubPage()))),
+        AnimatedBuilder(animation: CurrencyService.instance, builder: (context, _) => ListTile(leading: const Icon(Icons.currency_exchange, color: _blue), title: const Text('العملة', style: TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${CurrencyService.labelFor(CurrencyService.instance.displayCurrency)} (${CurrencyService.symbolFor(CurrencyService.instance.displayCurrency)})'), trailing: const CurrencySelector())),
         const Divider(height: 24),
         FilledButton.icon(onPressed: () => _logout(context), icon: const Icon(Icons.logout), label: const Text('تسجيل الخروج'), style: FilledButton.styleFrom(backgroundColor: _navy)),
       ],

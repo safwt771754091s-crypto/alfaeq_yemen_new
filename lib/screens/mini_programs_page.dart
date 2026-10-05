@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
-import '../core/money.dart';
+import '../services/currency_service.dart';
 import '../services/catalog_service.dart';
 import '../services/supabase_service.dart';
 import 'cart_page.dart';
@@ -267,8 +267,7 @@ class _ProgramProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = product.data;
     final imageUrl = (p['image_url'] ?? '').toString();
-    final price = p['price'];
-    final priceText = formatMoney(price is num ? price : null, p['currency']?.toString());
+    final priceText = CurrencyService.instance.formatProduct(p);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,

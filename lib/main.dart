@@ -10,10 +10,10 @@ import 'screens/merchant_invite_page.dart';
 import 'screens/my_orders_page.dart';
 import 'screens/notifications_page.dart';
 import 'services/auth_service.dart';
+import 'services/currency_service.dart';
 import 'services/supabase_service.dart';
 import 'services/catalog_service.dart';
 
-import 'core/money.dart';
 import 'core/product_units.dart';
 
 Future<void> main() async {
@@ -31,6 +31,11 @@ Future<void> main() async {
     startupError = error;
     startupStack = stackTrace;
   }
+
+  // Load the saved display currency + platform FX rates; never blocks startup.
+  try {
+    await CurrencyService.instance.load();
+  } catch (_) {/* fall back to defaults */}
 
   runApp(AlfaeqYemenApp(
     startupError: startupError,
@@ -454,7 +459,7 @@ class _StoreCatalogCard extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text('${formatAmount(num.tryParse('$price') ?? 0)} $currency / ${unit.label}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                          Text('${CurrencyService.instance.formatNative(num.tryParse('$price') ?? 0, '$currency'.toUpperCase() == 'USD' ? CurrencyService.instance.displayCurrency : '$currency')} / ${unit.label}', style: const TextStyle(fontWeight: FontWeight.w900)),
                           const SizedBox(height: 5),
                           SizedBox(
                             height: 34,

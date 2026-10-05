@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../core/money.dart';
 import '../core/product_units.dart';
+import '../services/currency_service.dart';
 import '../services/order_service.dart';
 import '../services/supabase_service.dart';
 import 'location_picker_page.dart';
@@ -73,6 +73,17 @@ class _CartPageState extends State<CartPage> {
     return total;
   }
 
+  String get _displayCurrency => CurrencyService.instance.displayCurrency;
+  bool get _baseIsUsd => _currency.toUpperCase() == 'USD';
+  num get _displayTotal => _baseIsUsd ? CurrencyService.instance.convert(_total.toDouble(), _displayCurrency) : _total;
+  num get _payTotal => _walletCurrency == _currency ? _total : CurrencyService.instance.convert(_total.toDouble(), _walletCurrency);
+  bool get _walletCovers {
+    if (_walletCurrency == _currency) return _walletBalance >= _total;
+    // Cross-currency debit only applies to USD-priced carts (the catalog base).
+    if (!_baseIsUsd) return false;
+    return _walletBalance >= _payTotal;
+  }
+
   Future<void> _saveItems(List<Map<String, dynamic>> items, {String? checkoutKey}) async {
     if (!SupabaseService.isInitialized || _uid.isEmpty) return;
     final metadata = <String, dynamic>{
@@ -128,7 +139,7 @@ class _CartPageState extends State<CartPage> {
     String paymentMethod = 'cash_on_delivery';
     LatLng? deliveryPoint;
     // The wallet holds one currency; only offer wallet payment when it matches the cart.
-    final walletCovers = _walletBalance >= _total && _walletCurrency == _currency;
+    final walletCovers = _walletCovers;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -144,7 +155,7 @@ class _CartPageState extends State<CartPage> {
                 const DropdownMenuItem(value: 'cash_on_delivery', child: Text('الدفع عند الاستلام')),
                 DropdownMenuItem(
                   value: 'wallet',
-                  child: Text('محفظة الفائق (رصيدك: ${formatAmount(_walletBalance)} $_walletCurrency)'),
+                  child: Text('محفظة الفائق (رصيدك: ${CurrencyService.instance.formatNative(_walletBalance, _walletCurrency)} — المطلوب: ${CurrencyService.instance.formatNative(_payTotal, _walletCurrency)})'),
                 ),
               ],
               onChanged: (v) => setDialogState(() => paymentMethod = v ?? 'cash_on_delivery'),
@@ -165,7 +176,7 @@ class _CartPageState extends State<CartPage> {
             ),
             if (deliveryPoint != null) Text('${deliveryPoint!.latitude.toStringAsFixed(6)}, ${deliveryPoint!.longitude.toStringAsFixed(6)}', textDirection: TextDirection.ltr),
             const SizedBox(height: 8),
-            Text('الإجمالي: ${formatMoney(_total, _currency)}', style: const TextStyle(fontWeight: FontWeight.w900)),
+            Text('الإجمالي: ${CurrencyService.instance.formatNative(_displayTotal, _displayCurrency)}', style: const TextStyle(fontWeight: FontWeight.w900)),
           ])),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
@@ -263,7 +274,7 @@ class _CartPageState extends State<CartPage> {
                             return Card(child: ListTile(
                               leading: const CircleAvatar(child: Icon(Icons.shopping_bag_outlined)),
                               title: Text(name, style: const TextStyle(fontWeight: FontWeight.w900)),
-                              subtitle: Text('$quantity ${unit.label} × $price $_currency/${unit.label} = ${price * quantity} $_currency'),
+                              subtitle: Text('$quantity ${unit.label} × ${CurrencyService.instance.formatProduct(item)}/${unit.label} = ${CurrencyService.instance.format(price.toDouble() * quantity)}'),
                               trailing: SizedBox(width: 150, child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
                                 IconButton(onPressed: _busy ? null : () => _changeQuantity(index, -1), icon: const Icon(Icons.remove_circle_outline)),
                                 Text('$quantity', style: const TextStyle(fontWeight: FontWeight.w900)),
@@ -273,7 +284,7 @@ class _CartPageState extends State<CartPage> {
                             ));
                           }),
                           const SizedBox(height: 10),
-                          Card(child: ListTile(title: const Text('الإجمالي', style: TextStyle(fontWeight: FontWeight.w900)), trailing: Text('$_total $_currency', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)))),
+                          Card(child: ListTile(title: const Text('الإجمالي', style: TextStyle(fontWeight: FontWeight.w900)), trailing: Text(CurrencyService.instance.formatNative(_displayTotal, _displayCurrency), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)))),
                           const SizedBox(height: 14),
                           SizedBox(height: 52, child: FilledButton.icon(onPressed: _busy ? null : _checkout, icon: const Icon(Icons.shopping_cart_checkout), label: const Text('إتمام الطلب والشراء', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)))),
                         ],

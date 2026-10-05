@@ -19,6 +19,11 @@ void main() {
       expect(formatAmount(1.5), '1.5');
       expect(formatAmount(2.10), '2.1');
     });
+
+    test('groups large integers for readability', () {
+      expect(formatAmount(33579), '33,579');
+      expect(formatAmount(1537.5), '1,537.5');
+    });
   });
 
   group('formatMoney', () {

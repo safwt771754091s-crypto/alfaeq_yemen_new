@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/order_service.dart';
+import '../services/currency_service.dart';
 import '../services/supabase_service.dart';
 import 'delivery_tracking.dart';
 
@@ -74,7 +75,9 @@ class _OrdersList extends StatelessWidget {
         final status = (data['status'] ?? 'pending').toString();
         final deliveryStatus = (data['delivery_status'] ?? data['deliveryStatus'] ?? 'awaiting_assignment').toString();
         final total = data['total'];
-        final currency = (data['currency'] ?? 'YER').toString();
+        final currency = (data['currency'] ?? 'USD').toString();
+        final displayCurrency = (data['display_currency'] ?? '').toString();
+        final displayTotal = data['display_total'];
         final rawItems = data['items'];
         final itemCount = rawItems is List ? rawItems.length : 0;
 
@@ -95,7 +98,11 @@ class _OrdersList extends StatelessWidget {
                 const SizedBox(height: 12),
                 Row(children: [
                   Expanded(child: Text('$itemCount ${itemCount == 1 ? 'صنف' : 'أصناف'}')),
-                  Text('${total ?? 0} $currency', style: const TextStyle(fontWeight: FontWeight.w900)),
+                  Text(
+                    displayTotal is num && displayCurrency.isNotEmpty
+                        ? CurrencyService.instance.formatNative(displayTotal, displayCurrency)
+                        : CurrencyService.instance.formatNative(total is num ? total : 0, currency == 'USD' ? CurrencyService.instance.displayCurrency : currency),
+                    style: const TextStyle(fontWeight: FontWeight.w900)),
                 ]),
                 const SizedBox(height: 8),
                 Row(children: [

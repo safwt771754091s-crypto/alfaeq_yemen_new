@@ -48,9 +48,13 @@ void main() {
       expect(qr, isNot(contains("'p_currency': 'YER'")));
     });
 
-    test('wallet checkout only offered when the wallet currency matches the cart', () {
+    test('wallet checkout is currency-aware and converts USD totals', () {
       final cart = File('lib/screens/cart_page.dart').readAsStringSync();
+      // Same-currency debit uses the raw total; otherwise the USD total is
+      // converted into the wallet currency before the balance check.
       expect(cart, contains('_walletCurrency == _currency'));
+      expect(cart, contains('convert(_total.toDouble(), _walletCurrency)'));
+      expect(cart, contains('_walletCovers'));
     });
 
     test('wallet currency integrity migration guards relabelling and duplicates', () {
