@@ -800,6 +800,19 @@ class WorldSectionPage extends StatelessWidget {
               const SizedBox(height: 14),
               TextField(decoration: InputDecoration(hintText: 'ابحث في ${section.title}...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none))),
               const SizedBox(height: 18),
+              const Text('منتجات القسم', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 9),
+              FutureBuilder<List<CatalogDocument>>(
+                future: CatalogService().activeProducts(sectionId: section.id, limit: 300),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
+                  if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المنتجات', text: 'تحقق من اتصال قاعدة البيانات.');
+                  final products = snapshot.data ?? const <CatalogDocument>[];
+                  if (products.isEmpty) return const _Info(title: 'لا توجد منتجات بعد', text: 'سيظهر هنا المحتوى الحقيقي عند إضافته.');
+                  return Column(children: products.map((product) => _SectionProductTile(product: product)).toList());
+                },
+              ),
+              const SizedBox(height: 18),
               const Text('المتاجر المعتمدة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 9),
               FutureBuilder<List<CatalogDocument>>(
@@ -816,6 +829,38 @@ class WorldSectionPage extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _SectionProductTile extends StatelessWidget {
+  const _SectionProductTile({required this.product});
+  final CatalogDocument product;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = product.data;
+    final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
+    final price = p['price'];
+    final priceText = price is num && price > 0 ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}' : 'عند الطلب';
+    final stock = p['stock_base'] ?? p['stock'];
+    final leading = imageUrl.isEmpty
+        ? const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.inventory_2_outlined, color: _blue))
+        : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(imageUrl, width: 52, height: 52, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(child: Icon(Icons.broken_image_outlined))));
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        leading: leading,
+        title: Text(p['name']?.toString() ?? 'صنف', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+        subtitle: Text('المتوفر: ${stock ?? '—'}'),
+        trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(priceText, style: const TextStyle(fontWeight: FontWeight.w900)),
+          IconButton(padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: () => _addProductToCart(context, product), tooltip: 'أضف للسلة', icon: const Icon(Icons.add_shopping_cart, color: _blue, size: 20)),
+        ]),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: product))),
+      ),
+    );
+  }
 }
 
 class _StoreCard extends StatelessWidget {
