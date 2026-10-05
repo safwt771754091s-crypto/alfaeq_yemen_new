@@ -77,5 +77,14 @@ void main() {
       expect(home, contains('_promotionDeals'));
       expect(home, contains("from('products')"));
     });
+
+    test('store and section listings filter server-side instead of truncating', () {
+      final store = File('lib/screens/store_detail_page.dart').readAsStringSync();
+      expect(store, contains('activeProducts(storeId: widget.store.id'));
+      expect(store, isNot(contains('activeProducts(limit: 5000)')));
+      final program = File('lib/screens/mini_programs_page.dart').readAsStringSync();
+      expect(program, contains('activeProducts(sectionId: widget.section.id'));
+      expect(program, isNot(contains('activeProducts(limit: 500)')));
+    });
   });
 }
