@@ -12,12 +12,12 @@ class _WhatsAppAutomationPageState extends State<WhatsAppAutomationPage> {
   Future<Map<String, dynamic>> _load() async {
     final client = SupabaseService.client;
     final results = await Future.wait([
-      client.functions.invoke('platform-api', body: const {'action': 'list_whatsapp_connections'}),
-      client.functions.invoke('platform-api', body: const {'action': 'list_whatsapp_imports', 'limit': 50}),
+      client.rpc('list_whatsapp_connections'),
+      client.rpc('list_whatsapp_imports', params: {'p_limit': 50}),
     ]);
-    final connections = ((results[0].data as Map?)?['connections'] as List? ?? [])
+    final connections = ((results[0] as Map?)?['connections'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    final imports = ((results[1].data as Map?)?['imports'] as List? ?? [])
+    final imports = ((results[1] as Map?)?['imports'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map)).toList();
     return {'connections': connections, 'imports': imports};
   }
@@ -51,9 +51,11 @@ class _WhatsAppAutomationPageState extends State<WhatsAppAutomationPage> {
     if (ok != true) return;
     setState(() => _loading = true);
     try {
-      await SupabaseService.client.functions.invoke('platform-api', body: {
-        'action': 'set_whatsapp_connection', 'phone': phone.text, 'storeId': store.text,
-        'merchantUid': merchant.text, 'autoPublish': auto,
+      await SupabaseService.client.rpc('set_whatsapp_connection', params: {
+        'p_phone': phone.text,
+        'p_store_id': store.text.trim().isEmpty ? null : store.text.trim(),
+        'p_merchant_uid': merchant.text.trim().isEmpty ? null : merchant.text.trim(),
+        'p_auto_publish': auto,
       });
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم ربط رقم واتساب بالمتجر.')));
       setState(() {});
@@ -86,10 +88,12 @@ class _WhatsAppAutomationPageState extends State<WhatsAppAutomationPage> {
     if (values == null) return;
     setState(() => _loading = true);
     try {
-      await SupabaseService.client.functions.invoke('platform-api', body: {
-        'action': 'confirm_whatsapp_import', 'importId': item['id'], 'name': values['name'],
-        'price': double.tryParse(values['price'] ?? ''), 'stock': int.tryParse(values['stock'] ?? ''),
-        'publish': false,
+      await SupabaseService.client.rpc('confirm_whatsapp_import', params: {
+        'p_import_id': item['id'],
+        'p_name': values['name'],
+        'p_price': double.tryParse(values['price'] ?? '') ?? 0,
+        'p_stock': num.tryParse(values['stock'] ?? '') ?? 0,
+        'p_publish': false,
       });
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إنشاء المنتج بأمان.')));
       setState(() {});

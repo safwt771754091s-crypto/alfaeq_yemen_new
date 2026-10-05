@@ -25,6 +25,16 @@ class _MerchantOrdersPageState extends State<MerchantOrdersPage>{
       _message('تم تحديث حالة الطلب.'); if(mounted)setState((){});
     }catch(e){_message('تعذر تحديث الطلب: ${e}');}finally{if(mounted)setState(()=>_busy=false);}
   }
+  Future<void> _sendInvoice(Map<String,dynamic> o) async {
+    if(SupabaseService.client.auth.currentUser==null||!await _allowed())return;
+    setState(()=>_busy=true);
+    try{
+      final res=await SupabaseService.client.rpc('whatsapp_notify_order',params:{'p_order_id':'${o['id']}','p_include_customer':false});
+      final queued=(res is Map?res['queued']:null)??0;
+      final configured=(res is Map?res['configured']:null)==true;
+      _message(configured?'تم إرسال الفاتورة عبر واتساب (عدد المستلمين: $queued).':'تم تجهيز الفاتورة؛ يلزم ضبط واتساب لإرسالها.');
+    }catch(e){_message('تعذر إرسال الفاتورة: $e');}finally{if(mounted)setState(()=>_busy=false);}
+  }
   @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:FutureBuilder<bool>(
     future:_allowed(),builder:(context,a){
       if(a.connectionState==ConnectionState.waiting)return const Scaffold(body:Center(child:CircularProgressIndicator()));
@@ -40,7 +50,7 @@ class _MerchantOrdersPageState extends State<MerchantOrdersPage>{
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: os.length,
-              itemBuilder: (c, i) => _OrderCard(order: os[i], busy: _busy, onStatus: _setStatus),
+                              itemBuilder: (c, i) => _OrderCard(order: os[i], busy: _busy, onStatus: _setStatus, onInvoice: _sendInvoice),
             ),
           );
         }),);
@@ -48,8 +58,8 @@ class _MerchantOrdersPageState extends State<MerchantOrdersPage>{
   void _message(String t){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(t)));}
 }
 class _OrderCard extends StatelessWidget{
- final Map<String,dynamic> order;final bool busy;final Future<void> Function(Map<String,dynamic>,String) onStatus;
- const _OrderCard({required this.order,required this.busy,required this.onStatus});
+ final Map<String,dynamic> order;final bool busy;final Future<void> Function(Map<String,dynamic>,String) onStatus;final Future<void> Function(Map<String,dynamic>) onInvoice;
+ const _OrderCard({required this.order,required this.busy,required this.onStatus,required this.onInvoice});
  @override Widget build(BuildContext context){
   final id='${order['id']??''}',status='${order['status']??'pending'}',delivery='${order['delivery_status']??'awaiting_assignment'}',items=order['items'] is List?List<dynamic>.from(order['items'] as List):const <dynamic>[];
   return Card(elevation:0,margin:const EdgeInsets.only(bottom:12),child:ExpansionTile(
@@ -62,6 +72,7 @@ class _OrderCard extends StatelessWidget{
       if(status=='pending')FilledButton.icon(onPressed:busy?null:()=>onStatus(order,'accepted'),icon:const Icon(Icons.check),label:const Text('قبول')),
       if(status=='accepted')FilledButton.icon(onPressed:busy?null:()=>onStatus(order,'preparing'),icon:const Icon(Icons.inventory_2_outlined),label:const Text('بدء التجهيز')),
       if(status=='preparing')FilledButton.icon(onPressed:busy?null:()=>onStatus(order,'ready_for_pickup'),icon:const Icon(Icons.local_shipping_outlined),label:const Text('جاهز للاستلام')),
+      OutlinedButton.icon(onPressed:busy?null:()=>onInvoice(order),icon:const Icon(Icons.receipt_long_outlined),label:const Text('إرسال الفاتورة واتساب')),
       if(status=='pending'||status=='accepted')OutlinedButton.icon(onPressed:busy?null:()=>onStatus(order,'cancelled'),icon:const Icon(Icons.close),label:const Text('إلغاء'))
     ])
    ]))]));}
