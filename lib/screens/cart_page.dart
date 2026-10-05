@@ -19,9 +19,9 @@ class _CartPageState extends State<CartPage> {
   String? _error;
   List<Map<String, dynamic>> _items = [];
   Map<String, dynamic> _metadata = {};
-  String _currency = 'YER';
+  String _currency = 'USD';
   num _walletBalance = 0;
-  String _walletCurrency = 'YER';
+  String _walletCurrency = 'USD';
   String get _uid => SupabaseService.client.auth.currentUser?.id ?? '';
 
   @override
@@ -47,7 +47,7 @@ class _CartPageState extends State<CartPage> {
       _items = raw is List ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
       final meta = row?['metadata'];
       _metadata = meta is Map ? Map<String, dynamic>.from(meta) : <String, dynamic>{};
-      _currency = _metadata['currency'] != null ? _metadata['currency'].toString() : (_items.isNotEmpty ? (_items.first['currency'] ?? 'YER').toString() : 'YER');
+      _currency = _metadata['currency'] != null ? _metadata['currency'].toString() : (_items.isNotEmpty ? (_items.first['currency'] ?? 'USD').toString() : 'USD');
     } catch (e) {
       _error = 'تعذر تحميل السلة من الخادم: $e';
     } finally {

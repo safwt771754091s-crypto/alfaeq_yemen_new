@@ -211,7 +211,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
           'description': row.description,
           'image_url': row.imageUrl,
           'price': row.price,
-          'currency': 'YER',
+          'currency': 'USD',
           'stock': row.stock,
           'stock_base': row.stock,
           'sale_unit': 'piece',
@@ -325,7 +325,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
               ..._preview.take(50).map((row) => Card(child: ListTile(
                 leading: row.imageUrl.isEmpty ? const Icon(Icons.inventory_2_outlined) : Image.network(row.imageUrl, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined)),
                 title: Text('${row.name} • ${row.reference}', style: const TextStyle(fontWeight: FontWeight.w800)),
-                subtitle: Text('الكمية: ${row.stock} • السعر: ${row.price} YER\nالمتجر: ${row.storeId}'),
+                subtitle: Text('الكمية: ${row.stock} • السعر: ${row.price} USD\nالمتجر: ${row.storeId}'),
                 isThreeLine: true,
               ))),
               const SizedBox(height: 12),
