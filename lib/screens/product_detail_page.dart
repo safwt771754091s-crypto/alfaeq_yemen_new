@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/money.dart';
 import '../core/product_units.dart';
 import '../services/catalog_service.dart';
 import '../services/review_service.dart';
@@ -138,7 +139,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   @override
   Widget build(BuildContext context) {
     final available = _stockBase > 0 || _data['stock'] == null;
-    final priceText = _price > 0 ? '${_price.toStringAsFixed(0)} $_currency' : 'عند الطلب';
+    final priceText = formatMoney(_price, _currency);
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(

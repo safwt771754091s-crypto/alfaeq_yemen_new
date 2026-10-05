@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_sections.dart';
+import '../core/money.dart';
 import '../core/product_units.dart';
 import '../services/auth_service.dart';
 import '../services/catalog_service.dart';
+import '../services/order_service.dart';
 import '../services/supabase_service.dart';
 import '../services/wallet_service.dart';
 import '../services/public_content_service.dart';
@@ -614,8 +616,8 @@ class _OfferCard extends StatelessWidget {
       ClipRRect(borderRadius: BorderRadius.circular(11), child: imageUrl.isEmpty ? Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.image_outlined, size: 42, color: Colors.black26)) : Image.network(imageUrl, height: 108, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.broken_image_outlined)))),
       const SizedBox(height: 7), Text(data['name']?.toString() ?? 'صنف', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontWeight: FontWeight.w800)),
       const SizedBox(height: 3), Row(children: [
-        Expanded(child: Text(price is num ? price.toStringAsFixed(0) + ' ' + (data['currency'] ?? 'YER').toString() : 'عند الطلب', style: const TextStyle(color: _navy, fontWeight: FontWeight.w900))),
-        if (original is num) Text(original.toStringAsFixed(0), style: const TextStyle(color: Colors.grey, decoration: TextDecoration.lineThrough, fontSize: 10)),
+        Expanded(child: Text(formatMoney(price is num ? price : null, data['currency']?.toString()), style: const TextStyle(color: _navy, fontWeight: FontWeight.w900))),
+        if (original is num) Text(formatAmount(original), style: const TextStyle(color: Colors.grey, decoration: TextDecoration.lineThrough, fontSize: 10)),
       ]),
       const Spacer(), SizedBox(height: 34, child: FilledButton.icon(onPressed: onAdd, icon: const Icon(Icons.add_shopping_cart, size: 16), label: const Text('أضف'), style: FilledButton.styleFrom(backgroundColor: _blue, padding: EdgeInsets.zero))),
     ]));
@@ -719,7 +721,7 @@ class _FeaturedProductCard extends StatelessWidget {
     final p = product.data;
     final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
     final price = p['price'];
-    final priceText = price is num && price > 0 ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}' : 'عند الطلب';
+    final priceText = formatMoney(price is num ? price : null, p['currency']?.toString());
     return InkWell(
       borderRadius: BorderRadius.circular(15),
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: product))),
@@ -991,7 +993,7 @@ class _SectionProductTile extends StatelessWidget {
     final p = product.data;
     final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
     final price = p['price'];
-    final priceText = price is num && price > 0 ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}' : 'عند الطلب';
+    final priceText = formatMoney(price is num ? price : null, p['currency']?.toString());
     final stock = p['stock_base'] ?? p['stock'];
     final leading = imageUrl.isEmpty
         ? const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.inventory_2_outlined, color: _blue))
@@ -1059,7 +1061,7 @@ class _StoreCard extends StatelessWidget {
                 final leading = imageUrl.isEmpty
                     ? const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.inventory_2_outlined, color: _blue))
                     : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(imageUrl, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(child: Icon(Icons.broken_image_outlined))));
-                final priceText = price is num ? price.toStringAsFixed(0) + ' ' + (p['currency'] ?? 'YER').toString() : 'عند الطلب';
+                final priceText = formatMoney(price is num ? price : null, p['currency']?.toString());
                 final stock = p['stock_base'] ?? p['stock'];
                 return ListTile(
                   leading: leading,
@@ -1174,8 +1176,17 @@ class WalletCenterPage extends StatefulWidget {
 
 class _WalletCenterPageState extends State<WalletCenterPage> {
   Future<Map<String, dynamic>?> _loadWallet(String uid) async {
-    final row = await SupabaseService.client.from('wallets').select().eq('uid', uid).maybeSingle();
-    return row == null ? null : Map<String, dynamic>.from(row);
+    try {
+      // One wallet per user; ensure it exists and read its real currency.
+      final row = await OrderService(preferSupabase: true).walletInfo();
+      return {
+        'available_balance': row.balance,
+        'currency': row.currency,
+        'status': 'active',
+      };
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -1200,7 +1211,7 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
                 Card(color: _navy, child: Padding(padding: const EdgeInsets.all(22), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text('الرصيد المتاح', style: TextStyle(color: Colors.white70)),
                   const SizedBox(height: 6),
-                  Text('$balance YER', style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900)),
+                  Text(formatMoney(balance, (data['currency'] ?? 'USD').toString(), fallback: '0'), style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 8),
                   Text(data['status'] == 'active' ? 'المحفظة نشطة' : 'حالة المحفظة: ' + (data['status']?.toString() ?? 'غير معروفة'), style: const TextStyle(color: Colors.white70)),
                 ])),
@@ -1248,7 +1259,7 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
                       final type = row['type']?.toString() ?? 'operation';
                       return Card(elevation: 0, child: ListTile(
                         leading: const Icon(Icons.receipt_long_outlined, color: _blue),
-                        title: Text(type+' • '+(row['amount'] ?? 0).toString()+' YER', style: const TextStyle(fontWeight: FontWeight.w800)),
+                        title: Text(type+' • '+formatAmount(num.tryParse('${row['amount'] ?? 0}') ?? 0), style: const TextStyle(fontWeight: FontWeight.w800)),
                         subtitle: Text('الحالة: '+(row['status'] ?? 'pending').toString()),
                       ));
                     }).toList());

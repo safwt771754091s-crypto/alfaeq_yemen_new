@@ -6,7 +6,7 @@ class WalletService {
   const WalletService();
 
   Future<Map<String, dynamic>> ensureMyWallet({
-    String currency = 'YER',
+    String currency = 'USD',
     String accountType = 'customer',
   }) async {
     final response = await SupabaseService.client.rpc(

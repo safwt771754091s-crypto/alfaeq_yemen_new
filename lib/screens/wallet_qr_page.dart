@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../core/money.dart';
+import '../services/order_service.dart';
 import '../services/supabase_service.dart';
 
 /// WeChat Pay-style wallet page: receive code (QR), scan/paste-to-pay, and a
@@ -135,14 +137,15 @@ class _WalletQrPageState extends State<WalletQrPage> {
 
     try {
       final idem = 'xfer-${DateTime.now().microsecondsSinceEpoch}';
+      final walletCurrency = (await OrderService(preferSupabase: true).walletInfo()).currency;
       final balance = await SupabaseService.client.rpc('wallet_transfer', params: {
         'p_to_uid': payeeUid,
         'p_amount': amount,
-        'p_currency': 'YER',
+        'p_currency': walletCurrency,
         'p_idempotency_key': idem,
         'p_note': noteController.text.trim().isEmpty ? null : noteController.text.trim(),
       });
-      _snack('تم الدفع بنجاح. رصيدك الآن: $balance YER');
+      _snack('تم الدفع بنجاح. رصيدك الآن: ${formatAmount(num.tryParse('$balance') ?? 0)} $walletCurrency');
       _reload();
     } catch (e) {
       _snack('تعذر إتمام الدفع: ${_friendly(e)}');
@@ -155,6 +158,9 @@ class _WalletQrPageState extends State<WalletQrPage> {
     if (s.contains('recipient_not_found')) return 'المستلم غير موجود.';
     if (s.contains('cannot_pay_self')) return 'لا يمكنك الدفع لنفسك.';
     if (s.contains('sender_wallet_missing')) return 'لا توجد محفظة. أنشئ محفظتك أولاً.';
+    if (s.contains('sender_currency_mismatch') || s.contains('recipient_currency_mismatch') || s.contains('wallet_currency_mismatch')) {
+      return 'عملة المحفظة لا تطابق عملة العملية.';
+    }
     return s;
   }
 
@@ -178,12 +184,13 @@ class _WalletQrPageState extends State<WalletQrPage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(title: const Text('الدفع والمحفظة', style: TextStyle(fontWeight: FontWeight.w900))),
-        body: FutureBuilder<Map<String, dynamic>?>(
+        body: FutureBuilder<({num balance, String currency})>(
           key: ValueKey(_refresh),
-          future: SupabaseService.client.from('wallets').select().eq('uid', user.id).maybeSingle(),
+          future: OrderService(preferSupabase: true).walletInfo(),
           builder: (context, snapshot) {
-            final data = snapshot.data == null ? <String, dynamic>{} : Map<String, dynamic>.from(snapshot.data!);
-            final balance = num.tryParse('${data['available_balance'] ?? 0}') ?? 0;
+            final info = snapshot.data;
+            final balance = info?.balance ?? 0;
+            final walletCurrency = info?.currency ?? 'YER';
             return ListView(
               padding: const EdgeInsets.all(20),
               children: [
@@ -196,7 +203,7 @@ class _WalletQrPageState extends State<WalletQrPage> {
                     children: [
                       const Text('الرصيد المتاح', style: TextStyle(color: Colors.white70)),
                       const SizedBox(height: 6),
-                      Text('$balance YER', style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900)),
+                      Text(formatMoney(balance, walletCurrency, fallback: '0'), style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900)),
                     ],
                   ),
                 ),
@@ -271,7 +278,7 @@ class _WalletQrPageState extends State<WalletQrPage> {
                         elevation: 0,
                         child: ListTile(
                           leading: Icon(isOut ? Icons.arrow_upward : Icons.arrow_downward, color: isOut ? Colors.redAccent : Colors.green),
-                          title: Text('${isOut ? 'صادر' : 'وارد'} • $amount YER', style: const TextStyle(fontWeight: FontWeight.w800)),
+                          title: Text('${isOut ? 'صادر' : 'وارد'} • '+formatAmount(num.tryParse('$amount') ?? 0)+' $walletCurrency', style: const TextStyle(fontWeight: FontWeight.w800)),
                           subtitle: Text((row['reference_type'] ?? type).toString()),
                         ),
                       );
