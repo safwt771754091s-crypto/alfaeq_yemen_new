@@ -144,11 +144,11 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
             ),
             const Padding(padding: EdgeInsets.fromLTRB(16, 16, 16, 8), child: Text('منتجات المتجر', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16))),
             FutureBuilder<List<CatalogDocument>>(
-              future: const CatalogService().activeProducts(limit: 5000),
+              future: CatalogService().activeProducts(storeId: widget.store.id, limit: 2000),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()));
                 if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(16), child: Text('تعذر تحميل المنتجات.'));
-                final products = (snapshot.data ?? const <CatalogDocument>[]).where((p) => (p.data['store_id'] ?? '').toString() == widget.store.id).toList();
+                final products = snapshot.data ?? const <CatalogDocument>[];
                 if (products.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد منتجات نشطة في هذا المتجر.', style: TextStyle(color: Colors.black54)));
                 return GridView.builder(
                   shrinkWrap: true,

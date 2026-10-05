@@ -109,6 +109,13 @@ class MiniProgramPage extends StatefulWidget {
 class _MiniProgramPageState extends State<MiniProgramPage> {
   final _search = TextEditingController();
   String _query = '';
+  late final Future<List<CatalogDocument>> _productsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _productsFuture = CatalogService().activeProducts(sectionId: widget.section.id, limit: 2000);
+  }
 
   @override
   void dispose() {
@@ -216,16 +223,20 @@ class _MiniProgramPageState extends State<MiniProgramPage> {
             const Text('الأصناف المتاحة', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
             const SizedBox(height: 9),
             FutureBuilder<List<CatalogDocument>>(
-              future: const CatalogService().activeProducts(limit: 500),
+              future: _productsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()));
                 }
                 if (snapshot.hasError) return const Text('تعذر تحميل الأصناف.');
                 var products = snapshot.data ?? const <CatalogDocument>[];
-                products = products.where((p) => (p.data['section_id'] ?? '').toString() == section.id).toList();
                 if (_query.isNotEmpty) {
-                  products = products.where((p) => (p.data['name'] ?? '').toString().contains(_query)).toList();
+                  final q = _query.trim().toLowerCase();
+                  products = products.where((p) {
+                    final name = (p.data['name'] ?? '').toString().toLowerCase();
+                    final barcode = (p.data['metadata'] is Map ? (p.data['metadata'] as Map)['barcode'] : null)?.toString().toLowerCase() ?? '';
+                    return name.contains(q) || barcode.contains(q);
+                  }).toList();
                 }
                 if (products.isEmpty) {
                   return const Text('لا توجد أصناف نشطة في هذا البرنامج بعد.', style: TextStyle(color: Colors.black54));

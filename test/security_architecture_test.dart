@@ -54,5 +54,43 @@ void main() {
       expect(ai, contains('AlfaeqAiService'));
       expect(ai, contains('تأكيد التنفيذ'));
     });
+
+    test('product search matches name, description and barcode', () {
+      final search = File('lib/services/unified_search_service.dart').readAsStringSync();
+      expect(search, contains("metadata->>barcode.ilike"));
+      final tools = File('lib/ai/ai_tools.dart').readAsStringSync();
+      expect(tools, contains("metadata->>barcode.ilike"));
+      expect(tools, contains(".limit(_max)"));
+    });
+
+    test('section page search box filters products', () {
+      final home = File('lib/screens/world_home_page.dart').readAsStringSync();
+      expect(home, contains('class _WorldSectionPageState'));
+      expect(home, contains('onChanged: (v) => setState(() => _query = v)'));
+      expect(home, contains("metadata") , reason: 'section filter reads product metadata for barcode');
+      expect(home, contains('_productsFuture'));
+    });
+
+    test('home offers read published promotions linked to active products', () {
+      final home = File('lib/screens/world_home_page.dart').readAsStringSync();
+      expect(home, contains('activePromotions'));
+      expect(home, contains('_promotionDeals'));
+      expect(home, contains("from('products')"));
+    });
+
+    test('store and section listings filter server-side instead of truncating', () {
+      final store = File('lib/screens/store_detail_page.dart').readAsStringSync();
+      expect(store, contains('activeProducts(storeId: widget.store.id'));
+      expect(store, isNot(contains('activeProducts(limit: 5000)')));
+      final program = File('lib/screens/mini_programs_page.dart').readAsStringSync();
+      expect(program, contains('activeProducts(sectionId: widget.section.id'));
+      expect(program, isNot(contains('activeProducts(limit: 500)')));
+    });
+
+    test('public update CTA opens its real link', () {
+      final home = File('lib/screens/world_home_page.dart').readAsStringSync();
+      expect(home, contains("import 'package:url_launcher/url_launcher.dart';"));
+      expect(home, contains('launchUrl(uri'));
+    });
   });
 }

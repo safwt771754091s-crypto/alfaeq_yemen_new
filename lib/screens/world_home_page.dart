@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_sections.dart';
 import '../services/auth_service.dart';
@@ -552,20 +553,43 @@ class _CategoriesSection extends StatelessWidget {
   }
 }
 
+int _promoDiscount(Map<String, dynamic> data) {
+  final percent = data['discount_percent'] ?? data['discountPercent'];
+  final price = data['price'];
+  final original = data['original_price'] ?? data['originalPrice'];
+  if (percent is num && percent > 0 && percent <= 100) return percent.round();
+  if (price is num && original is num && original > price) return ((1 - (price / original)) * 100).round();
+  return 0;
+}
+
+/// Loads published promotions that are linked to a real product, so the home
+/// offers carousel only shows deals the customer can actually add to the cart.
+Future<List<(CatalogDocument, int)>> _promotionDeals() async {
+  final promos = await const PublicContentService().activePromotions(limit: 40);
+  final ids = promos.map((p) => p.data['product_id']).whereType<String>().where((e) => e.isNotEmpty).toSet().toList();
+  if (ids.isEmpty) return const [];
+  final rows = await SupabaseService.client.from('products').select().inFilter('id', ids).eq('status', 'active');
+  final byId = {for (final r in rows) (r['id'] ?? '').toString(): Map<String, dynamic>.from(r)};
+  final deals = <(CatalogDocument, int)>[];
+  for (final promo in promos) {
+    final d = promo.data;
+    final product = byId[(d['product_id'] ?? '').toString()];
+    if (product == null) continue;
+    var discount = _promoDiscount(d);
+    if (discount <= 0) discount = 5;
+    deals.add((CatalogDocument.fromSupabase(product), discount));
+  }
+  return deals;
+}
+
 class _OffersSection extends StatelessWidget {
   final Future<void> Function(CatalogDocument) onAddToCart;
   const _OffersSection({required this.onAddToCart});
-  int _discount(Map<String, dynamic> data) {
-    final percent = data['discountPercent'] ?? data['discount_percent']; final price = data['price']; final original = data['originalPrice'] ?? data['original_price'];
-    if (percent is num && percent > 0 && percent <= 100) return percent.round();
-    if (price is num && original is num && original > price) return ((1 - (price / original)) * 100).round();
-    return 0;
-  }
   @override
-  Widget build(BuildContext context) => FutureBuilder<List<CatalogDocument>>(
-    future: const CatalogService().activeProducts(limit: 40),
+  Widget build(BuildContext context) => FutureBuilder<List<(CatalogDocument, int)>>(
+    future: _promotionDeals(),
     builder: (context, snapshot) {
-      final products = (snapshot.data ?? const <CatalogDocument>[]).where((doc) => _discount(doc.data) > 0).take(8).toList();
+      final deals = (snapshot.data ?? const <(CatalogDocument, int)>[]).take(8).toList();
       return Column(children: [
         Row(children: [
           const Expanded(child: Text('عروض مميزة 🔥', style: TextStyle(color: _navy, fontSize: 21, fontWeight: FontWeight.w900))),
@@ -574,10 +598,10 @@ class _OffersSection extends StatelessWidget {
         const SizedBox(height: 8),
         if (snapshot.connectionState == ConnectionState.waiting) const LinearProgressIndicator()
         else if (snapshot.hasError) const _Info(title: 'تعذر تحميل العروض', text: 'تحقق من الاتصال والصلاحيات.')
-        else if (products.isEmpty) const _Info(title: 'العروض جاهزة للظهور', text: 'عند إضافة خصم حقيقي للصنف سيظهر تلقائياً هنا.')
+        else if (deals.isEmpty) const _Info(title: 'العروض جاهزة للظهور', text: 'عند نشر عرض مرتبط بصنف سيظهر تلقائياً هنا.')
         else SizedBox(height: 238, child: ListView.separated(
-          scrollDirection: Axis.horizontal, itemCount: products.length, separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (context, i) { final p = products[i]; return _OfferCard(product: p, discount: _discount(p.data), onAdd: () => onAddToCart(p)); },
+          scrollDirection: Axis.horizontal, itemCount: deals.length, separatorBuilder: (_, __) => const SizedBox(width: 10),
+          itemBuilder: (context, i) { final (product, discount) = deals[i]; return _OfferCard(product: product, discount: discount, onAdd: () => onAddToCart(product)); },
         )),
       ]);
     },
@@ -595,7 +619,7 @@ class _OfferCard extends StatelessWidget {
       ClipRRect(borderRadius: BorderRadius.circular(11), child: imageUrl.isEmpty ? Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.image_outlined, size: 42, color: Colors.black26)) : Image.network(imageUrl, height: 108, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.broken_image_outlined)))),
       const SizedBox(height: 7), Text(data['name']?.toString() ?? 'صنف', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontWeight: FontWeight.w800)),
       const SizedBox(height: 3), Row(children: [
-        Expanded(child: Text(price is num ? price.toStringAsFixed(0) + ' ر.ي' : 'عند الطلب', style: const TextStyle(color: _navy, fontWeight: FontWeight.w900))),
+        Expanded(child: Text(price is num ? price.toStringAsFixed(0) + ' ' + (data['currency'] ?? 'YER').toString() : 'عند الطلب', style: const TextStyle(color: _navy, fontWeight: FontWeight.w900))),
         if (original is num) Text(original.toStringAsFixed(0), style: const TextStyle(color: Colors.grey, decoration: TextDecoration.lineThrough, fontSize: 10)),
       ]),
       const Spacer(), SizedBox(height: 34, child: FilledButton.icon(onPressed: onAdd, icon: const Icon(Icons.add_shopping_cart, size: 16), label: const Text('أضف'), style: FilledButton.styleFrom(backgroundColor: _blue, padding: EdgeInsets.zero))),
@@ -605,26 +629,20 @@ class _OfferCard extends StatelessWidget {
 
 class _OffersPage extends StatelessWidget {
   const _OffersPage();
-  int _discount(Map<String, dynamic> data) {
-    final p = data['discountPercent'] ?? data['discount_percent']; final price = data['price']; final original = data['originalPrice'] ?? data['original_price'];
-    if (p is num && p > 0 && p <= 100) return p.round();
-    if (price is num && original is num && original > price) return ((1 - (price / original)) * 100).round();
-    return 0;
-  }
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('العروض المميزة', style: TextStyle(fontWeight: FontWeight.w900))),
-    body: FutureBuilder<List<CatalogDocument>>(
-      future: const CatalogService().activeProducts(limit: 100),
+    body: FutureBuilder<List<(CatalogDocument, int)>>(
+      future: _promotionDeals(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         if (snapshot.hasError) return const Center(child: _Info(title: 'تعذر تحميل العروض', text: 'تحقق من الاتصال والصلاحيات.'));
-        final docs = (snapshot.data ?? const <CatalogDocument>[]).where((d) => _discount(d.data) > 0).toList();
-        if (docs.isEmpty) return const Center(child: _Info(title: 'لا توجد عروض حالياً', text: 'أضف خصماً حقيقياً إلى منتجاتك ليظهر هنا.'));
+        final deals = snapshot.data ?? const <(CatalogDocument, int)>[];
+        if (deals.isEmpty) return const Center(child: _Info(title: 'لا توجد عروض حالياً', text: 'انشر عرضاً مرتبطاً بصنف ليظهر هنا.'));
         return GridView.builder(
-          padding: const EdgeInsets.all(16), itemCount: docs.length,
+          padding: const EdgeInsets.all(16), itemCount: deals.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: .68),
-          itemBuilder: (_, i) { final d = docs[i]; return _OfferCard(product: d, discount: _discount(d.data), onAdd: () => _addProductToCart(context, d)); },
+          itemBuilder: (_, i) { final (product, discount) = deals[i]; return _OfferCard(product: product, discount: discount, onAdd: () => _addProductToCart(context, product)); },
         );
       },
     ),
@@ -672,10 +690,13 @@ class _PublicUpdatesSection extends StatelessWidget {
               ),
               title: Text(item.data['title']?.toString() ?? 'تحديث جديد', style: const TextStyle(fontWeight: FontWeight.w900)),
               subtitle: Text(item.data['summary']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis),
-              onTap: () {
-                final url = item.data['cta_url']?.toString();
-                if (url != null && url.isNotEmpty) {
-                  // The full destination can be opened by the existing URL launcher layer.
+              onTap: () async {
+                final url = item.data['cta_url']?.toString() ?? '';
+                if (url.isEmpty) return;
+                final uri = Uri.tryParse(url);
+                if (uri == null || !uri.hasScheme) return;
+                final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                if (!ok && context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(item.data['cta_label']?.toString() ?? 'تفاصيل التحديث')),
                   );
@@ -765,12 +786,47 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
-class WorldSectionPage extends StatelessWidget {
+class WorldSectionPage extends StatefulWidget {
   final AppSection section;
   const WorldSectionPage({super.key, required this.section});
 
   @override
-  Widget build(BuildContext context) => Directionality(
+  State<WorldSectionPage> createState() => _WorldSectionPageState();
+}
+
+class _WorldSectionPageState extends State<WorldSectionPage> {
+  final _searchController = TextEditingController();
+  String _query = '';
+  late final Future<List<CatalogDocument>> _productsFuture;
+  late final Future<List<CatalogDocument>> _storesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _productsFuture = CatalogService().activeProducts(sectionId: widget.section.id, limit: 2000);
+    _storesFuture = CatalogService().approvedStores(widget.section.id, limit: 30);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<CatalogDocument> _filter(List<CatalogDocument> products) {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return products;
+    return products.where((p) {
+      final name = (p.data['name'] ?? '').toString().toLowerCase();
+      final barcode = (p.data['metadata'] is Map ? (p.data['metadata'] as Map)['barcode'] : null)?.toString().toLowerCase() ?? '';
+      return name.contains(q) || barcode.contains(q);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final section = widget.section;
+    return Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
           appBar: AppBar(
@@ -798,17 +854,21 @@ class WorldSectionPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              TextField(decoration: InputDecoration(hintText: 'ابحث في ${section.title}...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none))),
+              TextField(
+                controller: _searchController,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(hintText: 'ابحث في ${section.title}...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none)),
+              ),
               const SizedBox(height: 18),
               const Text('منتجات القسم', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 9),
               FutureBuilder<List<CatalogDocument>>(
-                future: CatalogService().activeProducts(sectionId: section.id, limit: 300),
+                future: _productsFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
                   if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المنتجات', text: 'تحقق من اتصال قاعدة البيانات.');
-                  final products = snapshot.data ?? const <CatalogDocument>[];
-                  if (products.isEmpty) return const _Info(title: 'لا توجد منتجات بعد', text: 'سيظهر هنا المحتوى الحقيقي عند إضافته.');
+                  final products = _filter(snapshot.data ?? const <CatalogDocument>[]);
+                  if (products.isEmpty) return const _Info(title: 'لا توجد منتجات مطابقة', text: 'جرّب كلمة أخرى أو تحقق من الاسم أو الباركود.');
                   return Column(children: products.map((product) => _SectionProductTile(product: product)).toList());
                 },
               ),
@@ -816,7 +876,7 @@ class WorldSectionPage extends StatelessWidget {
               const Text('المتاجر المعتمدة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 9),
               FutureBuilder<List<CatalogDocument>>(
-                future: CatalogService().approvedStores(section.id, limit: 30),
+                future: _storesFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()));
                   if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المتاجر', text: 'تحقق من اتصال قاعدة البيانات.');
@@ -829,6 +889,7 @@ class WorldSectionPage extends StatelessWidget {
           ),
         ),
       );
+  }
 }
 
 class _SectionProductTile extends StatelessWidget {

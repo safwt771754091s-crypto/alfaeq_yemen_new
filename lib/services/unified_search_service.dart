@@ -32,7 +32,7 @@ class UnifiedSearchService {
             .from('products')
             .select()
             .eq('status', 'active')
-            .or('name.ilike.%$q%,description.ilike.%$q%')
+            .or('name.ilike.%$q%,description.ilike.%$q%,metadata->>barcode.ilike.%$q%')
             .order('name')
             .limit(limit);
         products = rows.map((e) => Map<String, dynamic>.from(e)).toList();
