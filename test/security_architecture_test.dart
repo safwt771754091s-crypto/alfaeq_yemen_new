@@ -62,5 +62,13 @@ void main() {
       expect(tools, contains("metadata->>barcode.ilike"));
       expect(tools, contains(".limit(_max)"));
     });
+
+    test('section page search box filters products', () {
+      final home = File('lib/screens/world_home_page.dart').readAsStringSync();
+      expect(home, contains('class _WorldSectionPageState'));
+      expect(home, contains('onChanged: (v) => setState(() => _query = v)'));
+      expect(home, contains("metadata") , reason: 'section filter reads product metadata for barcode');
+      expect(home, contains('_productsFuture'));
+    });
   });
 }

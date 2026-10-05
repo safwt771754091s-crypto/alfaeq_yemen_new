@@ -765,12 +765,47 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
-class WorldSectionPage extends StatelessWidget {
+class WorldSectionPage extends StatefulWidget {
   final AppSection section;
   const WorldSectionPage({super.key, required this.section});
 
   @override
-  Widget build(BuildContext context) => Directionality(
+  State<WorldSectionPage> createState() => _WorldSectionPageState();
+}
+
+class _WorldSectionPageState extends State<WorldSectionPage> {
+  final _searchController = TextEditingController();
+  String _query = '';
+  late final Future<List<CatalogDocument>> _productsFuture;
+  late final Future<List<CatalogDocument>> _storesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _productsFuture = CatalogService().activeProducts(sectionId: widget.section.id, limit: 300);
+    _storesFuture = CatalogService().approvedStores(widget.section.id, limit: 30);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<CatalogDocument> _filter(List<CatalogDocument> products) {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return products;
+    return products.where((p) {
+      final name = (p.data['name'] ?? '').toString().toLowerCase();
+      final barcode = (p.data['metadata'] is Map ? (p.data['metadata'] as Map)['barcode'] : null)?.toString().toLowerCase() ?? '';
+      return name.contains(q) || barcode.contains(q);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final section = widget.section;
+    return Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
           appBar: AppBar(
@@ -798,17 +833,21 @@ class WorldSectionPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              TextField(decoration: InputDecoration(hintText: 'ابحث في ${section.title}...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none))),
+              TextField(
+                controller: _searchController,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(hintText: 'ابحث في ${section.title}...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none)),
+              ),
               const SizedBox(height: 18),
               const Text('منتجات القسم', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 9),
               FutureBuilder<List<CatalogDocument>>(
-                future: CatalogService().activeProducts(sectionId: section.id, limit: 300),
+                future: _productsFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
                   if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المنتجات', text: 'تحقق من اتصال قاعدة البيانات.');
-                  final products = snapshot.data ?? const <CatalogDocument>[];
-                  if (products.isEmpty) return const _Info(title: 'لا توجد منتجات بعد', text: 'سيظهر هنا المحتوى الحقيقي عند إضافته.');
+                  final products = _filter(snapshot.data ?? const <CatalogDocument>[]);
+                  if (products.isEmpty) return const _Info(title: 'لا توجد منتجات مطابقة', text: 'جرّب كلمة أخرى أو تحقق من الاسم أو الباركود.');
                   return Column(children: products.map((product) => _SectionProductTile(product: product)).toList());
                 },
               ),
@@ -816,7 +855,7 @@ class WorldSectionPage extends StatelessWidget {
               const Text('المتاجر المعتمدة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 9),
               FutureBuilder<List<CatalogDocument>>(
-                future: CatalogService().approvedStores(section.id, limit: 30),
+                future: _storesFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()));
                   if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المتاجر', text: 'تحقق من اتصال قاعدة البيانات.');
@@ -829,6 +868,7 @@ class WorldSectionPage extends StatelessWidget {
           ),
         ),
       );
+  }
 }
 
 class _SectionProductTile extends StatelessWidget {
