@@ -618,7 +618,7 @@ class _OfferCard extends StatelessWidget {
       ClipRRect(borderRadius: BorderRadius.circular(11), child: imageUrl.isEmpty ? Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.image_outlined, size: 42, color: Colors.black26)) : Image.network(imageUrl, height: 108, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.broken_image_outlined)))),
       const SizedBox(height: 7), Text(data['name']?.toString() ?? 'صنف', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontWeight: FontWeight.w800)),
       const SizedBox(height: 3), Row(children: [
-        Expanded(child: Text(price is num ? price.toStringAsFixed(0) + ' ر.ي' : 'عند الطلب', style: const TextStyle(color: _navy, fontWeight: FontWeight.w900))),
+        Expanded(child: Text(price is num ? price.toStringAsFixed(0) + ' ' + (data['currency'] ?? 'YER').toString() : 'عند الطلب', style: const TextStyle(color: _navy, fontWeight: FontWeight.w900))),
         if (original is num) Text(original.toStringAsFixed(0), style: const TextStyle(color: Colors.grey, decoration: TextDecoration.lineThrough, fontSize: 10)),
       ]),
       const Spacer(), SizedBox(height: 34, child: FilledButton.icon(onPressed: onAdd, icon: const Icon(Icons.add_shopping_cart, size: 16), label: const Text('أضف'), style: FilledButton.styleFrom(backgroundColor: _blue, padding: EdgeInsets.zero))),
@@ -799,7 +799,7 @@ class _WorldSectionPageState extends State<WorldSectionPage> {
   @override
   void initState() {
     super.initState();
-    _productsFuture = CatalogService().activeProducts(sectionId: widget.section.id, limit: 300);
+    _productsFuture = CatalogService().activeProducts(sectionId: widget.section.id, limit: 2000);
     _storesFuture = CatalogService().approvedStores(widget.section.id, limit: 30);
   }
 
