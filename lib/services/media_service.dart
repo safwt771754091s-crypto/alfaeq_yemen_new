@@ -32,8 +32,8 @@ class MediaService {
 
     if (overwrite) {
       // The storage object is replaced in place; refresh the existing media
-      // record instead of inserting a new asset row.
-      await SupabaseService.client
+      // record, or create one if this is the first upload at this path.
+      final updated = await SupabaseService.client
           .from('media_assets')
           .update({
             'entity_id': productId,
@@ -41,23 +41,38 @@ class MediaService {
             'mime_type': _mimeType(safeExt),
           })
           .eq('owner_id', ownerId)
-          .eq('object_path', path);
+          .eq('object_path', path)
+          .select('id');
+      if ((updated as List).isEmpty) {
+        await _insertAsset(ownerId, productId, bucket, path, publicUrl, safeExt);
+      }
     } else {
-      await SupabaseService.client.from('media_assets').insert({
-        'owner_id': ownerId,
-        'entity_type': 'product',
-        'entity_id': productId,
-        'source': 'supabase_storage',
-        'bucket': bucket,
-        'object_path': path,
-        'public_url': publicUrl,
-        'mime_type': _mimeType(safeExt),
-        'is_public': true,
-        'metadata': {'storage': 'supabase', 'purpose': 'product_image'},
-      });
+      await _insertAsset(ownerId, productId, bucket, path, publicUrl, safeExt);
     }
 
     return publicUrl;
+  }
+
+  static Future<void> _insertAsset(
+    String ownerId,
+    String? productId,
+    String bucket,
+    String path,
+    String publicUrl,
+    String safeExt,
+  ) async {
+    await SupabaseService.client.from('media_assets').insert({
+      'owner_id': ownerId,
+      'entity_type': 'product',
+      'entity_id': productId,
+      'source': 'supabase_storage',
+      'bucket': bucket,
+      'object_path': path,
+      'public_url': publicUrl,
+      'mime_type': _mimeType(safeExt),
+      'is_public': true,
+      'metadata': {'storage': 'supabase', 'purpose': 'product_image'},
+    });
   }
 
   static String _mimeType(String extension) => switch (extension) {
