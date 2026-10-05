@@ -14,6 +14,7 @@ class MediaService {
     required Uint8List bytes,
     required String extension,
     String? productId,
+    bool overwrite = false,
   }) async {
     final safeExt = extension.replaceAll('.', '').toLowerCase();
     final suffix = productId == null || productId.isEmpty
@@ -24,23 +25,37 @@ class MediaService {
     await SupabaseService.client.storage.from(bucket).uploadBinary(
       path,
       bytes,
-      fileOptions: const FileOptions(cacheControl: '31536000', upsert: false),
+      fileOptions: FileOptions(cacheControl: '31536000', upsert: overwrite),
     );
 
     final publicUrl = SupabaseService.client.storage.from(bucket).getPublicUrl(path);
 
-    await SupabaseService.client.from('media_assets').insert({
-      'owner_id': ownerId,
-      'entity_type': 'product',
-      'entity_id': productId,
-      'source': 'supabase_storage',
-      'bucket': bucket,
-      'object_path': path,
-      'public_url': publicUrl,
-      'mime_type': _mimeType(safeExt),
-      'is_public': true,
-      'metadata': {'storage': 'supabase', 'purpose': 'product_image'},
-    });
+    if (overwrite) {
+      // The storage object is replaced in place; refresh the existing media
+      // record instead of inserting a new asset row.
+      await SupabaseService.client
+          .from('media_assets')
+          .update({
+            'entity_id': productId,
+            'public_url': publicUrl,
+            'mime_type': _mimeType(safeExt),
+          })
+          .eq('owner_id', ownerId)
+          .eq('object_path', path);
+    } else {
+      await SupabaseService.client.from('media_assets').insert({
+        'owner_id': ownerId,
+        'entity_type': 'product',
+        'entity_id': productId,
+        'source': 'supabase_storage',
+        'bucket': bucket,
+        'object_path': path,
+        'public_url': publicUrl,
+        'mime_type': _mimeType(safeExt),
+        'is_public': true,
+        'metadata': {'storage': 'supabase', 'purpose': 'product_image'},
+      });
+    }
 
     return publicUrl;
   }
