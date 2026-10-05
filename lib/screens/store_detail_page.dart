@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../core/money.dart';
+import '../services/currency_service.dart';
 import '../services/catalog_service.dart';
 import '../services/review_service.dart';
 import '../services/supabase_service.dart';
@@ -185,8 +185,7 @@ class _StoreProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = product.data;
     final imageUrl = (p['image_url'] ?? '').toString();
-    final price = p['price'];
-    final priceText = formatMoney(price is num ? price : null, p['currency']?.toString());
+    final priceText = CurrencyService.instance.formatProduct(p);
     return Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE3E8EF))),
       child: InkWell(

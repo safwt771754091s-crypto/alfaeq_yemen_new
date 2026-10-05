@@ -25,6 +25,7 @@ class SupabaseDataService {
     required String paymentMethod,
     double? latitude,
     double? longitude,
+    String displayCurrency = 'YER',
   }) async {
     final normalized = items.map((item) => {
       'product_id': item['productId'] ?? item['product_id'],
@@ -36,6 +37,7 @@ class SupabaseDataService {
       'p_payment_method': paymentMethod,
       'p_latitude': latitude,
       'p_longitude': longitude,
+      'p_display_currency': displayCurrency,
     });
     return id.toString();
   }
