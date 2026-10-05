@@ -8,6 +8,7 @@ import 'screens/cart_page.dart';
 import 'screens/developer_page.dart';
 import 'screens/merchant_invite_page.dart';
 import 'screens/my_orders_page.dart';
+import 'screens/notifications_page.dart';
 import 'services/auth_service.dart';
 import 'services/supabase_service.dart';
 import 'services/catalog_service.dart';
@@ -211,7 +212,7 @@ class HomePage extends StatelessWidget {
                 },
               ),
               IconButton(tooltip: 'طلباتي', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersPage())), icon: const Icon(Icons.receipt_long_outlined)),
-              IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none)),
+              IconButton(tooltip: 'الإشعارات', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage())), icon: const Icon(Icons.notifications_none)),
               PopupMenuButton<String>(
                 onSelected: (value) {
                   if (value == 'cart') Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage()));

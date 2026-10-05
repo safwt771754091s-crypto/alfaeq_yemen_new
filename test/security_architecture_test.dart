@@ -92,5 +92,21 @@ void main() {
       expect(home, contains("import 'package:url_launcher/url_launcher.dart';"));
       expect(home, contains('launchUrl(uri'));
     });
+
+    test('camera barcode scanner is wired into search', () {
+      final scanner = File('lib/screens/barcode_scanner_page.dart').readAsStringSync();
+      expect(scanner, contains('MobileScanner('));
+      expect(scanner, contains('BarcodeFormat.ean13'));
+      final search = File('lib/screens/search_page.dart').readAsStringSync();
+      expect(search, contains('BarcodeScannerPage()'));
+      expect(search, contains('_scanBarcode'));
+    });
+
+    test('home storefront exposes a featured products grid', () {
+      final home = File('lib/screens/world_home_page.dart').readAsStringSync();
+      expect(home, contains('_FeaturedProductsSection('));
+      expect(home, contains('activeProducts(limit: 200)'));
+      expect(home, contains('منتجات مختارة لك'));
+    });
   });
 }

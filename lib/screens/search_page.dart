@@ -7,6 +7,7 @@ import '../services/catalog_service.dart';
 import '../services/supabase_service.dart';
 import '../services/unified_search_service.dart';
 import 'cart_page.dart';
+import 'barcode_scanner_page.dart';
 import 'mini_programs_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
@@ -93,6 +94,17 @@ class _SearchPageState extends State<SearchPage> {
     if (q.isNotEmpty) _run(q);
   }
 
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const BarcodeScannerPage()),
+    );
+    final value = code?.trim();
+    if (value == null || value.isEmpty || !mounted) return;
+    _controller.text = value;
+    _submit(value);
+  }
+
   Future<void> _addToCart(Map<String, dynamic> row) async {
     final user = SupabaseService.client.auth.currentUser;
     if (user == null) {
@@ -143,9 +155,18 @@ class _SearchPageState extends State<SearchPage> {
                 decoration: InputDecoration(
                   hintText: 'ابحث عن منتج، متجر، أو خدمة…',
                   prefixIcon: const Icon(Icons.search, color: _navy),
-                  suffixIcon: _query.isEmpty
-                      ? null
-                      : IconButton(icon: const Icon(Icons.close), onPressed: () { _controller.clear(); _onChanged(''); }),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'مسح الباركود',
+                        icon: const Icon(Icons.qr_code_scanner, color: _navy),
+                        onPressed: _scanBarcode,
+                      ),
+                      if (_query.isNotEmpty)
+                        IconButton(icon: const Icon(Icons.close), onPressed: () { _controller.clear(); _onChanged(''); }),
+                    ],
+                  ),
                   filled: true,
                   fillColor: Colors.white,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
