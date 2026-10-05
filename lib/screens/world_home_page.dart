@@ -142,6 +142,32 @@ class _LiveCartBadge extends StatelessWidget {
   }
 }
 
+class _LiveNotificationsBadge extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  const _LiveNotificationsBadge({required this.icon, required this.color});
+
+  int _unread(List<Map<String, dynamic>> rows) =>
+      rows.where((row) => row['read_at'] == null).length;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = SupabaseService.client.auth.currentUser;
+    if (user == null || !SupabaseService.isInitialized) {
+      return _CartBadgeIcon(icon: icon, count: 0, color: color);
+    }
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: SupabaseService.client
+          .from('notifications')
+          .stream(primaryKey: ['id'])
+          .eq('user_id', user.id)
+          .limit(100),
+      builder: (context, snapshot) =>
+          _CartBadgeIcon(icon: icon, count: _unread(snapshot.data ?? const []), color: color),
+    );
+  }
+}
+
 class _CartBadgeIcon extends StatelessWidget {
   final IconData icon;
   final int count;
@@ -299,7 +325,7 @@ class _HomeHeader extends StatelessWidget {
                 ),
               ),
               const CurrencySelector(dark: true),
-              IconButton(onPressed: onNotifications, icon: const Icon(Icons.notifications_none, color: Colors.white)),
+              IconButton(onPressed: onNotifications, icon: const _LiveNotificationsBadge(icon: Icons.notifications_none, color: Colors.white)),
               IconButton(onPressed: onCart, icon: const _LiveCartBadge(icon: Icons.shopping_cart_outlined, color: Colors.white)),
             ],
           ),

@@ -11,6 +11,7 @@ class DriverCenterPage extends StatefulWidget {
 }
 class _DriverCenterPageState extends State<DriverCenterPage>{
   final _auth=AuthService(); bool _busy=false; StreamSubscription<Position>? _locationSubscription;
+  bool _resumeChecked=false;
 
   Future<bool> _allowed() async {
     final role=await _auth.role();
@@ -29,6 +30,12 @@ class _DriverCenterPageState extends State<DriverCenterPage>{
       }
       if(value)await _startLiveLocation(user.id);else await _stopLiveLocation();
     }catch(e){_message('تعذر تحديث حالة المندوب: $e');}finally{if(mounted)setState(()=>_busy=false);}
+  }
+  Future<void> _resumeIfOnline(String uid, bool online, bool approved) async {
+    if (_resumeChecked) return;
+    _resumeChecked = true;
+    if (!online || !approved || _locationSubscription != null) return;
+    try { await _startLiveLocation(uid); } catch (_) {}
   }
   Future<void> _startLiveLocation(String uid) async {
     await _stopLiveLocation(); await LocationService.requireCurrentPosition();
@@ -83,6 +90,7 @@ class _DriverCenterPageState extends State<DriverCenterPage>{
           builder:(context,profile){
             final d=profile.data?.isNotEmpty==true?profile.data!.first:<String,dynamic>{};
             final approved=d['approved']==true, online=d['is_online']==true;
+            if (profile.connectionState==ConnectionState.active) { _resumeIfOnline(user.id, online, approved); }
             final active=(d['active_order_count'] as num?)?.toInt()??0;
             return Scaffold(
               appBar:AppBar(title:const Text('مركز المندوب')),
