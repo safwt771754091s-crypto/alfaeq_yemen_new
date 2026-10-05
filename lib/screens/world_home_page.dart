@@ -199,8 +199,6 @@ class _HomeTabState extends State<_HomeTab> {
               const _SearchBar(),
               const SizedBox(height: 16),
               const _HeroBanner(),
-              const SizedBox(height: 10),
-              const _BannerDots(),
               const SizedBox(height: 18),
               _CategoriesSection(onOpen: widget.onOpen),
               const SizedBox(height: 18),
@@ -394,23 +392,6 @@ class _HeroBanner extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ),
-      );
-}
-
-class _BannerDots extends StatelessWidget {
-  const _BannerDots();
-  @override
-  Widget build(BuildContext context) => Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(
-          4,
-          (i) => Container(
-            width: i == 0 ? 9 : 7,
-            height: i == 0 ? 9 : 7,
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(color: i == 0 ? _blue : const Color(0xFFD4D9DF), shape: BoxShape.circle),
           ),
         ),
       );
