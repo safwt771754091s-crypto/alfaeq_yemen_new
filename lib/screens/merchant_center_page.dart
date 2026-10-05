@@ -93,7 +93,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
         'owner_id': user.id,
         'name': name,
         'price': price,
-        'currency': 'YER',
+        'currency': 'USD',
         'stock': stock,
         'stock_base': stockBase,
         'sale_unit': _saleUnit,
