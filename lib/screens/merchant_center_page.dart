@@ -2,12 +2,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
-import '../core/money.dart';
+import '../services/currency_service.dart';
 import '../services/location_service.dart';
 import '../core/product_units.dart';
 import '../services/supabase_service.dart';
 import '../services/auth_service.dart';
 import '../services/alfaeq_event_bus_service.dart';
+import 'product_edit_page.dart';
 
 class MerchantCenterPage extends StatefulWidget {
   const MerchantCenterPage({super.key});
@@ -127,31 +128,12 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
   }
 
   Future<void> _updateProduct(Map<String, dynamic> doc) async {
-    final data = doc;
-    final priceController = TextEditingController(text: '${data['price'] ?? ''}');
-    final stockController = TextEditingController(text: '${data['stock'] ?? ''}');
-    final result = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: Text('${data['name'] ?? 'تعديل الصنف'}'), content: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر')), TextField(controller: stockController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المخزون'))]), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حفظ'))]));
-    if (result != true) return;
-    final price = num.tryParse(priceController.text.trim()); final stock = int.tryParse(stockController.text.trim());
-    if (price == null || price < 0 || stock == null || stock < 0) { _message('السعر والمخزون غير صالحين.'); return; }
-    final productId = doc['id'].toString();
-    final updatedAt = DateTime.now().toUtc();
-    final stockBase = ProductUnit.fromProduct(data).toBase(stock).round();
-    await SupabaseService.client.from('products').update({
-      'price': price,
-      'stock': stock,
-      'stock_base': stockBase,
-      'updated_at': updatedAt.toIso8601String(),
-    }).eq('id', productId);
-    await _eventBus.publishInventoryChanged(productId, data: {
-      'storeId': data['store_id'],
-      'ownerId': data['owner_id'],
-      'stock': stock,
-      'stockBase': stockBase,
-      'price': price,
-      'reason': 'merchant.product.updated',
-      'version': updatedAt.microsecondsSinceEpoch.toString(),
-    });
+    final user = _user;
+    if (user == null) { _message('يجب تسجيل الدخول أولاً.'); return; }
+    final changed = await Navigator.push<bool>(context, MaterialPageRoute(
+      builder: (_) => ProductEditPage(product: doc, ownerId: user.id, canChangeSection: false),
+    ));
+    if (changed == true) _message('تم حفظ تعديلات الصنف.');
   }
 
   void _message(String text) { if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text))); }
@@ -196,7 +178,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
     final docs = snapshot.data ?? const <Map<String, dynamic>>[]; final filtered = _selectedStoreId == null ? docs : docs.where((doc) => doc['store_id'] == _selectedStoreId).toList();
     if (filtered.isEmpty) return const _EmptyCard(text: 'لا توجد أصناف لهذا المتجر بعد.');
-    return Column(children: filtered.map((doc) { final data = doc; return Card(elevation: 0, child: ListTile(leading: const Icon(Icons.inventory_2_outlined), title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('مخزون: ${data['stock'] ?? 0} • حالة: ${data['status'] ?? 'active'}'), trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [Text(formatMoney(num.tryParse('${data['price'] ?? 0}'), data['currency']?.toString()), style: const TextStyle(fontWeight: FontWeight.w900)), TextButton(onPressed: () => _updateProduct(doc), child: const Text('تعديل'))]))); }).toList());
+    return Column(children: filtered.map((doc) { final data = doc; return Card(elevation: 0, child: ListTile(leading: const Icon(Icons.inventory_2_outlined), title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('مخزون: ${data['stock'] ?? 0} • حالة: ${data['status'] ?? 'active'}'), trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [Text(CurrencyService.instance.formatProduct(data), style: const TextStyle(fontWeight: FontWeight.w900)), TextButton(onPressed: () => _updateProduct(doc), child: const Text('تعديل'))]), onTap: () => _updateProduct(doc))); }).toList());
           });
         },
       );

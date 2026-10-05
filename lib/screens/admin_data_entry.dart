@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../core/app_sections.dart';
+import 'product_edit_page.dart';
 import '../core/product_units.dart';
 import '../services/auth_service.dart';
 import '../services/media_service.dart';
@@ -232,6 +233,15 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
     }
   }
 
+  Future<void> _editProduct(Map<String, dynamic> data) async {
+    final user = SupabaseService.client.auth.currentUser;
+    if (user == null) { _message('يجب تسجيل الدخول أولاً.'); return; }
+    final changed = await Navigator.push<bool>(context, MaterialPageRoute(
+      builder: (_) => ProductEditPage(product: data, ownerId: user.id, canChangeSection: true, title: 'تعديل صنف / نقل القسم'),
+    ));
+    if (changed == true) _message('تم حفظ تعديلات الصنف ونقله للقسم الجديد.');
+  }
+
   void _message(String text) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
@@ -448,13 +458,22 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
           if (visible.isEmpty) return const Card(child: ListTile(title: Text('لا توجد أصناف لهذا المتجر بعد.')));
           return Column(
             children: visible.map((data) {
+              final img = (data['image_url'] ?? data['imageUrl'] ?? data['image'] ?? '').toString();
+              final sectionId = (data['section_id'] ?? '').toString();
+              final section = appSections.where((s) => s.id == sectionId).map((s) => s.title).firstOrNull;
               return Card(
                 child: ListTile(
-                  leading: const Icon(Icons.inventory_2_outlined),
+                  leading: img.isEmpty
+                      ? const CircleAvatar(child: Icon(Icons.inventory_2_outlined))
+                      : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(img, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(child: Icon(Icons.broken_image_outlined)))),
                   title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
-                  subtitle: Text('${data['description'] ?? ''}\nالمخزون: ${data['stock'] ?? 0} • الحالة: ${data['status'] ?? 'active'}'),
+                  subtitle: Text('${data['description'] ?? ''}\nالمخزون: ${data['stock'] ?? 0} • ${section ?? 'بدون قسم'} • الحالة: ${data['status'] ?? 'active'}', maxLines: 3, overflow: TextOverflow.ellipsis),
                   isThreeLine: true,
-                  trailing: Text('${data['price'] ?? 0} ${data['currency'] ?? 'YER'}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                  trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text('${data['price'] ?? 0} ${data['currency'] ?? 'USD'}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                    TextButton.icon(onPressed: _saving ? null : () => _editProduct(data), icon: const Icon(Icons.edit_outlined, size: 16), label: const Text('تعديل')),
+                  ]),
+                  onTap: _saving ? null : () => _editProduct(data),
                 ),
               );
             }).toList(),
