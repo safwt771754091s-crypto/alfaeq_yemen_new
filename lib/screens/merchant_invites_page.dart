@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -29,7 +30,10 @@ class _MerchantInvitesPageState extends State<MerchantInvitesPage> {
     try {
       final response = await SupabaseService.client.functions.invoke(
         'create-merchant-invite',
-        body: <String, dynamic>{'label': label},
+        body: <String, dynamic>{
+          'label': label,
+          if (kIsWeb) 'baseUrl': Uri.base.replace(query: '', fragment: '').toString(),
+        },
       );
       final raw = response.data;
       final data = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
