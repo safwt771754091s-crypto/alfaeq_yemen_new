@@ -83,7 +83,10 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await _auth.sendPasswordReset(email: email);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('إذا كان البريد مسجّلاً فسيصلك رابط لتعيين كلمة مرور جديدة. تفقّد صندوق الوارد والبريد المزعج.'),
+        duration: Duration(seconds: 7),
+      ));
     } on Exception catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_authMessage(e.toString()))));
