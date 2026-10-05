@@ -152,6 +152,63 @@ class _WalletQrPageState extends State<WalletQrPage> {
     }
   }
 
+  Future<void> _redeemVoucher() async {
+    final controller = TextEditingController();
+    final code = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 16, right: 16, top: 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('شحن المحفظة برمز', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              const Text('أدخل رمز الشحن الذي اشتريته من الفائق يمن.', style: TextStyle(color: Colors.black54, fontSize: 12)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(hintText: 'ALF-XXXXXXXX-XXXXXXXX', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.pop(context, controller.text.trim()),
+                  icon: const Icon(Icons.redeem),
+                  label: const Text('شحن الآن'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (code == null || code.isEmpty) return;
+    try {
+      final res = await SupabaseService.client.rpc('redeem_wallet_voucher', params: {'p_code': code});
+      final map = res is Map ? res : const {};
+      final amount = num.tryParse('${map['amount'] ?? ''}') ?? 0;
+      final currency = (map['currency'] ?? 'USD').toString();
+      _snack('تم شحن المحفظة بمبلغ ${formatAmount(amount)} $currency.');
+      _reload();
+    } catch (e) {
+      _snack('تعذر الشحن: ${_friendlyVoucher(e)}');
+    }
+  }
+
+  String _friendlyVoucher(Object e) {
+    final s = e.toString();
+    if (s.contains('voucher_not_found')) return 'رمز الشحن غير موجود.';
+    if (s.contains('voucher_already_used')) return 'هذا الرمز مستخدم مسبقاً.';
+    if (s.contains('code_required')) return 'أدخل رمز الشحن.';
+    return s;
+  }
+
   String _friendly(Object e) {
     final s = e.toString();
     if (s.contains('insufficient_wallet_balance')) return 'الرصيد غير كافٍ.';
@@ -218,16 +275,25 @@ class _WalletQrPageState extends State<WalletQrPage> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: payload));
-                        _snack('تم نسخ رمز الاستلام.');
-                      },
-                      icon: const Icon(Icons.copy_outlined),
-                      label: const Text('انسخ رمزي'),
+                    child: FilledButton.tonalIcon(
+                      onPressed: _redeemVoucher,
+                      icon: const Icon(Icons.redeem),
+                      label: const Text('شحن'),
                     ),
                   ),
                 ]),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: payload));
+                      _snack('تم نسخ رمز الاستلام.');
+                    },
+                    icon: const Icon(Icons.copy_outlined),
+                    label: const Text('انسخ رمزي للاستلام'),
+                  ),
+                ),
                 const SizedBox(height: 22),
                 Card(
                   elevation: 0,
