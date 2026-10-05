@@ -70,5 +70,12 @@ void main() {
       expect(home, contains("metadata") , reason: 'section filter reads product metadata for barcode');
       expect(home, contains('_productsFuture'));
     });
+
+    test('home offers read published promotions linked to active products', () {
+      final home = File('lib/screens/world_home_page.dart').readAsStringSync();
+      expect(home, contains('activePromotions'));
+      expect(home, contains('_promotionDeals'));
+      expect(home, contains("from('products')"));
+    });
   });
 }

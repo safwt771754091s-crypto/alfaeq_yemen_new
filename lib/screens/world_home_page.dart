@@ -552,20 +552,43 @@ class _CategoriesSection extends StatelessWidget {
   }
 }
 
+int _promoDiscount(Map<String, dynamic> data) {
+  final percent = data['discount_percent'] ?? data['discountPercent'];
+  final price = data['price'];
+  final original = data['original_price'] ?? data['originalPrice'];
+  if (percent is num && percent > 0 && percent <= 100) return percent.round();
+  if (price is num && original is num && original > price) return ((1 - (price / original)) * 100).round();
+  return 0;
+}
+
+/// Loads published promotions that are linked to a real product, so the home
+/// offers carousel only shows deals the customer can actually add to the cart.
+Future<List<(CatalogDocument, int)>> _promotionDeals() async {
+  final promos = await const PublicContentService().activePromotions(limit: 40);
+  final ids = promos.map((p) => p.data['product_id']).whereType<String>().where((e) => e.isNotEmpty).toSet().toList();
+  if (ids.isEmpty) return const [];
+  final rows = await SupabaseService.client.from('products').select().inFilter('id', ids).eq('status', 'active');
+  final byId = {for (final r in rows) (r['id'] ?? '').toString(): Map<String, dynamic>.from(r)};
+  final deals = <(CatalogDocument, int)>[];
+  for (final promo in promos) {
+    final d = promo.data;
+    final product = byId[(d['product_id'] ?? '').toString()];
+    if (product == null) continue;
+    var discount = _promoDiscount(d);
+    if (discount <= 0) discount = 5;
+    deals.add((CatalogDocument.fromSupabase(product), discount));
+  }
+  return deals;
+}
+
 class _OffersSection extends StatelessWidget {
   final Future<void> Function(CatalogDocument) onAddToCart;
   const _OffersSection({required this.onAddToCart});
-  int _discount(Map<String, dynamic> data) {
-    final percent = data['discountPercent'] ?? data['discount_percent']; final price = data['price']; final original = data['originalPrice'] ?? data['original_price'];
-    if (percent is num && percent > 0 && percent <= 100) return percent.round();
-    if (price is num && original is num && original > price) return ((1 - (price / original)) * 100).round();
-    return 0;
-  }
   @override
-  Widget build(BuildContext context) => FutureBuilder<List<CatalogDocument>>(
-    future: const CatalogService().activeProducts(limit: 40),
+  Widget build(BuildContext context) => FutureBuilder<List<(CatalogDocument, int)>>(
+    future: _promotionDeals(),
     builder: (context, snapshot) {
-      final products = (snapshot.data ?? const <CatalogDocument>[]).where((doc) => _discount(doc.data) > 0).take(8).toList();
+      final deals = (snapshot.data ?? const <(CatalogDocument, int)>[]).take(8).toList();
       return Column(children: [
         Row(children: [
           const Expanded(child: Text('عروض مميزة 🔥', style: TextStyle(color: _navy, fontSize: 21, fontWeight: FontWeight.w900))),
@@ -574,10 +597,10 @@ class _OffersSection extends StatelessWidget {
         const SizedBox(height: 8),
         if (snapshot.connectionState == ConnectionState.waiting) const LinearProgressIndicator()
         else if (snapshot.hasError) const _Info(title: 'تعذر تحميل العروض', text: 'تحقق من الاتصال والصلاحيات.')
-        else if (products.isEmpty) const _Info(title: 'العروض جاهزة للظهور', text: 'عند إضافة خصم حقيقي للصنف سيظهر تلقائياً هنا.')
+        else if (deals.isEmpty) const _Info(title: 'العروض جاهزة للظهور', text: 'عند نشر عرض مرتبط بصنف سيظهر تلقائياً هنا.')
         else SizedBox(height: 238, child: ListView.separated(
-          scrollDirection: Axis.horizontal, itemCount: products.length, separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (context, i) { final p = products[i]; return _OfferCard(product: p, discount: _discount(p.data), onAdd: () => onAddToCart(p)); },
+          scrollDirection: Axis.horizontal, itemCount: deals.length, separatorBuilder: (_, __) => const SizedBox(width: 10),
+          itemBuilder: (context, i) { final (product, discount) = deals[i]; return _OfferCard(product: product, discount: discount, onAdd: () => onAddToCart(product)); },
         )),
       ]);
     },
@@ -605,26 +628,20 @@ class _OfferCard extends StatelessWidget {
 
 class _OffersPage extends StatelessWidget {
   const _OffersPage();
-  int _discount(Map<String, dynamic> data) {
-    final p = data['discountPercent'] ?? data['discount_percent']; final price = data['price']; final original = data['originalPrice'] ?? data['original_price'];
-    if (p is num && p > 0 && p <= 100) return p.round();
-    if (price is num && original is num && original > price) return ((1 - (price / original)) * 100).round();
-    return 0;
-  }
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('العروض المميزة', style: TextStyle(fontWeight: FontWeight.w900))),
-    body: FutureBuilder<List<CatalogDocument>>(
-      future: const CatalogService().activeProducts(limit: 100),
+    body: FutureBuilder<List<(CatalogDocument, int)>>(
+      future: _promotionDeals(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         if (snapshot.hasError) return const Center(child: _Info(title: 'تعذر تحميل العروض', text: 'تحقق من الاتصال والصلاحيات.'));
-        final docs = (snapshot.data ?? const <CatalogDocument>[]).where((d) => _discount(d.data) > 0).toList();
-        if (docs.isEmpty) return const Center(child: _Info(title: 'لا توجد عروض حالياً', text: 'أضف خصماً حقيقياً إلى منتجاتك ليظهر هنا.'));
+        final deals = snapshot.data ?? const <(CatalogDocument, int)>[];
+        if (deals.isEmpty) return const Center(child: _Info(title: 'لا توجد عروض حالياً', text: 'انشر عرضاً مرتبطاً بصنف ليظهر هنا.'));
         return GridView.builder(
-          padding: const EdgeInsets.all(16), itemCount: docs.length,
+          padding: const EdgeInsets.all(16), itemCount: deals.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: .68),
-          itemBuilder: (_, i) { final d = docs[i]; return _OfferCard(product: d, discount: _discount(d.data), onAdd: () => _addProductToCart(context, d)); },
+          itemBuilder: (_, i) { final (product, discount) = deals[i]; return _OfferCard(product: product, discount: discount, onAdd: () => _addProductToCart(context, product)); },
         );
       },
     ),
