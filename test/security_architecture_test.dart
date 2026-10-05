@@ -101,5 +101,12 @@ void main() {
       expect(search, contains('BarcodeScannerPage()'));
       expect(search, contains('_scanBarcode'));
     });
+
+    test('home storefront exposes a featured products grid', () {
+      final home = File('lib/screens/world_home_page.dart').readAsStringSync();
+      expect(home, contains('_FeaturedProductsSection('));
+      expect(home, contains('activeProducts(limit: 200)'));
+      expect(home, contains('منتجات مختارة لك'));
+    });
   });
 }

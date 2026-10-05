@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_sections.dart';
+import '../core/product_units.dart';
 import '../services/auth_service.dart';
 import '../services/catalog_service.dart';
 import '../services/supabase_service.dart';
@@ -208,6 +209,8 @@ class _HomeTabState extends State<_HomeTab> {
               _ServicesEntry(onOpen: widget.onOpen),
               const SizedBox(height: 22),
               _OffersSection(onAddToCart: (product) => _addProductToCart(context, product)),
+              const SizedBox(height: 22),
+              _FeaturedProductsSection(onAddToCart: (product) => _addProductToCart(context, product)),
               const SizedBox(height: 20),
               const _PublicUpdatesSection(),
               const SizedBox(height: 24),
@@ -674,9 +677,104 @@ Future<void> _addProductToCart(BuildContext context, CatalogDocument product) as
   }
 }
 
+/// A merchandising grid of real, in-stock products so the storefront always
+/// shows shoppable items even when no promotions are published.
+class _FeaturedProductsSection extends StatefulWidget {
+  final Future<void> Function(CatalogDocument) onAddToCart;
+  const _FeaturedProductsSection({required this.onAddToCart});
+  @override
+  State<_FeaturedProductsSection> createState() => _FeaturedProductsSectionState();
+}
+
+class _FeaturedProductsSectionState extends State<_FeaturedProductsSection> {
+  late final Future<List<CatalogDocument>> _future = _load();
+
+  Future<List<CatalogDocument>> _load() async {
+    final products = await const CatalogService().activeProducts(limit: 200);
+    final inStock = products.where((p) {
+      final stock = ProductUnit.stockBase(p.data);
+      return stock > 0;
+    }).toList();
+    return (inStock.isEmpty ? products : inStock).take(12).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<CatalogDocument>>(
+        future: _future,
+        builder: (context, snapshot) {
+          final items = snapshot.data ?? const <CatalogDocument>[];
+          if (snapshot.connectionState == ConnectionState.waiting && items.isEmpty) {
+            return const LinearProgressIndicator();
+          }
+          if (snapshot.hasError || items.isEmpty) return const SizedBox.shrink();
+          return Column(children: [
+            Row(children: [
+              const Expanded(child: Text('منتجات مختارة لك ✨', style: TextStyle(color: _navy, fontSize: 21, fontWeight: FontWeight.w900))),
+              TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductsPage())), child: const Text('تصفّح الكل')),
+            ]),
+            const SizedBox(height: 8),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: items.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: .72),
+              itemBuilder: (context, i) {
+                final product = items[i];
+                return _FeaturedProductCard(product: product, onAdd: () => widget.onAddToCart(product));
+              },
+            ),
+          ]);
+        },
+      );
+}
+
+class _FeaturedProductCard extends StatelessWidget {
+  final CatalogDocument product;
+  final VoidCallback onAdd;
+  const _FeaturedProductCard({required this.product, required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = product.data;
+    final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
+    final price = p['price'];
+    final priceText = price is num && price > 0 ? '${price.toStringAsFixed(0)} ${p['currency'] ?? 'YER'}' : 'عند الطلب';
+    return InkWell(
+      borderRadius: BorderRadius.circular(15),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: product))),
+      child: Container(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE3E8EF))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+              child: imageUrl.isEmpty
+                  ? Container(color: const Color(0xFFF0F3F7), child: const Icon(Icons.image_outlined, size: 40, color: Colors.black26))
+                  : Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF0F3F7), child: const Icon(Icons.broken_image_outlined))),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(9, 7, 9, 9),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(p['name']?.toString() ?? 'صنف', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontWeight: FontWeight.w800, fontSize: 12.5, height: 1.25)),
+              const SizedBox(height: 6),
+              Row(children: [
+                Expanded(child: Text(priceText, style: const TextStyle(color: _navy, fontWeight: FontWeight.w900))),
+                SizedBox(
+                  height: 30,
+                  child: FilledButton(onPressed: onAdd, style: FilledButton.styleFrom(backgroundColor: _blue, padding: const EdgeInsets.symmetric(horizontal: 10)), child: const Icon(Icons.add_shopping_cart, size: 15)),
+                ),
+              ]),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
 class _PublicUpdatesSection extends StatelessWidget {
   const _PublicUpdatesSection();
-
   @override
   Widget build(BuildContext context) => FutureBuilder<List<SiteUpdateDocument>>(
     future: const PublicContentService().publishedUpdates(limit: 6),
