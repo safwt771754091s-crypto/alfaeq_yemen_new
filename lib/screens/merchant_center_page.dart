@@ -79,6 +79,88 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     } finally { if (mounted) setState(() => _saving = false); }
   }
 
+  Future<void> _editStore(Map<String, dynamic> doc) async {
+    final storeId = doc['id'].toString();
+    final nameC = TextEditingController(text: '${doc['name'] ?? ''}');
+    final phoneC = TextEditingController(text: '${doc['phone'] ?? ''}');
+    final addressC = TextEditingController(text: '${doc['address'] ?? ''}');
+    var section = (doc['section_id'] ?? appSections.first.id).toString();
+    if (!appSections.any((s) => s.id == section)) section = appSections.first.id;
+    double? lat = (doc['latitude'] as num?)?.toDouble();
+    double? lng = (doc['longitude'] as num?)?.toDouble();
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setLocal) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('تعديل بيانات المتجر', style: TextStyle(fontWeight: FontWeight.w900)),
+            content: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextField(controller: nameC, decoration: const InputDecoration(labelText: 'اسم المتجر', border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                TextField(controller: phoneC, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'رقم الهاتف', border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                TextField(controller: addressC, decoration: const InputDecoration(labelText: 'العنوان', border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: section,
+                  decoration: const InputDecoration(labelText: 'القسم', border: OutlineInputBorder()),
+                  items: [for (final s in appSections) DropdownMenuItem(value: s.id, child: Text(s.title))],
+                  onChanged: (v) { if (v != null) setLocal(() => section = v); },
+                ),
+                const SizedBox(height: 10),
+                Row(children: [
+                  const Icon(Icons.location_on_outlined, size: 18),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(lat != null && lng != null ? 'الموقع: ${lat!.toStringAsFixed(4)}, ${lng!.toStringAsFixed(4)}' : 'لم يُحدَّد الموقع')),
+                  TextButton(
+                    onPressed: () async {
+                      try {
+                        final p = await LocationService.requireCurrentPosition();
+                        setLocal(() { lat = p.latitude; lng = p.longitude; });
+                      } catch (_) {}
+                    },
+                    child: const Text('تحديث الموقع'),
+                  ),
+                ]),
+              ]),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حفظ')),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (saved != true) return;
+    final name = nameC.text.trim();
+    if (name.isEmpty) { _message('اسم المتجر مطلوب.'); return; }
+    setState(() => _saving = true);
+    try {
+      await SupabaseService.client.from('stores').update({
+        'name': name,
+        'phone': phoneC.text.trim().isEmpty ? null : phoneC.text.trim(),
+        'address': addressC.text.trim(),
+        'section_id': section,
+        if (lat != null && lng != null) 'latitude': lat,
+        if (lat != null && lng != null) 'longitude': lng,
+        if (lat != null && lng != null) 'location': {'latitude': lat, 'longitude': lng, 'source': 'device'},
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', storeId);
+      await _eventBus.publishStoreUpdated(storeId, data: {
+        'storeId': storeId,
+        'action': 'store.updated',
+        'version': 'store-$storeId-${DateTime.now().millisecondsSinceEpoch}',
+      });
+      _message('تم تحديث بيانات المتجر.');
+    } catch (e) {
+      _message('تعذر تحديث المتجر: $e');
+    } finally { if (mounted) setState(() => _saving = false); }
+  }
+
   Future<void> _createProduct() async {
     final user = _user; final storeId = _selectedStoreId; final name = _productName.text.trim(); final price = num.tryParse(_price.text.trim()); final stock = num.tryParse(_stock.text.trim());
     if (user == null || storeId == null || name.isEmpty) { _message('اختر متجراً وأدخل اسم الصنف.'); return; }
@@ -152,7 +234,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
     final docs = snapshot.data ?? const <Map<String, dynamic>>[];
     if (docs.isEmpty) return const _EmptyCard(text: 'لم تنشئ متجراً بعد.');
-    return Column(children: docs.map((doc) { final data = doc; final selected = _selectedStoreId == doc['id']; return Card(elevation: 0, child: ListTile(selected: selected, leading: CircleAvatar(backgroundColor: const Color(0xFFE7F3EE), child: Icon(Icons.storefront_outlined, color: Theme.of(context).colorScheme.primary)), title: Text('${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900)), subtitle: Text('${data['status'] ?? 'pending'} • ${data['phone'] ?? ''}'), trailing: selected ? const Icon(Icons.check_circle) : const Icon(Icons.chevron_left), onTap: () => setState(() => _selectedStoreId = doc['id'].toString()))); }).toList());
+    return Column(children: docs.map((doc) { final data = doc; final selected = _selectedStoreId == doc['id']; return Card(elevation: 0, child: ListTile(selected: selected, leading: CircleAvatar(backgroundColor: const Color(0xFFE7F3EE), child: Icon(Icons.storefront_outlined, color: Theme.of(context).colorScheme.primary)), title: Text('${data['name'] ?? 'متجر'}', style: const TextStyle(fontWeight: FontWeight.w900)), subtitle: Text('${data['status'] ?? 'pending'} • ${data['phone'] ?? ''}'), trailing: IconButton(icon: const Icon(Icons.edit_outlined), tooltip: 'تعديل المتجر', onPressed: () => _editStore(doc)), onTap: () => setState(() => _selectedStoreId = doc['id'].toString()))); }).toList());
   });
 
   Widget _storeForm() => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
