@@ -24,11 +24,20 @@ class AlfaeqAiToolRegistry {
   }
 
   Future<Map<String,Object?>> _search(Map<String,Object?> a) async {
-    final q=(a['query']??'').toString().trim().toLowerCase(); if(q.isEmpty)return {'ok':false,'error':'أدخل ما تريد البحث عنه.'};
+    final raw=(a['query']??'').toString().trim();
+    if(raw.isEmpty)return {'ok':false,'error':'أدخل ما تريد البحث عنه.'};
+    // PostgREST or() splits on commas and treats parentheses as grouping, so
+    // strip those (and wildcards) to keep the filter well-formed.
+    final q=raw.replaceAll(RegExp(r'[,()%*]'),' ').replaceAll(RegExp(r'\s+'),' ').trim();
+    if(q.isEmpty)return {'ok':false,'error':'أدخل ما تريد البحث عنه.'};
     final products=<Map<String,Object?>>[],stores=<Map<String,Object?>>[];
-    final rows=await _db.from('products').select().eq('status','active').order('name').limit(100);
-    for(final raw in rows){final d=Map<String,dynamic>.from(raw);final name=(d['name']??'').toString();final cat=(d['section_id']??'').toString();if('$name $cat'.toLowerCase().contains(q)){products.add({'id':d['id'],'name':name,'price':d['price'],'currency':d['currency']??'YER','storeId':d['store_id'],'available':d['stock_base']});if(products.length>=_max)break;}}
-    if(products.length<_max){final ss=await _db.from('stores').select().inFilter('status',['approved','active']).order('name').limit(100);for(final raw in ss){final d=Map<String,dynamic>.from(raw);final name=(d['name']??'').toString();if(name.toLowerCase().contains(q)){stores.add({'id':d['id'],'name':name,'address':d['address']});if(stores.length>=_max)break;}}}
+    final rows=await _db.from('products').select().eq('status','active')
+        .or('name.ilike.%$q%,description.ilike.%$q%,metadata->>barcode.ilike.%$q%')
+        .order('name').limit(_max);
+    for(final rawRow in rows){final d=Map<String,dynamic>.from(rawRow);products.add({'id':d['id'],'name':d['name'],'price':d['price'],'currency':d['currency']??'YER','storeId':d['store_id'],'available':d['stock_base']});}
+    final ss=await _db.from('stores').select().inFilter('status',['approved','active'])
+        .or('name.ilike.%$q%,address.ilike.%$q%').order('name').limit(_max);
+    for(final rawRow in ss){final d=Map<String,dynamic>.from(rawRow);stores.add({'id':d['id'],'name':d['name'],'address':d['address']});}
     return {'ok':true,'products':products,'stores':stores};
   }
 

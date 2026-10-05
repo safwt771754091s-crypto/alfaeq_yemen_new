@@ -54,5 +54,13 @@ void main() {
       expect(ai, contains('AlfaeqAiService'));
       expect(ai, contains('تأكيد التنفيذ'));
     });
+
+    test('product search matches name, description and barcode', () {
+      final search = File('lib/services/unified_search_service.dart').readAsStringSync();
+      expect(search, contains("metadata->>barcode.ilike"));
+      final tools = File('lib/ai/ai_tools.dart').readAsStringSync();
+      expect(tools, contains("metadata->>barcode.ilike"));
+      expect(tools, contains(".limit(_max)"));
+    });
   });
 }
