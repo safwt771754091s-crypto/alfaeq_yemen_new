@@ -21,6 +21,7 @@ import 'store_detail_page.dart';
 import 'search_page.dart';
 import 'support_chat_page.dart';
 import 'wallet_qr_page.dart';
+import 'barcode_scanner_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
 const _yellow = Color(0xFFFFC107);
@@ -321,6 +322,16 @@ class _SearchBar extends StatelessWidget {
         decoration: InputDecoration(
           hintText: 'ابحث عن منتجات أو خدمات...',
           prefixIcon: const Icon(Icons.search, color: _navy),
+          suffixIcon: IconButton(
+            tooltip: 'مسح الباركود',
+            icon: const Icon(Icons.qr_code_scanner, color: _navy),
+            onPressed: () async {
+              final code = await Navigator.push<String>(context, MaterialPageRoute(builder: (_) => const BarcodeScannerPage()));
+              final value = code?.trim();
+              if (value == null || value.isEmpty || !context.mounted) return;
+              Navigator.push(context, MaterialPageRoute(builder: (_) => SearchPage(initialQuery: value)));
+            },
+          ),
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 17),
