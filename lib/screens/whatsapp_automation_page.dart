@@ -66,6 +66,42 @@ class _WhatsAppAutomationPageState extends State<WhatsAppAutomationPage> {
     }
   }
 
+  Future<void> _setStoreContact() async {
+    final store = TextEditingController();
+    final phone = TextEditingController();
+    final merchant = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('رقم واتساب المتجر'),
+        content: SingleChildScrollView(child: Column(children: [
+          TextField(controller: store, decoration: const InputDecoration(labelText: 'معرّف المتجر Store ID')),
+          TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'رقم واتساب بصيغة دولية مع +')),
+          TextField(controller: merchant, decoration: const InputDecoration(labelText: 'معرّف مالك المتجر (اختياري)')),
+        ])),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حفظ')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _loading = true);
+    try {
+      await SupabaseService.client.rpc('set_store_contact', params: {
+        'p_store_id': store.text.trim(),
+        'p_phone': phone.text.trim().isEmpty ? null : phone.text.trim(),
+        'p_merchant_uid': merchant.text.trim().isEmpty ? null : merchant.text.trim(),
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ رقم المتجر لإرسال الفواتير.')));
+      setState(() {});
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الحفظ: ' + e.toString())));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   Future<void> _confirm(Map<String, dynamic> item) async {
     final name = TextEditingController(text: (item['parsed']?['name'] ?? '').toString());
     final price = TextEditingController(text: (item['parsed']?['price'] ?? '').toString());
@@ -109,7 +145,10 @@ class _WhatsAppAutomationPageState extends State<WhatsAppAutomationPage> {
     textDirection: TextDirection.rtl,
     child: Scaffold(
       appBar: AppBar(title: const Text('أتمتة واتساب', style: TextStyle(fontWeight: FontWeight.w900)),
-        actions: [IconButton(onPressed: _bindNumber, icon: const Icon(Icons.add_link), tooltip: 'ربط رقم')]),
+        actions: [
+          IconButton(onPressed: _setStoreContact, icon: const Icon(Icons.storefront_outlined), tooltip: 'رقم واتساب المتجر'),
+          IconButton(onPressed: _bindNumber, icon: const Icon(Icons.add_link), tooltip: 'ربط رقم'),
+        ]),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _load(),
         builder: (context, snapshot) {
@@ -124,7 +163,7 @@ class _WhatsAppAutomationPageState extends State<WhatsAppAutomationPage> {
               const SizedBox(height: 8),
               const Text('الربط التشغيلي يمر الآن عبر Supabase Edge Functions وقاعدة البيانات الإنتاجية.'),
               const SizedBox(height: 10),
-              const SelectableText('Supabase Edge Function: platform-api', style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
+              const SelectableText('Supabase Edge Function: whatsapp-webhook', style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
             ]))),
             const SizedBox(height: 12),
             const Text('الأرقام المرتبطة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
