@@ -48,6 +48,21 @@ class CatalogService {
     return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
   }
 
+  /// Every approved/active store regardless of section — powers the flat
+  /// "all stores" list so merchants are discoverable without knowing a section.
+  Future<List<CatalogDocument>> allApprovedStores({int limit = 200}) async {
+    if (!useSupabase || !SupabaseService.isInitialized) {
+      throw StateError('خدمة الكتالوج الجديدة غير مفعلة.');
+    }
+    final rows = await SupabaseService.client
+        .from('stores')
+        .select()
+        .inFilter('status', ['approved', 'active'])
+        .order('name')
+        .limit(limit);
+    return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
+  }
+
   Future<void> addToCart(String uid, CatalogDocument product, {num? saleQuantity}) async {
     if (!useSupabase || !SupabaseService.isInitialized) {
       throw StateError('خدمة السلة الجديدة غير مفعلة.');

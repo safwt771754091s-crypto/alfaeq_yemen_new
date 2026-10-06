@@ -863,6 +863,21 @@ class _StoresTab extends StatelessWidget {
           const SizedBox(height: 6),
           const Text('متاجر الفائق المعتمدة ومنتجاتها الحقيقية.', style: TextStyle(color: Colors.black54)),
           const SizedBox(height: 16),
+          const Text('كل المتاجر المعتمدة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 9),
+          FutureBuilder<List<CatalogDocument>>(
+            future: CatalogService().allApprovedStores(limit: 200),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
+              if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المتاجر', text: 'تحقق من اتصال قاعدة البيانات.');
+              final stores = snapshot.data ?? const <CatalogDocument>[];
+              if (stores.isEmpty) return const _Info(title: 'لا توجد متاجر معتمدة بعد', text: 'سيظهر هنا المحتوى الحقيقي عند اعتماد المتاجر.');
+              return Column(children: stores.map((store) => _StoreCard(store: store)).toList());
+            },
+          ),
+          const SizedBox(height: 18),
+          const Text('تصفح حسب القسم', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 9),
           ...appSections.map((section) => Card(
                 elevation: 0,
                 child: ListTile(
