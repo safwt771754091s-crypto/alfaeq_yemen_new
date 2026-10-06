@@ -135,5 +135,23 @@ void main() {
       expect(home, contains('activeProducts(limit: 200)'));
       expect(home, contains('منتجات مختارة لك'));
     });
+
+    test('account center exposes WeChat-style profile controls', () {
+      final home = File('lib/screens/world_home_page.dart').readAsStringSync();
+      expect(home, contains("import 'account_center_page.dart';"));
+      expect(home, contains('AccountCenterPage()'));
+
+      final page = File('lib/screens/account_center_page.dart').readAsStringSync();
+      expect(page, contains('uploadAvatar'));
+      expect(page, contains('changePassword'));
+      expect(page, contains('changeEmail'));
+      expect(page, contains("FileType.image"));
+      expect(page, contains('تغيير الصورة'));
+
+      final service = File('lib/services/profile_service.dart').readAsStringSync();
+      expect(service, contains("storage.from(_avatarBucket).uploadBinary"));
+      expect(service, contains("from('users').upsert"));
+      expect(service, contains('signInWithPassword'), reason: 'password change re-authenticates');
+    });
   });
 }

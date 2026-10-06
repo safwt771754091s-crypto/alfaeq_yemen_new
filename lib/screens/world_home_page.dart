@@ -4,7 +4,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/app_sections.dart';
 import '../core/money.dart';
 import '../core/product_units.dart';
-import '../services/auth_service.dart';
 import '../services/catalog_service.dart';
 import '../services/currency_service.dart';
 import '../services/order_service.dart';
@@ -12,6 +11,7 @@ import '../services/supabase_service.dart';
 import '../services/wallet_service.dart';
 import '../services/public_content_service.dart';
 import 'cart_page.dart';
+import 'account_center_page.dart';
 import 'location_picker_page.dart';
 import 'my_orders_page.dart';
 import 'notifications_page.dart';
@@ -53,7 +53,7 @@ class _WorldHomePageState extends State<WorldHomePage> {
       const MomentsPage(),
       const CartPage(),
       const MyOrdersPage(),
-      const _AccountTab(),
+      const AccountCenterPage(),
     ];
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -1299,39 +1299,6 @@ class _WalletCenterPageState extends State<WalletCenterPage> {
     );
   }
 }
-class _AccountTab extends StatelessWidget {
-  const _AccountTab();
-  Future<void> _logout(BuildContext context) async => AuthService().signOut();
-
-  @override
-  Widget build(BuildContext context) {
-    final user = SupabaseService.client.auth.currentUser;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 22, 16, 28),
-      children: [
-        const Text('حسابي', style: TextStyle(color: _navy, fontSize: 28, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 16),
-        Card(child: ListTile(
-          leading: const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.person_outline, color: _blue)),
-          title: Text(((user?.userMetadata ?? const <String, dynamic>{})['full_name'] ?? (user?.userMetadata ?? const <String, dynamic>{})['name'] ?? 'مستخدم الفائق').toString(), style: const TextStyle(fontWeight: FontWeight.w900)),
-          subtitle: Text(user?.email ?? user?.phone ?? 'حساب مسجل الدخول'),
-        )),
-        ListTile(leading: const Icon(Icons.shopping_cart_outlined, color: _blue), title: const Text('السلة', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage()))),
-        ListTile(leading: const Icon(Icons.receipt_long_outlined, color: _blue), title: const Text('طلباتي وتتبع التوصيل', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyOrdersPage()))),
-        ListTile(leading: const Icon(Icons.account_balance_wallet_outlined, color: _blue), title: const Text('محفظتي', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletCenterPage()))),
-        ListTile(leading: const Icon(Icons.notifications_none, color: _blue), title: const Text('الإشعارات', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()))),
-        ListTile(leading: const Icon(Icons.support_agent_outlined, color: _blue), title: const Text('دعم الفائق', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatPage()))),
-        ListTile(leading: const Icon(Icons.auto_awesome, color: _blue), title: const Text('ذكاء الفائق', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()))),
-        ListTile(leading: const Icon(Icons.auto_awesome_outlined, color: _blue), title: const Text('اللحظات', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MomentsPage()))),
-        ListTile(leading: const Icon(Icons.grid_view_outlined, color: _blue), title: const Text('كل الخدمات', style: TextStyle(fontWeight: FontWeight.w800)), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServicesHubPage()))),
-        AnimatedBuilder(animation: CurrencyService.instance, builder: (context, _) => ListTile(leading: const Icon(Icons.currency_exchange, color: _blue), title: const Text('العملة', style: TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${CurrencyService.labelFor(CurrencyService.instance.displayCurrency)} (${CurrencyService.symbolFor(CurrencyService.instance.displayCurrency)})'), trailing: const CurrencySelector())),
-        const Divider(height: 24),
-        FilledButton.icon(onPressed: () => _logout(context), icon: const Icon(Icons.logout), label: const Text('تسجيل الخروج'), style: FilledButton.styleFrom(backgroundColor: _navy)),
-      ],
-    );
-  }
-}
-
 class _Info extends StatelessWidget {
   final String title;
   final String text;
