@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/app_sections.dart';
 import '../services/supabase_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -14,6 +15,7 @@ class MerchantInvitesPage extends StatefulWidget {
 
 class _MerchantInvitesPageState extends State<MerchantInvitesPage> {
   final _label = TextEditingController();
+  String _section = appSections.first.id;
   bool _busy = false;
   String? _lastLink;
 
@@ -32,6 +34,7 @@ class _MerchantInvitesPageState extends State<MerchantInvitesPage> {
         'create-merchant-invite',
         body: <String, dynamic>{
           'label': label,
+          'section': _section,
           if (kIsWeb) 'baseUrl': Uri.base.replace(query: '', fragment: '').toString(),
         },
       );
@@ -128,6 +131,13 @@ class _MerchantInvitesPageState extends State<MerchantInvitesPage> {
                       labelText: 'اسم أو وصف التاجر (اختياري)',
                       border: OutlineInputBorder(),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _section,
+                    decoration: const InputDecoration(labelText: 'قسم المتجر', border: OutlineInputBorder()),
+                    items: [for (final s in appSections) DropdownMenuItem(value: s.id, child: Text(s.title))],
+                    onChanged: (value) { if (value != null) setState(() => _section = value); },
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
