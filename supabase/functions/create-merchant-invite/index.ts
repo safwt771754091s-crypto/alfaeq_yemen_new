@@ -37,6 +37,7 @@ Deno.serve(async (req: Request) => {
 
   const body = await req.json().catch(() => ({}));
   const label = String(body?.label ?? "").trim().slice(0, 200);
+  const section = String(body?.section ?? "").trim().slice(0, 60);
   const baseUrl = await resolveBaseUrl(admin, body?.baseUrl);
 
   const token = mintToken();
@@ -46,6 +47,7 @@ Deno.serve(async (req: Request) => {
   const { error: insertError } = await admin.from("merchant_invites").insert({
     token_hash: tokenHash,
     label: label || null,
+    section_id: section || "markets",
     status: "active",
     created_by: userData.user.id,
     expires_at: expiresAt.toISOString(),

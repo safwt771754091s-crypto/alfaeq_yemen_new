@@ -245,5 +245,17 @@ void main() {
       final dashboard = File('lib/screens/admin_dashboard.dart').readAsStringSync();
       expect(dashboard, contains("from('login_events').stream("));
     });
+
+    test('merchant invites carry a store section so approved stores are visible', () {
+      // Stores created from an invite had section_id NULL, so
+      // CatalogService.approvedStores(sectionId) never listed them.
+      final migration = File('supabase/migrations/20261005220000_merchant_store_sections_v1.sql').readAsStringSync();
+      expect(migration, contains('add column if not exists section_id'));
+      expect(migration, contains("v_section := 'markets'"));
+      final inviteFn = File('supabase/functions/create-merchant-invite/index.ts').readAsStringSync();
+      expect(inviteFn, contains('section_id: section || "markets"'));
+      final page = File('lib/screens/merchant_invites_page.dart').readAsStringSync();
+      expect(page, contains("'section': _section"));
+    });
   });
 }
