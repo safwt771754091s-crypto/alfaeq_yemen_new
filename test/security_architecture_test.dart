@@ -163,5 +163,15 @@ void main() {
       expect(fn, contains('api.resend.com/emails'));
       expect(fn, isNot(contains('"detail"')), reason: 'no provider detail leaks to callers');
     });
+
+    test('startup retries the backend connection and offers a reconnect action', () {
+      final main = File('lib/main.dart').readAsStringSync();
+      expect(main, contains('for (var attempt = 0; attempt < 3; attempt++)'));
+      expect(main, contains('إعادة المحاولة'));
+      expect(main, contains('تعذر الاتصال بخادم الفائق يمن'));
+      final login = File('lib/screens/login_page.dart').readAsStringSync();
+      expect(login, contains("error.contains('Unable to connect')"));
+      expect(login, contains("error.contains('ClientException')"));
+    });
   });
 }
