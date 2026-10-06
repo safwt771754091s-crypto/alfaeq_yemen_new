@@ -233,5 +233,17 @@ void main() {
         expect(source, contains('OPTIONS'), reason: '$name must answer the preflight');
       }
     });
+
+    test('realtime publication covers every table the app streams', () {
+      // A `.stream()` call on a table missing from supabase_realtime never
+      // delivers rows (the admin login log showed "تعذر قراءة سجل الدخول").
+      final migration = File('supabase/migrations/20261005210000_realtime_publication_parity_v1.sql').readAsStringSync();
+      for (final table in ['login_events', 'products', 'stores']) {
+        expect(migration, contains(table), reason: '$table must be added to the publication');
+      }
+      expect(migration, contains('supabase_realtime'));
+      final dashboard = File('lib/screens/admin_dashboard.dart').readAsStringSync();
+      expect(dashboard, contains("from('login_events').stream("));
+    });
   });
 }
