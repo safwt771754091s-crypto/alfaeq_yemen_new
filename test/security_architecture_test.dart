@@ -371,5 +371,14 @@ void main() {
       expect(page, contains('_cancel('));
       expect(page, contains('cannot_cancel_paid_order'));
     });
+
+    test('merchant settlement converts order currency into the wallet currency', () {
+      final migration = File('supabase/migrations/20261005290000_settlement_currency_integrity_v1.sql').readAsStringSync();
+      expect(migration, contains('create or replace function private.fx_convert'));
+      expect(migration, contains('create or replace function private.settle_order_to_merchant'));
+      expect(migration, contains('private.fx_convert(v_entry.amount, v_order_currency, v_wallet.currency)'));
+      expect(migration, contains("'order_amount', v_entry.amount"));
+      expect(migration, contains("'wallet_currency', v_wallet.currency"));
+    });
   });
 }
