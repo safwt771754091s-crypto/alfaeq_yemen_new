@@ -42,6 +42,8 @@ class AlfaeqAiService {
     _tool('get_my_order','قراءة طلب محدد للمستخدم.',{'orderId':{'type':'string'}},['orderId']),
     _tool('get_my_account_summary','ملخص حساب المستخدم.',{}),
     _tool('get_my_cart','قراءة السلة الحالية.',{}),
+    _tool('get_my_wallet','قراءة أرصدة محفظة المستخدم الحقيقية.',{}),
+    _tool('find_nearby_stores','إيجاد أقرب المتاجر المعتمدة إلى موقع المستخدم الحالي.',{'limit':{'type':'integer','minimum':1,'maximum':20}}),
     _tool('add_to_cart','إضافة منتج للسلة بعد التأكيد.',{'productId':{'type':'string'},'quantity':{'type':'integer','minimum':1,'maximum':100}},['productId','quantity']),
     _tool('update_cart_item','تعديل كمية منتج بعد التأكيد.',{'productId':{'type':'string'},'quantity':{'type':'integer','minimum':1,'maximum':100}},['productId','quantity']),
     _tool('remove_from_cart','حذف منتج من السلة بعد التأكيد.',{'productId':{'type':'string'}},['productId']),
