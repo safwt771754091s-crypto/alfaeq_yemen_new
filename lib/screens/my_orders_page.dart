@@ -80,6 +80,9 @@ class _OrdersList extends StatelessWidget {
         final displayTotal = data['display_total'];
         final rawItems = data['items'];
         final itemCount = rawItems is List ? rawItems.length : 0;
+        final meta = data['metadata'];
+        final paid = meta is Map && (meta['payment_status'] ?? '') == 'paid';
+        final canCancel = !paid && (status == 'pending' || status == 'accepted');
 
         return Card(
           elevation: 0,
@@ -109,7 +112,15 @@ class _OrdersList extends StatelessWidget {
                   const Icon(Icons.local_shipping_outlined, size: 18),
                   const SizedBox(width: 6),
                   Expanded(child: Text(_deliveryLabel(deliveryStatus))),
-                  const Icon(Icons.chevron_left),
+                  if (canCancel)
+                    TextButton.icon(
+                      onPressed: () => _cancel(context, id),
+                      icon: const Icon(Icons.cancel_outlined, size: 18),
+                      label: const Text('إلغاء'),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+                    )
+                  else
+                    const Icon(Icons.chevron_left),
                 ]),
               ]),
             ),
@@ -117,6 +128,36 @@ class _OrdersList extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _cancel(BuildContext context, String id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('إلغاء الطلب'),
+        content: const Text('هل تريد إلغاء هذا الطلب؟ لا يمكن التراجع بعد الإلغاء.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('رجوع')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('تأكيد الإلغاء'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await OrderService(preferSupabase: true).cancelMyOrder(id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إلغاء الطلب وتحديث حالته.')));
+      }
+    } catch (e) {
+      final msg = e.toString().contains('cannot_cancel_paid_order')
+          ? 'لا يمكن إلغاء طلب مدفوع. تواصل مع الدعم للاسترجاع.'
+          : 'تعذر إلغاء الطلب: $e';
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
   }
 
   static String _orderLabel(String value) => switch (value) {
