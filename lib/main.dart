@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,14 +24,21 @@ Future<void> main() async {
   Object? startupError;
   StackTrace? startupStack;
 
-  try {
-    // Initialize Supabase completely before any widget can access Auth.
-    // This follows the supported supabase_flutter startup order and prevents
-    // AuthGate from racing the client's internal auth initialization.
-    await SupabaseService.initialize();
-  } catch (error, stackTrace) {
-    startupError = error;
-    startupStack = stackTrace;
+  // A dropped connection at launch must not brick the app. Retry the Supabase
+  // bootstrap before surfacing the fatal error screen.
+  for (var attempt = 0; attempt < 3; attempt++) {
+    try {
+      await SupabaseService.initialize();
+      startupError = null;
+      startupStack = null;
+      break;
+    } catch (error, stackTrace) {
+      startupError = error;
+      startupStack = stackTrace;
+      if (attempt < 2) {
+        await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+      }
+    }
   }
 
   // Load the saved display currency + platform FX rates; never blocks startup.
@@ -43,7 +52,7 @@ Future<void> main() async {
   ));
 }
 
-class AlfaeqYemenApp extends StatelessWidget {
+class AlfaeqYemenApp extends StatefulWidget {
   final Object? startupError;
   final StackTrace? startupStack;
 
@@ -54,8 +63,45 @@ class AlfaeqYemenApp extends StatelessWidget {
   });
 
   @override
+  State<AlfaeqYemenApp> createState() => _AlfaeqYemenAppState();
+}
+
+class _AlfaeqYemenAppState extends State<AlfaeqYemenApp> {
+  Object? _startupError;
+  bool _retrying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startupError = widget.startupError;
+  }
+
+  Future<void> _retry() async {
+    if (_retrying) return;
+    setState(() => _retrying = true);
+    Object? error;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        await SupabaseService.initialize();
+        error = null;
+        break;
+      } catch (e) {
+        error = e;
+        if (attempt < 2) {
+          await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+        }
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _startupError = error;
+      _retrying = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (startupError != null) {
+    if (_startupError != null) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'الفائق يمن',
@@ -66,9 +112,40 @@ class AlfaeqYemenApp extends StatelessWidget {
             body: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: SelectableText(
-                  'تعذر تشغيل خدمات الفائق يمن.\\n\\nخطأ التهيئة: $startupError',
-                  textAlign: TextAlign.center,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.wifi_off_rounded, size: 56, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'تعذر الاتصال بخادم الفائق يمن.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'تأكد من اتصالك بالإنترنت ثم أعد المحاولة.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: _retrying ? null : _retry,
+                      icon: _retrying
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.refresh),
+                      label: Text(_retrying ? 'جارٍ الاتصال…' : 'إعادة المحاولة'),
+                    ),
+                    const SizedBox(height: 16),
+                    SelectableText(
+                      'تفاصيل: $_startupError',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
                 ),
               ),
             ),
