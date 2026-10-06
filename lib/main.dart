@@ -13,6 +13,7 @@ import 'screens/my_orders_page.dart';
 import 'screens/notifications_page.dart';
 import 'services/auth_service.dart';
 import 'services/currency_service.dart';
+import 'services/push_service.dart';
 import 'services/supabase_service.dart';
 import 'services/catalog_service.dart';
 
@@ -74,6 +75,15 @@ class _AlfaeqYemenAppState extends State<AlfaeqYemenApp> {
   void initState() {
     super.initState();
     _startupError = widget.startupError;
+    _registerPushOnAuth();
+  }
+
+  void _registerPushOnAuth() {
+    if (!SupabaseService.isInitialized) return;
+    SupabaseService.client.auth.onAuthStateChange.listen((event) {
+      if (event.session != null) PushService.instance.registerCurrentDevice();
+    });
+    PushService.instance.registerCurrentDevice();
   }
 
   Future<void> _retry() async {
