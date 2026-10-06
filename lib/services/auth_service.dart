@@ -9,6 +9,12 @@ import 'supabase_service.dart';
 class AuthService {
   GoTrueClient get auth => SupabaseService.client.auth;
 
+  /// Email + password is the primary sign-in method. Set
+  /// `--dart-define=GOOGLE_AUTH_ENABLED=true` once the Google provider is
+  /// configured in Supabase to show the Google button again.
+  static const bool googleAuthEnabled =
+      bool.fromEnvironment('GOOGLE_AUTH_ENABLED');
+
   User? get currentUser => auth.currentUser;
 
   Stream<User?> get authStateChanges =>
