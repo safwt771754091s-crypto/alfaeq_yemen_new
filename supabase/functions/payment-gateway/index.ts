@@ -35,7 +35,7 @@ function enabledProviders(): string[] {
   const override = (Deno.env.get("PAYMENT_ENABLED_PROVIDERS") ?? "")
     .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   if (override.length) return override;
-  const providers = ["manual"];
+  const providers = ["manual", "local_transfer"];
   if (STRIPE_SECRET_KEY) providers.push("stripe");
   if (PAYPAL_CLIENT_ID && PAYPAL_CLIENT_SECRET) providers.push("paypal");
   return providers;
@@ -97,7 +97,10 @@ async function createIntent(admin: SupabaseClient, uid: string, body: Record<str
   let result: Record<string, unknown>;
   if (provider === "stripe") result = await stripeCreateIntent(orderId, amount, currency, uid);
   else if (provider === "paypal") result = await paypalCreateOrder(orderId, amount, currency);
-  else result = { provider: "manual", status: "pending", instructions: "manual_settlement" };
+  else if (provider === "local_transfer") {
+    const ref = `ALF-${orderId.slice(-6).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    result = { provider: "local_transfer", status: "pending", reference: ref, instructions: "transfer_then_submit_receipt" };
+  } else result = { provider: "manual", status: "pending", instructions: "manual_settlement" };
 
   if (result.providerRef) {
     await admin.rpc("attach_payment_provider", {

@@ -140,6 +140,42 @@ class OrderService {
     return data['status'] == 'paid';
   }
 
+  /// Submits a bank/e-wallet transfer receipt for staff review.
+  Future<void> submitLocalPayment({
+    required String orderId,
+    required String reference,
+    required String receiptUrl,
+    String? note,
+  }) async {
+    await supabase.rpc('submit_local_payment', params: {
+      'p_order_id': orderId,
+      'p_reference': reference,
+      'p_receipt_url': receiptUrl,
+      'p_note': note,
+    });
+  }
+
+  /// Staff: approve (mark paid) or reject a submitted local transfer.
+  Future<bool> approveLocalPayment({required String orderId, required bool approve, String? note}) async {
+    final res = await supabase.rpc('approve_local_payment', params: {
+      'p_order_id': orderId,
+      'p_approve': approve,
+      'p_note': note,
+    });
+    return res == true;
+  }
+
+  /// Orders awaiting a local-transfer review (staff view).
+  Future<List<Map<String, dynamic>>> pendingLocalPayments() async {
+    final rows = await supabase
+        .from('orders')
+        .select('id, customer_id, total, currency, created_at, metadata')
+        .eq('metadata->>payment_status', 'awaiting_review')
+        .order('created_at', ascending: false)
+        .limit(100);
+    return (rows as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
   List<Map<String, dynamic>> _normalize(List<Map<String, dynamic>> items) => items
       .map((item) => {
             'product_id': item['productId'] ?? item['product_id'],
