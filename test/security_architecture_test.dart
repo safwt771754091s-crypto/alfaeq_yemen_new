@@ -380,5 +380,12 @@ void main() {
       expect(migration, contains("'order_amount', v_entry.amount"));
       expect(migration, contains("'wallet_currency', v_wallet.currency"));
     });
+
+    test('customers can view the order invoice', () {
+      final page = File('lib/screens/delivery_tracking.dart').readAsStringSync();
+      expect(page, contains("rpc('get_order_invoice'"));
+      expect(page, contains('_showInvoice'));
+      expect(page, contains('فاتورة الطلب'));
+    });
   });
 }

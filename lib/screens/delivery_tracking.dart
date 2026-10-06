@@ -7,13 +7,42 @@ class DeliveryTracking extends StatelessWidget {
   final String orderId;
   const DeliveryTracking({super.key, required this.orderId});
 
+  Future<void> _showInvoice(BuildContext context) async {
+    try {
+      final data = await SupabaseService.client.rpc('get_order_invoice', params: {'p_order_id': orderId});
+      if (!context.mounted) return;
+      final body = data is Map ? (data['body'] ?? '').toString() : data.toString();
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('فاتورة الطلب'),
+          content: SingleChildScrollView(child: SelectableText(body.isEmpty ? 'لا توجد بيانات فاتورة.' : body)),
+          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق'))],
+        ),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر جلب الفاتورة: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUid = SupabaseService.client.auth.currentUser?.id;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('تتبع الطلب', style: TextStyle(fontWeight: FontWeight.w900))),
+        appBar: AppBar(
+          title: const Text('تتبع الطلب', style: TextStyle(fontWeight: FontWeight.w900)),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.receipt_long_outlined),
+              tooltip: 'الفاتورة',
+              onPressed: () => _showInvoice(context),
+            ),
+          ],
+        ),
         body: currentUid == null
             ? const _MessageState(icon: Icons.lock_outline, message: 'يجب تسجيل الدخول أولاً.')
             : !SupabaseService.isInitialized
