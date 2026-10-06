@@ -257,5 +257,14 @@ void main() {
       final page = File('lib/screens/merchant_invites_page.dart').readAsStringSync();
       expect(page, contains("'section': _section"));
     });
+
+    test('customer stores tab lists every approved store, not only sections', () {
+      final catalog = File('lib/services/catalog_service.dart').readAsStringSync();
+      expect(catalog, contains('allApprovedStores'));
+      expect(catalog, contains("inFilter('status', ['approved', 'active'])"));
+      final home = File('lib/screens/world_home_page.dart').readAsStringSync();
+      expect(home, contains('CatalogService().allApprovedStores('));
+      expect(home, contains('كل المتاجر المعتمدة'));
+    });
   });
 }
