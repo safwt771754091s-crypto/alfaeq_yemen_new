@@ -10,6 +10,7 @@ import 'cart_page.dart';
 import 'bulk_product_import_page.dart';
 import 'developer_page.dart';
 import 'dispatch_center_page.dart';
+import 'fx_rates_page.dart';
 import 'location_picker_page.dart';
 import 'local_payment_review_page.dart';
 import 'merchant_approval_page.dart';
@@ -83,6 +84,7 @@ class AdminDashboard extends StatelessWidget {
                 const SizedBox(height: 8),
                 _ActionCard(icon: Icons.manage_accounts_outlined, title: 'المستخدمون والأدوار', subtitle: 'إدارة الأدوار والصلاحيات وتعطيل الحسابات وإلغاء الجلسات', onTap: () => _open(context, AdminUserManagementPage())),
                 _ActionCard(icon: Icons.tune_outlined, title: 'مركز تشغيل المنصة', subtitle: 'الأقسام، الدفع، التجار والإعدادات التشغيلية', onTap: () => _open(context, PlatformControlPage())),
+                _ActionCard(icon: Icons.currency_exchange, title: 'أسعار الصرف', subtitle: 'ضبط سعر صرف الدولار مقابل الريال اليمني والسعودي فورياً', onTap: () => _open(context, const FxRatesPage())),
                 _ActionCard(icon: Icons.card_giftcard, title: 'رموز شحن المحفظة', subtitle: 'إصدار رموز شحن مدفوعة وتتبّع استخدامها', onTap: () => _open(context, const WalletVouchersPage())),
                 _ActionCard(icon: Icons.message_outlined, title: 'أتمتة واتساب', subtitle: 'استقبال منتجات التجار عبر WhatsApp Business وربطها بالمتجر', onTap: () => _open(context, WhatsAppAutomationPage())),
                 _ActionCard(icon: Icons.fact_check_outlined, title: 'اعتماد المتاجر', subtitle: 'مراجعة واعتماد طلبات التجار', onTap: () => _open(context, MerchantApprovalPage())),

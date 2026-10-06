@@ -336,5 +336,20 @@ void main() {
       expect(service, contains('submitLocalPayment'));
       expect(service, contains('approveLocalPayment'));
     });
+
+    test('fx rates are correct and staff-editable', () {
+      final migration = File('supabase/migrations/20261005270000_fix_fx_rates_sar_v1.sql').readAsStringSync();
+      // The USD base rate must stay 1 and SAR must be the riyal peg, not 410.
+      expect(migration, contains("'SAR', 3.75"));
+      expect(migration, contains("(value->'rates'->>'SAR') = '410'"));
+      expect(migration, contains('usd_rate_must_be_one'));
+      expect(migration, contains('rates_must_be_positive'));
+      final service = File('lib/services/currency_service.dart').readAsStringSync();
+      expect(service, contains('Future<void> updateRates'));
+      expect(service, contains("rpc('set_fx_rates'"));
+      expect(File('lib/screens/fx_rates_page.dart').existsSync(), isTrue);
+      final dashboard = File('lib/screens/admin_dashboard.dart').readAsStringSync();
+      expect(dashboard, contains('FxRatesPage'));
+    });
   });
 }
