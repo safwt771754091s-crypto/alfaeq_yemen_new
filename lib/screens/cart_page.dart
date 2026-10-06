@@ -1,5 +1,9 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/product_units.dart';
 import '../services/currency_service.dart';
@@ -38,6 +42,7 @@ class _CartPageState extends State<CartPage> {
   String _providerLabel(String provider) => switch (provider) {
         'stripe' => 'بطاقة (Stripe)',
         'paypal' => 'PayPal',
+        'local_transfer' => 'حوالة بنكية / محفظة محلية',
         _ => provider,
       };
 
@@ -147,6 +152,69 @@ class _CartPageState extends State<CartPage> {
     finally { if (mounted) setState(() => _busy = false); }
   }
 
+  /// Prompts for a transfer reference + receipt, uploads the receipt, and
+  /// submits it for staff review. Returns true when submitted.
+  Future<bool> _submitLocalTransfer({required String orderId, required String suggestedRef}) async {
+    final refController = TextEditingController(text: suggestedRef);
+    final noteController = TextEditingController();
+    Uint8List? bytes;
+    String? fileName;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('إشعار الحوالة'),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('حوّل المبلغ إلى حساب المنصة ثم أدخل رقم الحوالة وارفع صورة الإشعار. رقم مرجعي مقترح: $suggestedRef',
+                  style: const TextStyle(fontSize: 12, color: Colors.black54)),
+              const SizedBox(height: 12),
+              TextField(controller: refController, decoration: const InputDecoration(labelText: 'رقم/مرجع الحوالة', border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: noteController, maxLines: 2, decoration: const InputDecoration(labelText: 'ملاحظة (اختياري)', border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final picked = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+                  if (picked == null || picked.files.isEmpty) return;
+                  setDialogState(() { bytes = picked.files.first.bytes; fileName = picked.files.first.name; });
+                },
+                icon: Icon(bytes == null ? Icons.upload_file_outlined : Icons.check_circle_outline),
+                label: Text(bytes == null ? 'اختر صورة إشعار التحويل' : 'تم اختيار: ${fileName ?? "الإشعار"}'),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('لاحقاً')),
+            FilledButton(
+              onPressed: (bytes == null || refController.text.trim().isEmpty) ? null : () => Navigator.pop(dialogContext, true),
+              child: const Text('إرسال للمراجعة'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) { refController.dispose(); noteController.dispose(); return false; }
+
+    final reference = refController.text.trim();
+    final note = noteController.text.trim();
+    refController.dispose();
+    noteController.dispose();
+
+    final ext = (fileName ?? '').contains('.') ? fileName!.split('.').last.toLowerCase() : 'jpg';
+    final path = 'receipts/$_uid/${orderId}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await SupabaseService.client.storage.from('media').uploadBinary(
+          path, bytes!,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+        );
+    final url = SupabaseService.client.storage.from('media').getPublicUrl(path);
+    await OrderService(preferSupabase: true).submitLocalPayment(
+      orderId: orderId, reference: reference, receiptUrl: url, note: note.isEmpty ? null : note,
+    );
+    return true;
+  }
+
   Future<void> _checkout() async {
     if (_busy || _items.isEmpty || _uid.isEmpty) return;
     final addressController = TextEditingController();
@@ -247,7 +315,14 @@ class _CartPageState extends State<CartPage> {
       if (!mounted) return;
 
       var message = paymentMethod == 'wallet' ? 'تم الخصم من محفظة الفائق.' : 'الدفع عند الاستلام.';
-      if (isOnline) {
+      if (isOnline && provider == 'local_transfer') {
+        final intent = await service.createPaymentIntent(orderId: orderId, provider: provider);
+        final reference = intent['reference']?.toString() ?? '';
+        final submitted = await _submitLocalTransfer(orderId: orderId, suggestedRef: reference);
+        message = submitted
+            ? 'تم استلام إشعار الحوالة. سيُراجع فريق المنصة الدفع ويؤكّد الطلب.'
+            : 'تم إنشاء الطلب. يمكنك إرسال إشعار الحوالة لاحقاً من صفحة الطلبات.';
+      } else if (isOnline) {
         final intent = await service.createPaymentIntent(orderId: orderId, provider: provider);
         final ref = intent['providerRef']?.toString() ?? '';
         final approveUrl = intent['approveUrl']?.toString() ?? '';

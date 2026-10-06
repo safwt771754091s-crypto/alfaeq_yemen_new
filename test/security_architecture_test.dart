@@ -320,5 +320,21 @@ void main() {
       final service = File('lib/services/push_service.dart').readAsStringSync();
       expect(service, contains('register_device_token'));
     });
+
+    test('local transfer payment flow is wired', () {
+      final migration = File('supabase/migrations/20261005260000_local_transfer_payment_v1.sql').readAsStringSync();
+      expect(migration, contains('create or replace function public.submit_local_payment'));
+      expect(migration, contains('create or replace function public.approve_local_payment'));
+      expect(migration, contains("grant execute on function public.submit_local_payment(text, text, text, text) to authenticated"));
+      expect(migration, contains('private.is_platform_staff()'));
+      final gateway = File('supabase/functions/payment-gateway/index.ts').readAsStringSync();
+      expect(gateway, contains('local_transfer'));
+      final cart = File('lib/screens/cart_page.dart').readAsStringSync();
+      expect(cart, contains('_submitLocalTransfer'));
+      expect(cart, contains("'local_transfer'"));
+      final service = File('lib/services/order_service.dart').readAsStringSync();
+      expect(service, contains('submitLocalPayment'));
+      expect(service, contains('approveLocalPayment'));
+    });
   });
 }

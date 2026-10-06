@@ -11,6 +11,7 @@ import 'bulk_product_import_page.dart';
 import 'developer_page.dart';
 import 'dispatch_center_page.dart';
 import 'location_picker_page.dart';
+import 'local_payment_review_page.dart';
 import 'merchant_approval_page.dart';
 import 'merchant_invites_page.dart';
 import 'merchant_portal_page.dart';
@@ -85,6 +86,7 @@ class AdminDashboard extends StatelessWidget {
                 _ActionCard(icon: Icons.card_giftcard, title: 'رموز شحن المحفظة', subtitle: 'إصدار رموز شحن مدفوعة وتتبّع استخدامها', onTap: () => _open(context, const WalletVouchersPage())),
                 _ActionCard(icon: Icons.message_outlined, title: 'أتمتة واتساب', subtitle: 'استقبال منتجات التجار عبر WhatsApp Business وربطها بالمتجر', onTap: () => _open(context, WhatsAppAutomationPage())),
                 _ActionCard(icon: Icons.fact_check_outlined, title: 'اعتماد المتاجر', subtitle: 'مراجعة واعتماد طلبات التجار', onTap: () => _open(context, MerchantApprovalPage())),
+                _ActionCard(icon: Icons.receipt_long_outlined, title: 'مراجعة الحوالات المحلية', subtitle: 'تأكيد أو رفض إشعارات التحويل البنكي ودفع الطلبات', onTap: () => _open(context, const LocalPaymentReviewPage())),
                 _ActionCard(icon: Icons.add_link, title: 'التجار والروابط', subtitle: 'إنشاء وإدارة دعوات التجار', onTap: () => _open(context, MerchantInvitesPage())),
                 _ActionCard(icon: Icons.storefront_outlined, title: 'مركز التاجر', subtitle: 'الكتالوج والمنتجات والطلبات', onTap: () => _open(context, MerchantPortalPage())),
                 _ActionCard(icon: Icons.add_business_outlined, title: 'إدخال البيانات', subtitle: 'إضافة المتاجر والمنتجات مع تحديد موقع المتجر على الخريطة', onTap: () => _open(context, AdminDataEntry())),
