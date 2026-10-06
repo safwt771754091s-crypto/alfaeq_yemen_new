@@ -216,5 +216,22 @@ void main() {
       final qr = File('lib/screens/wallet_qr_page.dart').readAsStringSync();
       expect(qr, contains("rpc('redeem_wallet_voucher'"));
     });
+
+    test('edge functions invoked from the web client answer CORS preflight', () {
+      // Every function the Flutter web bundle calls must handle OPTIONS,
+      // otherwise the browser blocks the request before it reaches the handler.
+      const browserInvoked = [
+        'ai-gateway',
+        'automation-event-gateway',
+        'create-merchant-invite',
+        'developer-control',
+        'request-password-reset',
+      ];
+      for (final name in browserInvoked) {
+        final source = File('supabase/functions/$name/index.ts').readAsStringSync();
+        expect(source, contains('Access-Control-Allow-Origin'), reason: '$name must send CORS headers');
+        expect(source, contains('OPTIONS'), reason: '$name must answer the preflight');
+      }
+    });
   });
 }

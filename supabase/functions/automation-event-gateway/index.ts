@@ -1,7 +1,15 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 Deno.serve(async (req: Request) => {
+  // The web client calls this function from the browser, so the preflight must
+  // be answered with CORS headers or the request never reaches the handler.
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return json({ ok: false, error: "server_configuration_missing" }, 500);
   const auth = req.headers.get("authorization") ?? "";
@@ -31,5 +39,5 @@ Deno.serve(async (req: Request) => {
   return json({ ok: true, actorUid: userData.user.id, eventId, eventType, accepted: Boolean(result?.accepted), duplicate: Boolean(result?.duplicate) });
 });
 function json(data: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
+  return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "content-type": "application/json" } });
 }
