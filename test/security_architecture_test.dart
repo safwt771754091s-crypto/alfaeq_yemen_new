@@ -361,5 +361,15 @@ void main() {
       expect(migration, contains("'invalid customer transition'"));
       expect(migration, contains('create or replace function private.transition_order_internal'));
     });
+
+    test('customers can cancel unpaid orders from the app', () {
+      final service = File('lib/services/order_service.dart').readAsStringSync();
+      expect(service, contains('Future<void> cancelMyOrder'));
+      expect(service, contains("rpc('transition_order'"));
+      final page = File('lib/screens/my_orders_page.dart').readAsStringSync();
+      expect(page, contains('canCancel'));
+      expect(page, contains('_cancel('));
+      expect(page, contains('cannot_cancel_paid_order'));
+    });
   });
 }

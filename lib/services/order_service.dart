@@ -201,6 +201,12 @@ class OrderService {
     return rows.isEmpty ? null : Map<String, dynamic>.from(rows.first);
   }
 
+  /// Customer-side cancellation. The server enforces that only an unpaid,
+  /// non-terminal order can be cancelled and releases any reserved inventory.
+  Future<void> cancelMyOrder(String orderId) async {
+    await supabase.rpc('transition_order', params: {'p_order_id': orderId, 'p_status': 'cancelled'});
+  }
+
   Stream<List<Map<String, dynamic>>> order(String orderId) =>
       supabase.from('orders').stream(primaryKey: ['id']).eq('id', orderId).limit(1);
 
