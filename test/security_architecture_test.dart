@@ -295,5 +295,17 @@ void main() {
       expect(cart, contains('online_'));
       expect(cart, contains('_paymentProviders'));
     });
+
+    test('chat realtime notifies members and tracks unread', () {
+      final migration = File('supabase/migrations/20261005240000_chat_realtime_unread_v1.sql').readAsStringSync();
+      expect(migration, contains('create trigger chat_message_notify'));
+      expect(migration, contains("perform private.notify_user("));
+      expect(migration, contains('create or replace function public.mark_thread_read'));
+      expect(migration, contains('create or replace function public.my_thread_unread_counts'));
+      expect(migration, contains("grant execute on function public.mark_thread_read(uuid) to authenticated"));
+      final page = File('lib/screens/conversations_page.dart').readAsStringSync();
+      expect(page, contains("rpc('my_thread_unread_counts')"));
+      expect(page, contains("rpc('mark_thread_read'"));
+    });
   });
 }
