@@ -85,6 +85,61 @@ class OrderService {
     return id.toString();
   }
 
+  /// Creates an order to be paid through an online provider (no wallet debit).
+  /// The returned order id is then passed to [createPaymentIntent].
+  Future<String> createPendingOrder({
+    required List<Map<String, dynamic>> items,
+    required String address,
+    String provider = 'manual',
+    double? latitude,
+    double? longitude,
+    String displayCurrency = 'YER',
+  }) async {
+    final normalized = _normalize(items);
+    final id = await supabase.rpc('create_pending_order', params: {
+      'p_items': normalized,
+      'p_address': address,
+      'p_provider': provider,
+      'p_display_currency': displayCurrency,
+      'p_latitude': latitude,
+      'p_longitude': longitude,
+    });
+    return id.toString();
+  }
+
+  /// Asks the payment gateway which online providers are actually configured.
+  Future<List<String>> paymentProviders() async {
+    final res = await supabase.functions.invoke('payment-gateway', body: {'action': 'providers'});
+    final data = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : const <String, dynamic>{};
+    final list = data['enabledProviders'];
+    return list is List ? list.map((e) => e.toString()).toList() : const <String>[];
+  }
+
+  /// Creates a payment intent for an order with an online provider.
+  Future<Map<String, dynamic>> createPaymentIntent({required String orderId, String? provider}) async {
+    final res = await supabase.functions.invoke('payment-gateway', body: {
+      'action': 'create_intent',
+      'orderId': orderId,
+      if (provider != null) 'provider': provider,
+    });
+    final data = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : const <String, dynamic>{};
+    if (data['ok'] != true) throw StateError(data['error']?.toString() ?? 'payment_intent_failed');
+    return data;
+  }
+
+  /// Confirms an intent with the provider and, when the PSP reports success,
+  /// marks the order paid server-side.
+  Future<bool> confirmPayment({required String orderId, required String providerRef, String? provider}) async {
+    final res = await supabase.functions.invoke('payment-gateway', body: {
+      'action': 'confirm',
+      'orderId': orderId,
+      'providerRef': providerRef,
+      if (provider != null) 'provider': provider,
+    });
+    final data = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : const <String, dynamic>{};
+    return data['status'] == 'paid';
+  }
+
   List<Map<String, dynamic>> _normalize(List<Map<String, dynamic>> items) => items
       .map((item) => {
             'product_id': item['productId'] ?? item['product_id'],

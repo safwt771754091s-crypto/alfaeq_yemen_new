@@ -266,5 +266,34 @@ void main() {
       expect(home, contains('CatalogService().allApprovedStores('));
       expect(home, contains('كل المتاجر المعتمدة'));
     });
+
+    test('online payment layer never lets a client mark an order paid', () {
+      final migration = File('supabase/migrations/20261005230000_payment_gateway_v1.sql').readAsStringSync();
+      // money-moving RPCs are service-role only
+      expect(migration, contains('revoke all on function public.mark_order_paid'));
+      expect(migration, contains('from public, anon, authenticated'));
+      expect(migration, contains('revoke all on function public.attach_payment_provider'));
+      expect(migration, contains('create or replace function public.create_pending_order'));
+      // the client-facing pending-order RPC is granted to authenticated only
+      expect(migration, contains('grant execute on function public.create_pending_order'));
+    });
+
+    test('payment-gateway edge function handles CORS and verifies the Stripe webhook', () {
+      final fn = File('supabase/functions/payment-gateway/index.ts').readAsStringSync();
+      expect(fn, contains('if (req.method === "OPTIONS") return new Response("ok"'));
+      expect(fn, contains('verifyStripeSignature'));
+      expect(fn, contains('mark_order_paid'));
+      final config = File('supabase/config.toml').readAsStringSync();
+      expect(config, contains('[functions.payment-gateway]'));
+    });
+
+    test('checkout exposes configured online providers', () {
+      final order = File('lib/services/order_service.dart').readAsStringSync();
+      expect(order, contains('createPendingOrder'));
+      expect(order, contains('paymentProviders'));
+      final cart = File('lib/screens/cart_page.dart').readAsStringSync();
+      expect(cart, contains('online_'));
+      expect(cart, contains('_paymentProviders'));
+    });
   });
 }

@@ -22,10 +22,24 @@ class _CartPageState extends State<CartPage> {
   String _currency = 'USD';
   num _walletBalance = 0;
   String _walletCurrency = 'USD';
+  List<String> _paymentProviders = const [];
   String get _uid => SupabaseService.client.auth.currentUser?.id ?? '';
 
   @override
-  void initState() { super.initState(); _loadCart(); _loadWallet(); }
+  void initState() { super.initState(); _loadCart(); _loadWallet(); _loadPaymentProviders(); }
+
+  Future<void> _loadPaymentProviders() async {
+    try {
+      final providers = await OrderService(preferSupabase: true).paymentProviders();
+      if (mounted) setState(() => _paymentProviders = providers.where((p) => p != 'manual').toList());
+    } catch (_) {/* online payments are optional */}
+  }
+
+  String _providerLabel(String provider) => switch (provider) {
+        'stripe' => 'بطاقة (Stripe)',
+        'paypal' => 'PayPal',
+        _ => provider,
+      };
 
   Future<void> _loadWallet() async {
     if (_uid.isEmpty) return;
@@ -157,6 +171,8 @@ class _CartPageState extends State<CartPage> {
                   value: 'wallet',
                   child: Text('محفظة الفائق (رصيدك: ${CurrencyService.instance.formatNative(_walletBalance, _walletCurrency)} — المطلوب: ${CurrencyService.instance.formatNative(_payTotal, _walletCurrency)})'),
                 ),
+                for (final p in _paymentProviders)
+                  DropdownMenuItem(value: 'online_$p', child: Text('الدفع الإلكتروني (${_providerLabel(p)})')),
               ],
               onChanged: (v) => setDialogState(() => paymentMethod = v ?? 'cash_on_delivery'),
             ),
@@ -199,6 +215,8 @@ class _CartPageState extends State<CartPage> {
     setState(() => _busy = true);
     try {
       final service = OrderService(preferSupabase: true);
+      final isOnline = paymentMethod.startsWith('online_');
+      final provider = isOnline ? paymentMethod.substring('online_'.length) : null;
       final orderId = paymentMethod == 'wallet'
           ? await service.createPaidOrder(
               items: _items,
@@ -208,23 +226,44 @@ class _CartPageState extends State<CartPage> {
               latitude: deliveryPoint?.latitude,
               longitude: deliveryPoint?.longitude,
             )
-          : await service.createOrder(
-              customerId: _uid,
-              items: _items,
-              address: address,
-              paymentMethod: paymentMethod,
-              latitude: deliveryPoint?.latitude,
-              longitude: deliveryPoint?.longitude,
-            );
+          : isOnline
+              ? await service.createPendingOrder(
+                  items: _items,
+                  address: address,
+                  provider: provider!,
+                  latitude: deliveryPoint?.latitude,
+                  longitude: deliveryPoint?.longitude,
+                )
+              : await service.createOrder(
+                  customerId: _uid,
+                  items: _items,
+                  address: address,
+                  paymentMethod: paymentMethod,
+                  latitude: deliveryPoint?.latitude,
+                  longitude: deliveryPoint?.longitude,
+                );
       // Checkout clears the Supabase cart atomically inside create_order.
       if (mounted) setState(() => _items = []);
+      if (!mounted) return;
+
+      var message = paymentMethod == 'wallet' ? 'تم الخصم من محفظة الفائق.' : 'الدفع عند الاستلام.';
+      if (isOnline) {
+        final intent = await service.createPaymentIntent(orderId: orderId, provider: provider);
+        final ref = intent['providerRef']?.toString() ?? '';
+        final approveUrl = intent['approveUrl']?.toString() ?? '';
+        final paid = ref.isEmpty ? false : await service.confirmPayment(orderId: orderId, providerRef: ref, provider: provider);
+        message = paid
+            ? 'تم الدفع إلكترونياً بنجاح.'
+            : approveUrl.isNotEmpty
+                ? 'تم إنشاء الطلب. أكمل الدفع عبر الرابط: $approveUrl'
+                : 'تم إنشاء الطلب. بانتظار تأكيد الدفع الإلكتروني.';
+      }
       if (!mounted) return;
       await showDialog<void>(
         context: context,
         builder: (_) => AlertDialog(
           title: const Text('تم إنشاء الطلب'),
-          content: Text('رقم الطلب: $orderId\n'
-              '${paymentMethod == 'wallet' ? 'تم الخصم من محفظة الفائق.' : 'الدفع عند الاستلام.'}\n'
+          content: Text('رقم الطلب: $orderId\n$message\n'
               'تم التحقق من المنتجات والمخزون وتسعير الطلب من الخادم.'),
           actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
         ),
