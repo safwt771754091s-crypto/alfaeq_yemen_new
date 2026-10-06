@@ -57,6 +57,16 @@ class CurrencyService extends ChangeNotifier {
     } catch (_) {/* keep the last good rates */}
   }
 
+  /// Staff-only: persist new platform rates server-side and refresh the cache.
+  Future<void> updateRates(Map<String, double> rates) async {
+    if (!SupabaseService.isInitialized) throw StateError('الخادم غير متصل.');
+    final payload = {
+      'rates': {for (final e in rates.entries) e.key.toUpperCase(): e.value},
+    };
+    await SupabaseService.client.rpc('set_fx_rates', params: {'p_rates': payload});
+    await refreshRates();
+  }
+
   Future<void> setDisplayCurrency(String code) async {
     final next = _normalize(code);
     if (next == _display) return;
