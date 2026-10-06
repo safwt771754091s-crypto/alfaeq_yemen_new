@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
@@ -6,7 +8,8 @@ import 'group_chat_page.dart';
 import 'support_chat_page.dart';
 
 /// WeChat-style "Chats" tab: a unified conversation list where the first entry
-/// is the always-available Alfaeq AI, followed by live support threads.
+/// is the always-available Alfaeq AI, followed by live support/group threads.
+/// Threads update live (Realtime) and show an unread badge per conversation.
 class ConversationsPage extends StatefulWidget {
   const ConversationsPage({super.key});
   @override
@@ -15,6 +18,39 @@ class ConversationsPage extends StatefulWidget {
 
 class _ConversationsPageState extends State<ConversationsPage> {
   String? get _uid => SupabaseService.client.auth.currentUser?.id;
+
+  Timer? _unreadTimer;
+  Map<String, int> _unread = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshUnread();
+    // Realtime pushes message rows, but the unread aggregate is cheap to poll;
+    // a short interval keeps the badge fresh without a second subscription.
+    _unreadTimer = Timer.periodic(const Duration(seconds: 15), (_) => _refreshUnread());
+  }
+
+  @override
+  void dispose() {
+    _unreadTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshUnread() async {
+    if (_uid == null || !SupabaseService.isInitialized) return;
+    try {
+      final res = await SupabaseService.client.rpc('my_thread_unread_counts');
+      final counts = <String, int>{};
+      for (final row in (res as List)) {
+        final map = Map<String, dynamic>.from(row as Map);
+        final id = map['thread_id']?.toString();
+        final value = map['unread'];
+        if (id != null && value is num && value > 0) counts[id] = value.toInt();
+      }
+      if (mounted) setState(() => _unread = counts);
+    } catch (_) {/* unread badges are best-effort */}
+  }
 
   Stream<List<Map<String, dynamic>>> _threads() => SupabaseService.client
       .from('chat_threads')
@@ -88,7 +124,8 @@ class _ConversationsPageState extends State<ConversationsPage> {
                 }
                 return Column(
                   children: [
-                    for (final row in rows) _ThreadTile(row: row, lastMessage: _lastMessage),
+                    for (final row in rows)
+                      _ThreadTile(row: row, lastMessage: _lastMessage, unread: _unread[row['id'].toString()] ?? 0),
                   ],
                 );
               },
@@ -124,7 +161,8 @@ class _AiConversationTile extends StatelessWidget {
 class _ThreadTile extends StatelessWidget {
   final Map<String, dynamic> row;
   final Stream<List<Map<String, dynamic>>> Function(String) lastMessage;
-  const _ThreadTile({required this.row, required this.lastMessage});
+  final int unread;
+  const _ThreadTile({required this.row, required this.lastMessage, this.unread = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -136,14 +174,18 @@ class _ThreadTile extends StatelessWidget {
     return Column(
       children: [
         ListTile(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => isGroup
-                  ? GroupChatPage(threadId: id, title: title)
-                  : SupportChatPage(initialThreadId: id),
-            ),
-          ),
+          onTap: () async {
+            try { await SupabaseService.client.rpc('mark_thread_read', params: {'p_thread_id': id}); } catch (_) {}
+            if (!context.mounted) return;
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => isGroup
+                    ? GroupChatPage(threadId: id, title: title)
+                    : SupportChatPage(initialThreadId: id),
+              ),
+            );
+          },
           leading: CircleAvatar(
             radius: 26,
             backgroundColor: const Color(0xFFF1F6FF),
@@ -158,7 +200,18 @@ class _ThreadTile extends StatelessWidget {
               return Text(text, maxLines: 1, overflow: TextOverflow.ellipsis);
             },
           ),
-          trailing: const Icon(Icons.chevron_left),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (unread > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
+                  child: Text(unread > 99 ? '99+' : '$unread', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+                ),
+              const Icon(Icons.chevron_left),
+            ],
+          ),
         ),
         const Divider(height: 1),
       ],
