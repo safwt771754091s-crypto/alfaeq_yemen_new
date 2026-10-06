@@ -203,26 +203,37 @@ class AdminDashboard extends StatelessWidget {
     final client = SupabaseService.client;
     final results = await Future.wait([
       client.from('users').select('uid'),
-      client.from('users').select('uid').eq('is_online', true),
       client.from('stores').select('id'),
       client.from('products').select('id'),
       client.from('orders').select('id'),
       client.from('wallet_operations').select('id'),
       client.from('audit_logs').select('id'),
-      client.from('login_events').select('uid'),
+      client.from('login_events').select('uid,login_at'),
     ]);
-    final loginRows = results[7] as List;
-    final loggedInUsers = loginRows.map((d) => (d as Map)['uid']?.toString()).whereType<String>().toSet().length;
+    final loginRows = results[6] as List;
+    final uids = <String>{};
+    final online = <String>{};
+    // "Present now" = signed in within the last 24h. users.is_online does not
+    // exist in the schema, so derive presence from the login event log.
+    final cutoff = DateTime.now().toUtc().subtract(const Duration(hours: 24));
+    for (final raw in loginRows) {
+      final row = raw as Map;
+      final uid = row['uid']?.toString();
+      if (uid == null) continue;
+      uids.add(uid);
+      final at = DateTime.tryParse('${row['login_at']}');
+      if (at != null && at.toUtc().isAfter(cutoff)) online.add(uid);
+    }
     return _AdminStats(
       users: (results[0] as List).length,
-      onlineUsers: (results[1] as List).length,
-      loggedInUsers: loggedInUsers,
+      onlineUsers: online.length,
+      loggedInUsers: uids.length,
       loginEvents: loginRows.length,
-      stores: (results[2] as List).length,
-      products: (results[3] as List).length,
-      orders: (results[4] as List).length,
-      walletOperations: (results[5] as List).length,
-      auditLogs: (results[6] as List).length,
+      stores: (results[1] as List).length,
+      products: (results[2] as List).length,
+      orders: (results[3] as List).length,
+      walletOperations: (results[4] as List).length,
+      auditLogs: (results[5] as List).length,
     );
   }
 

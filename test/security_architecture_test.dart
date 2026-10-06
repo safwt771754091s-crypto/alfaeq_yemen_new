@@ -181,5 +181,40 @@ void main() {
       expect(login, contains("error.contains('Unable to connect')"));
       expect(login, contains("error.contains('ClientException')"));
     });
+
+    test('admin overview derives presence without the missing users.is_online column', () {
+      final admin = File('lib/screens/admin_dashboard.dart').readAsStringSync();
+      expect(
+        admin,
+        isNot(contains("from('users').select('uid').eq('is_online'")),
+        reason: 'public.users has no is_online column; the query used to 400 and blank the whole overview',
+      );
+      expect(admin, contains("from('login_events').select('uid,login_at')"));
+      expect(admin, contains('hours: 24'));
+    });
+
+    test('catalog importer never probes the optional platform-api function on startup', () {
+      final importer = File('lib/services/super_alfaeq_catalog_importer.dart').readAsStringSync();
+      // The products table is authoritative; the edge function is only a
+      // fallback when the table is empty, so a missing deployment cannot spam
+      // the console with CORS errors during login.
+      final readyBody = importer.substring(importer.indexOf('Future<bool> isReady'), importer.indexOf('Future<int> importIfNeeded'));
+      expect(readyBody, contains("from('products')"));
+      expect(readyBody, isNot(contains("'platform-api'")), reason: 'readiness must not hit the edge function first');
+      expect(importer, contains('_remoteReady'));
+    });
+
+    test('wallet recharge vouchers are issued and redeemed through staff-gated RPCs', () {
+      final migration = File('supabase/migrations/20261005180000_wallet_topup_vouchers_v1.sql').readAsStringSync();
+      expect(migration, contains('create or replace function public.issue_wallet_vouchers'));
+      expect(migration, contains('create or replace function public.redeem_wallet_voucher'));
+      expect(migration, contains('private.is_platform_staff()'));
+      expect(migration, contains('grant execute on function public.issue_wallet_vouchers'));
+      final page = File('lib/screens/wallet_vouchers_page.dart').readAsStringSync();
+      expect(page, contains("rpc('issue_wallet_vouchers'"));
+      expect(page, contains("rpc('list_wallet_vouchers'"));
+      final qr = File('lib/screens/wallet_qr_page.dart').readAsStringSync();
+      expect(qr, contains("rpc('redeem_wallet_voucher'"));
+    });
   });
 }
