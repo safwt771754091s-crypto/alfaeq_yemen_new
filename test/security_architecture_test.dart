@@ -181,5 +181,69 @@ void main() {
       expect(login, contains("error.contains('Unable to connect')"));
       expect(login, contains("error.contains('ClientException')"));
     });
+
+    test('admin overview derives presence without the missing users.is_online column', () {
+      final admin = File('lib/screens/admin_dashboard.dart').readAsStringSync();
+      expect(
+        admin,
+        isNot(contains("from('users').select('uid').eq('is_online'")),
+        reason: 'public.users has no is_online column; the query used to 400 and blank the whole overview',
+      );
+      expect(admin, contains("from('login_events').select('uid,login_at')"));
+      expect(admin, contains('hours: 24'));
+    });
+
+    test('catalog importer never probes the optional platform-api function on startup', () {
+      final importer = File('lib/services/super_alfaeq_catalog_importer.dart').readAsStringSync();
+      // The products table is authoritative; the edge function is only a
+      // fallback when the table is empty, so a missing deployment cannot spam
+      // the console with CORS errors during login.
+      final readyBody = importer.substring(importer.indexOf('Future<bool> isReady'), importer.indexOf('Future<int> importIfNeeded'));
+      expect(readyBody, contains("from('products')"));
+      expect(readyBody, isNot(contains("'platform-api'")), reason: 'readiness must not hit the edge function first');
+      expect(importer, contains('_remoteReady'));
+    });
+
+    test('wallet recharge vouchers are issued and redeemed through staff-gated RPCs', () {
+      final migration = File('supabase/migrations/20261005180000_wallet_topup_vouchers_v1.sql').readAsStringSync();
+      expect(migration, contains('create or replace function public.issue_wallet_vouchers'));
+      expect(migration, contains('create or replace function public.redeem_wallet_voucher'));
+      expect(migration, contains('private.is_platform_staff()'));
+      expect(migration, contains('grant execute on function public.issue_wallet_vouchers'));
+      final page = File('lib/screens/wallet_vouchers_page.dart').readAsStringSync();
+      expect(page, contains("rpc('issue_wallet_vouchers'"));
+      expect(page, contains("rpc('list_wallet_vouchers'"));
+      final qr = File('lib/screens/wallet_qr_page.dart').readAsStringSync();
+      expect(qr, contains("rpc('redeem_wallet_voucher'"));
+    });
+
+    test('edge functions invoked from the web client answer CORS preflight', () {
+      // Every function the Flutter web bundle calls must handle OPTIONS,
+      // otherwise the browser blocks the request before it reaches the handler.
+      const browserInvoked = [
+        'ai-gateway',
+        'automation-event-gateway',
+        'create-merchant-invite',
+        'developer-control',
+        'request-password-reset',
+      ];
+      for (final name in browserInvoked) {
+        final source = File('supabase/functions/$name/index.ts').readAsStringSync();
+        expect(source, contains('Access-Control-Allow-Origin'), reason: '$name must send CORS headers');
+        expect(source, contains('OPTIONS'), reason: '$name must answer the preflight');
+      }
+    });
+
+    test('realtime publication covers every table the app streams', () {
+      // A `.stream()` call on a table missing from supabase_realtime never
+      // delivers rows (the admin login log showed "تعذر قراءة سجل الدخول").
+      final migration = File('supabase/migrations/20261005210000_realtime_publication_parity_v1.sql').readAsStringSync();
+      for (final table in ['login_events', 'products', 'stores']) {
+        expect(migration, contains(table), reason: '$table must be added to the publication');
+      }
+      expect(migration, contains('supabase_realtime'));
+      final dashboard = File('lib/screens/admin_dashboard.dart').readAsStringSync();
+      expect(dashboard, contains("from('login_events').stream("));
+    });
   });
 }
