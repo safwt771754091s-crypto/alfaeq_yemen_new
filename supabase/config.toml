@@ -1,9 +1,12 @@
 [functions.automation-worker]
 verify_jwt = false
-
-# These functions authenticate with shared secrets (x-alfaeq-*), not a JWT,
-# so they must be callable without an Authorization header.
 [functions.ai-event-worker]
+verify_jwt = false
+
+# Provider-agnostic online payments. The function authenticates the caller
+# itself (and verifies the Stripe webhook HMAC), so JWT verification is off;
+# this also keeps the Stripe webhook (which has no Supabase JWT) reachable.
+[functions.payment-gateway]
 verify_jwt = false
 
 [functions.sheets-catalog-sync]
