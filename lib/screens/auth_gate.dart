@@ -5,12 +5,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/auth_service.dart';
 import '../services/super_alfaeq_catalog_importer.dart';
+import '../services/supabase_service.dart';
 import 'admin_dashboard.dart';
 import 'customer_session_shell.dart';
 import 'driver_center_page.dart';
 import 'developer_page.dart';
 import 'login_page.dart';
 import 'merchant_portal_page.dart';
+import 'reset_password_page.dart';
 import 'world_home_page.dart';
 
 class AuthGate extends StatefulWidget {
@@ -23,6 +25,7 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   final AuthService _auth = AuthService();
   StreamSubscription<User?>? _authSubscription;
+  bool _passwordRecovery = false;
 
   @override
   void initState() {
@@ -36,6 +39,18 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         _auth.stopPresence();
       }
       if (mounted) setState(() {});
+    });
+    _watchPasswordRecovery();
+  }
+
+  /// Supabase emits a PASSWORD_RECOVERY event when the user lands on a
+  /// recovery link; capture it so we can show the "new password" form even
+  /// though a temporary session exists.
+  void _watchPasswordRecovery() {
+    SupabaseService.client.auth.onAuthStateChange.listen((event) {
+      if (event.event == AuthChangeEvent.passwordRecovery && mounted) {
+        setState(() => _passwordRecovery = true);
+      }
     });
   }
 
@@ -60,6 +75,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    if (_passwordRecovery) {
+      return ResetPasswordPage(onDone: () => setState(() => _passwordRecovery = false));
+    }
     final user = _auth.currentUser;
     if (user == null) return const LoginPage();
 

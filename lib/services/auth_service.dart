@@ -100,7 +100,8 @@ class AuthService {
   }
 
   Future<void> sendPasswordReset({required String email}) async {
-    await auth.resetPasswordForEmail(email.trim());
+    final redirectTo = kIsWeb ? (Uri.base.origin + Uri.base.path) : null;
+    await auth.resetPasswordForEmail(email.trim(), redirectTo: redirectTo);
   }
 
   Future<AuthResponse> register({
