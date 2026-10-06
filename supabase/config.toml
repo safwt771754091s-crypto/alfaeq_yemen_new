@@ -8,3 +8,10 @@ verify_jwt = false
 
 [functions.sheets-catalog-sync]
 verify_jwt = false
+
+# Password recovery is emailed through Resend (the project has no built-in
+# mailer). The function takes only an email and always returns a generic
+# success, so it needs no JWT -- this also keeps it callable with the new
+# non-JWT publishable keys.
+[functions.request-password-reset]
+verify_jwt = false

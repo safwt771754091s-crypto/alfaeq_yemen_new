@@ -107,6 +107,21 @@ class AuthService {
 
   Future<void> sendPasswordReset({required String email}) async {
     final redirectTo = kIsWeb ? (Uri.base.origin + Uri.base.path) : null;
+    // The project has no built-in mailer configured, so deliver the recovery
+    // link through the Resend-backed edge function. A 200 is treated as sent
+    // (the function always reports success to avoid account enumeration).
+    try {
+      final response = await SupabaseService.client.functions.invoke(
+        'request-password-reset',
+        body: {
+          'email': email.trim(),
+          if (redirectTo != null) 'redirectTo': redirectTo,
+        },
+      );
+      if (response.status == 200) return;
+    } on Exception {
+      // Fall back to the built-in mailer below.
+    }
     await auth.resetPasswordForEmail(email.trim(), redirectTo: redirectTo);
   }
 

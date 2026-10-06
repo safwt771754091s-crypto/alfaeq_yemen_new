@@ -153,5 +153,15 @@ void main() {
       expect(service, contains("from('users').upsert"));
       expect(service, contains('signInWithPassword'), reason: 'password change re-authenticates');
     });
+
+    test('password reset is delivered through the Resend edge function', () {
+      final auth = File('lib/services/auth_service.dart').readAsStringSync();
+      expect(auth, contains("functions.invoke(\n        'request-password-reset'"));
+      final fn = File('supabase/functions/request-password-reset/index.ts').readAsStringSync();
+      expect(fn, contains('admin.auth.admin.generateLink'));
+      expect(fn, contains('type: "recovery"'));
+      expect(fn, contains('api.resend.com/emails'));
+      expect(fn, isNot(contains('"detail"')), reason: 'no provider detail leaks to callers');
+    });
   });
 }
