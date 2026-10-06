@@ -351,5 +351,15 @@ void main() {
       final dashboard = File('lib/screens/admin_dashboard.dart').readAsStringSync();
       expect(dashboard, contains('FxRatesPage'));
     });
+
+    test('delivery lifecycle settles driver load and guards transitions', () {
+      final migration = File('supabase/migrations/20261005280000_delivery_lifecycle_integrity_v1.sql').readAsStringSync();
+      expect(migration, contains('create or replace function private.driver_update_order'));
+      expect(migration, contains("active_order_count = greatest(0, active_order_count - 1)"));
+      expect(migration, contains('perform public.release_order_inventory(p_order_id)'));
+      expect(migration, contains('cannot_cancel_paid_order'));
+      expect(migration, contains("'invalid customer transition'"));
+      expect(migration, contains('create or replace function private.transition_order_internal'));
+    });
   });
 }
