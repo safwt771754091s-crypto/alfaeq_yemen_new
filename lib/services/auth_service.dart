@@ -107,22 +107,22 @@ class AuthService {
 
   Future<void> sendPasswordReset({required String email}) async {
     final redirectTo = kIsWeb ? (Uri.base.origin + Uri.base.path) : null;
-    // The project has no built-in mailer configured, so deliver the recovery
-    // link through the Resend-backed edge function. A 200 is treated as sent
-    // (the function always reports success to avoid account enumeration).
+    // Supabase's built-in mailer delivers to any customer, so it is the primary
+    // path. The Resend-backed function is only a fallback for when the built-in
+    // mailer is unavailable (rate limit, SMTP misconfiguration).
     try {
-      final response = await SupabaseService.client.functions.invoke(
-        'request-password-reset',
-        body: {
-          'email': email.trim(),
-          if (redirectTo != null) 'redirectTo': redirectTo,
-        },
-      );
-      if (response.status == 200) return;
+      await auth.resetPasswordForEmail(email.trim(), redirectTo: redirectTo);
+      return;
     } on Exception {
-      // Fall back to the built-in mailer below.
+      // Fall through to the edge-function fallback.
     }
-    await auth.resetPasswordForEmail(email.trim(), redirectTo: redirectTo);
+    await SupabaseService.client.functions.invoke(
+      'request-password-reset',
+      body: {
+        'email': email.trim(),
+        if (redirectTo != null) 'redirectTo': redirectTo,
+      },
+    );
   }
 
   Future<AuthResponse> register({
