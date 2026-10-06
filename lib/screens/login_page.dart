@@ -111,6 +111,9 @@ class _LoginPageState extends State<LoginPage> {
     if (error.contains('over_email_send_rate_limit') || error.contains('rate limit')) {
       return 'محاولات كثيرة. انتظر قليلاً ثم حاول مرة أخرى.';
     }
+    if (error.contains('Error sending recovery email') || error.contains('Error sending confirmation email') || error.contains('Error sending email') || error.contains('Error sending magic link')) {
+      return 'تعذّر إرسال البريد الآن. لم يتم ضبط مزوّد البريد (SMTP) بعد، تواصل مع الدعم لإتمام الإعداد.';
+    }
     if (error.contains('signup_disabled')) return 'إنشاء الحسابات معطّل حالياً. تواصل مع الدعم.';
     if (error.contains('provider is not enabled') || error.contains('validation_failed')) {
       return 'تسجيل الدخول بحساب Google غير مفعّل حالياً. استخدم البريد وكلمة المرور.';
