@@ -21,6 +21,8 @@ class AlfaeqAiPermissionGateway {
     'get_my_order':(AiActionLevel.read,<String>{'customer','merchant','driver','developer','admin','owner'},true),
     'get_my_account_summary':(AiActionLevel.read,<String>{'customer','merchant','driver','developer','admin','owner'},true),
     'get_my_cart':(AiActionLevel.read,<String>{'customer','merchant','driver','developer','admin','owner'},true),
+    'get_my_wallet':(AiActionLevel.read,<String>{'customer','merchant','driver','developer','admin','owner'},true),
+    'find_nearby_stores':(AiActionLevel.read,<String>{'customer','merchant','driver','developer','admin','owner'},true),
     'add_to_cart':(AiActionLevel.reversible,<String>{'customer','merchant','driver','developer','admin','owner'},true),
     'update_cart_item':(AiActionLevel.reversible,<String>{'customer','merchant','driver','developer','admin','owner'},true),
     'remove_from_cart':(AiActionLevel.reversible,<String>{'customer','merchant','driver','developer','admin','owner'},true),

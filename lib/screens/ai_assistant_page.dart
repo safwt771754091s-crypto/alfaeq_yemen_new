@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../ai/ai_service.dart';
+import 'barcode_scanner_page.dart';
 
 class AiAssistantPage extends StatefulWidget {
   const AiAssistantPage({super.key});
@@ -18,6 +19,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
   // One-tap entry points so the assistant feels like a super-app hub.
   static const _shortcuts = <(IconData, String, String)>[
+    (Icons.qr_code_scanner, 'امسح باركود', 'سأمسح باركود منتج للبحث عنه'),
     (Icons.search, 'ابحث عن منتج', 'ابحث عن منتج أرز في المتجر'),
     (Icons.receipt_long_outlined, 'تابع طلبي', 'ما حالة طلبي الأخير؟'),
     (Icons.shopping_cart_outlined, 'سلتي', 'ماذا يوجد في سلتي الآن؟'),
@@ -53,6 +55,18 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       _busy = false;
     });
     _scrollToEnd();
+  }
+
+  Future<void> _onShortcut(int index) async {
+    if (index == 0) {
+      final code = await Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (_) => const BarcodeScannerPage()),
+      );
+      if (!mounted || code == null || code.trim().isEmpty) return;
+      await _dispatch('ابحث عن المنتج بالباركود ${code.trim()}');
+      return;
+    }
+    await _dispatch(_shortcuts[index].$3);
   }
 
   void _scrollToEnd() {
@@ -196,7 +210,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                   return ActionChip(
                     avatar: Icon(s.$1, size: 18),
                     label: Text(s.$2, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    onPressed: _busy ? null : () => _dispatch(s.$3),
+                    onPressed: _busy ? null : () => _onShortcut(i),
                   );
                 },
               ),

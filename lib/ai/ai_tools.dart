@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 
@@ -14,6 +17,8 @@ class AlfaeqAiToolRegistry {
         case 'get_my_order': return await _order(args);
         case 'get_my_account_summary': return await _account();
         case 'get_my_cart': return await _cart();
+        case 'get_my_wallet': return await _wallet();
+        case 'find_nearby_stores': return await _nearbyStores(args);
         case 'add_to_cart': return await _cartChange(args,'add',userConfirmed);
         case 'update_cart_item': return await _cartChange(args,'update',userConfirmed);
         case 'remove_from_cart': return await _cartChange(args,'remove',userConfirmed);
@@ -30,14 +35,19 @@ class AlfaeqAiToolRegistry {
     // strip those (and wildcards) to keep the filter well-formed.
     final q=raw.replaceAll(RegExp(r'[,()%*]'),' ').replaceAll(RegExp(r'\s+'),' ').trim();
     if(q.isEmpty)return {'ok':false,'error':'أدخل ما تريد البحث عنه.'};
+    final type=(a['type']??'both').toString();
     final products=<Map<String,Object?>>[],stores=<Map<String,Object?>>[];
-    final rows=await _db.from('products').select().eq('status','active')
-        .or('name.ilike.%$q%,description.ilike.%$q%,metadata->>barcode.ilike.%$q%')
-        .order('name').limit(_max);
-    for(final rawRow in rows){final d=Map<String,dynamic>.from(rawRow);products.add({'id':d['id'],'name':d['name'],'price':d['price'],'currency':d['currency']??'YER','storeId':d['store_id'],'available':d['stock_base']});}
-    final ss=await _db.from('stores').select().inFilter('status',['approved','active'])
-        .or('name.ilike.%$q%,address.ilike.%$q%').order('name').limit(_max);
-    for(final rawRow in ss){final d=Map<String,dynamic>.from(rawRow);stores.add({'id':d['id'],'name':d['name'],'address':d['address']});}
+    if(type!='stores'){
+      final rows=await _db.from('products').select().eq('status','active')
+          .or('name.ilike.%$q%,description.ilike.%$q%,metadata->>barcode.ilike.%$q%')
+          .order('name').limit(_max);
+      for(final rawRow in rows){final d=Map<String,dynamic>.from(rawRow);products.add({'id':d['id'],'name':d['name'],'price':d['price'],'currency':d['currency']??'YER','storeId':d['store_id'],'available':d['stock_base']});}
+    }
+    if(type!='products'){
+      final ss=await _db.from('stores').select().inFilter('status',['approved','active'])
+          .or('name.ilike.%$q%,address.ilike.%$q%').order('name').limit(_max);
+      for(final rawRow in ss){final d=Map<String,dynamic>.from(rawRow);stores.add({'id':d['id'],'name':d['name'],'address':d['address']});}
+    }
     return {'ok':true,'products':products,'stores':stores};
   }
 
@@ -58,6 +68,46 @@ class AlfaeqAiToolRegistry {
 
   Future<Map<String,Object?>> _cart() async {
     final u=_db.auth.currentUser;if(u==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};final row=await _db.from('carts').select('items,metadata').eq('uid',u.id).maybeSingle();final raw=row?['items'];return {'ok':true,'items':raw is List?raw:const [],'currency':row?['metadata'] is Map?((row!['metadata'] as Map)['currency']??'YER'):'YER'};
+  }
+
+  Future<Map<String,Object?>> _wallet() async {
+    final u=_db.auth.currentUser;if(u==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
+    final rows=await _db.from('wallets').select('currency,available_balance,status').eq('uid',u.id).limit(5);
+    final wallets=rows.map((r)=>{'currency':r['currency']??'USD','balance':r['available_balance']??0,'status':r['status']??'active'}).toList();
+    return {'ok':true,'wallets':wallets};
+  }
+
+  Future<Map<String,Object?>> _nearbyStores(Map<String,Object?> a) async {
+    final limit=((a['limit'] as num?)?.toInt()??_max).clamp(1,20);
+    try {
+      var perm=await Geolocator.checkPermission();
+      if(perm==LocationPermission.denied)perm=await Geolocator.requestPermission();
+      if(perm==LocationPermission.denied||perm==LocationPermission.deniedForever){
+        return {'ok':false,'error':'لم يتم منح صلاحية الموقع لعرض أقرب المتاجر.'};
+      }
+      final pos=await Geolocator.getCurrentPosition();
+      final rows=await _db.from('stores').select('id,name,address,latitude,longitude')
+          .inFilter('status',['approved','active']).limit(200);
+      final withDist=<Map<String,Object?>>[];
+      for(final rawRow in rows){
+        final d=Map<String,dynamic>.from(rawRow);
+        final lat=(d['latitude'] as num?)?.toDouble();final lng=(d['longitude'] as num?)?.toDouble();
+        if(lat==null||lng==null)continue;
+        final km=_haversineKm(pos.latitude,pos.longitude,lat,lng);
+        withDist.add({'id':d['id'],'name':d['name'],'address':d['address'],'distanceKm':double.parse(km.toStringAsFixed(2))});
+      }
+      withDist.sort((a,b)=>(a['distanceKm'] as double).compareTo(b['distanceKm'] as double));
+      return {'ok':true,'stores':withDist.take(limit).toList(),'userLocation':{'lat':pos.latitude,'lng':pos.longitude}};
+    } catch(e){
+      return {'ok':false,'error':'تعذر تحديد موقعك الحالي. تأكد من تفعيل خدمة الموقع.','detail':e.toString()};
+    }
+  }
+
+  static double _haversineKm(double lat1,double lon1,double lat2,double lon2){
+    const r=6371.0;
+    final dLat=(lat2-lat1)*math.pi/180,dLon=(lon2-lon1)*math.pi/180;
+    final a=math.sin(dLat/2)*math.sin(dLat/2)+math.cos(lat1*math.pi/180)*math.cos(lat2*math.pi/180)*math.sin(dLon/2)*math.sin(dLon/2);
+    return 2*r*math.asin(math.min(1,math.sqrt(a)));
   }
 
   Future<Map<String,Object?>> _cartChange(Map<String,Object?> a,String action,bool confirmed) async {
