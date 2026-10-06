@@ -307,5 +307,18 @@ void main() {
       expect(page, contains("rpc('my_thread_unread_counts')"));
       expect(page, contains("rpc('mark_thread_read'"));
     });
+
+    test('push notification infrastructure is provider-ready', () {
+      final migration = File('supabase/migrations/20261005250000_push_notifications_v1.sql').readAsStringSync();
+      expect(migration, contains('create table if not exists public.device_tokens'));
+      expect(migration, contains('create or replace function public.register_device_token'));
+      expect(migration, contains('create trigger push_on_notification'));
+      expect(migration, contains('net.http_post'));
+      expect(File('supabase/functions/push-dispatch/index.ts').existsSync(), isTrue);
+      final config = File('supabase/config.toml').readAsStringSync();
+      expect(config, contains('[functions.push-dispatch]'));
+      final service = File('lib/services/push_service.dart').readAsStringSync();
+      expect(service, contains('register_device_token'));
+    });
   });
 }

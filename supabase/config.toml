@@ -9,6 +9,12 @@ verify_jwt = false
 [functions.payment-gateway]
 verify_jwt = false
 
+# Push fan-out is called by a database trigger (pg_net) with an HMAC signature
+# instead of a Supabase JWT, so JWT verification is off; the function enforces
+# the shared secret itself.
+[functions.push-dispatch]
+verify_jwt = false
+
 [functions.sheets-catalog-sync]
 verify_jwt = false
 
