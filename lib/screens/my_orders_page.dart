@@ -104,7 +104,9 @@ class _OrdersList extends StatelessWidget {
                   Text(
                     displayTotal is num && displayCurrency.isNotEmpty
                         ? CurrencyService.instance.formatNative(displayTotal, displayCurrency)
-                        : CurrencyService.instance.formatNative(total is num ? total : 0, currency == 'USD' ? CurrencyService.instance.displayCurrency : currency),
+                        : CurrencyService.instance.formatNative(
+                            CurrencyService.instance.convertBetween((total is num ? total : 0).toDouble(), currency, CurrencyService.instance.displayCurrency),
+                            CurrencyService.instance.displayCurrency),
                     style: const TextStyle(fontWeight: FontWeight.w900)),
                 ]),
                 const SizedBox(height: 8),

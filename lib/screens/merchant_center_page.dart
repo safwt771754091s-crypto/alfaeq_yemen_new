@@ -27,6 +27,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
   String _sectionId = appSections.first.id;
   String? _selectedStoreId;
   String _saleUnit = 'piece';
+  String _priceCurrency = 'YER';
   bool _saving = false;
   final _eventBus = AlfaeqEventBusService();
 
@@ -176,7 +177,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
         'owner_id': user.id,
         'name': name,
         'price': price,
-        'currency': 'USD',
+        'currency': _priceCurrency,
         'stock': stock,
         'stock_base': stockBase,
         'sale_unit': _saleUnit,
@@ -244,7 +245,9 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
     SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _saving ? null : _createStore, icon: const Icon(Icons.my_location), label: const Text('إرسال المتجر مع الموقع للمراجعة')))
   ])));
 
-  Widget _productForm() => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [if (_selectedStoreId == null) const Align(alignment: Alignment.centerRight, child: Text('اختر متجراً أولاً من القائمة أعلاه.', style: TextStyle(color: Colors.black54))), TextField(controller: _productName, decoration: const InputDecoration(labelText: 'اسم الصنف')), TextField(controller: _price, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر بالريال اليمني')), TextField(controller: _stock, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'المخزون بـ ${ProductUnit.fromId(_saleUnit).label}')),
+  Widget _productForm() => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [if (_selectedStoreId == null) const Align(alignment: Alignment.centerRight, child: Text('اختر متجراً أولاً من القائمة أعلاه.', style: TextStyle(color: Colors.black54))), TextField(controller: _productName, decoration: const InputDecoration(labelText: 'اسم الصنف')), TextField(controller: _price, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر')), const SizedBox(height: 12),
+    DropdownButtonFormField<String>(initialValue: _priceCurrency, decoration: const InputDecoration(labelText: 'عملة السعر'), items: [for (final c in CurrencyService.supported) DropdownMenuItem(value: c, child: Text('${CurrencyService.labelFor(c)} (${CurrencyService.symbolFor(c)})'))], onChanged: (value) { if (value != null) setState(() => _priceCurrency = value); }), const SizedBox(height: 12),
+    TextField(controller: _stock, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'المخزون بـ ${ProductUnit.fromId(_saleUnit).label}')),
     DropdownButtonFormField<String>(initialValue: _saleUnit, decoration: const InputDecoration(labelText: 'وحدة البيع'), items: [for (final u in ProductUnit.all) DropdownMenuItem(value: u.id, child: Text(u.label))], onChanged: (value) { if (value != null) setState(() => _saleUnit = value); }), const SizedBox(height: 12), SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _saving || _selectedStoreId == null ? null : _createProduct, icon: const Icon(Icons.add), label: const Text('حفظ الصنف')))])));
 
   Widget _products(String uid) => FutureBuilder<bool>(
