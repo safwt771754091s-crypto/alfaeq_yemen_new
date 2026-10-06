@@ -112,7 +112,7 @@ class _LoginPageState extends State<LoginPage> {
       return 'محاولات كثيرة. انتظر قليلاً ثم حاول مرة أخرى.';
     }
     if (error.contains('Error sending recovery email') || error.contains('Error sending confirmation email') || error.contains('Error sending email') || error.contains('Error sending magic link')) {
-      return 'تعذّر إرسال البريد الآن. لم يتم ضبط مزوّد البريد (SMTP) بعد، تواصل مع الدعم لإتمام الإعداد.';
+      return 'تعذّر إرسال البريد الآن. حاول مرة أخرى بعد قليل أو تواصل مع الدعم.';
     }
     if (error.contains('signup_disabled')) return 'إنشاء الحسابات معطّل حالياً. تواصل مع الدعم.';
     if (error.contains('provider is not enabled') || error.contains('validation_failed')) {

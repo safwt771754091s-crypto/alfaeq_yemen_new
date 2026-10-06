@@ -154,9 +154,17 @@ void main() {
       expect(service, contains('signInWithPassword'), reason: 'password change re-authenticates');
     });
 
-    test('password reset is delivered through the Resend edge function', () {
+    test('password reset uses the built-in mailer first, Resend as fallback', () {
       final auth = File('lib/services/auth_service.dart').readAsStringSync();
-      expect(auth, contains("functions.invoke(\n        'request-password-reset'"));
+      final resetStart = auth.indexOf('sendPasswordReset');
+      final resetBody = auth.substring(resetStart, auth.indexOf('Future<AuthResponse> register'));
+      expect(resetBody, contains('auth.resetPasswordForEmail'));
+      expect(resetBody, contains("'request-password-reset'"));
+      expect(
+        resetBody.indexOf('auth.resetPasswordForEmail') < resetBody.indexOf("'request-password-reset'"),
+        isTrue,
+        reason: 'built-in mailer must be attempted before the edge-function fallback',
+      );
       final fn = File('supabase/functions/request-password-reset/index.ts').readAsStringSync();
       expect(fn, contains('admin.auth.admin.generateLink'));
       expect(fn, contains('type: "recovery"'));
