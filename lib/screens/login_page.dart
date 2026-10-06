@@ -133,7 +133,9 @@ class _LoginPageState extends State<LoginPage> {
     if (error.contains('email-already-in-use')) return 'البريد الإلكتروني مستخدم بالفعل.';
     if (error.contains('weak-password')) return 'كلمة المرور ضعيفة. استخدم 6 أحرف أو أكثر.';
     if (error.contains('invalid-email')) return 'أدخل بريدًا إلكترونيًا صحيحًا.';
-    if (error.contains('network-request-failed') || error.contains('Failed to fetch') || error.contains('SocketException')) return 'تحقق من اتصال الإنترنت.';
+    if (error.contains('network-request-failed') || error.contains('Failed to fetch') || error.contains('SocketException') || error.contains('ClientException') || error.contains('XMLHttpRequest') || error.contains('Unable to connect') || error.contains('Connection failed') || error.contains('Connection closed') || error.contains('connection reset') || error.contains('HandshakeException') || error.contains('TimeoutException') || error.contains('timed out')) {
+      return 'تعذر الاتصال بخادم الفائق يمن. تحقق من اتصال الإنترنت ثم أعد المحاولة.';
+    }
     final normalized = error.replaceAll(RegExp(r'\s+'), ' ').trim();
     return 'تعذر إتمام العملية: $normalized';
   }
