@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../services/currency_service.dart';
 
-/// Staff editor for the platform exchange rates. The catalog is priced in USD,
-/// so every rate here is "how many units of this currency per 1 USD".
+/// Staff editor for the platform exchange rates. The catalog can hold prices in
+/// any supported currency, so every rate here is "how many units of this
+/// currency per 1 USD" and conversions pivot through USD.
 class FxRatesPage extends StatefulWidget {
   const FxRatesPage({super.key});
   @override
@@ -71,7 +72,7 @@ class _FxRatesPageState extends State<FxRatesPage> {
               child: const Padding(
                 padding: EdgeInsets.all(14),
                 child: Text(
-                  'الكتالوج مسعّر بالدولار الأمريكي (USD) وهو العملة الأساس. اكتب كم وحدة من كل عملة تساوي دولاراً واحداً.',
+                  'الكتالوج يقبل التسعير بأي عملة مدعومة، والتحويل يتم عبر الدولار الأمريكي (USD) كعملة أساس. اكتب كم وحدة من كل عملة تساوي دولاراً واحداً.',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
