@@ -498,12 +498,20 @@ class _StoreCatalogCard extends StatelessWidget {
             subtitle: Text('${data['address'] ?? ''} • ${data['phone'] ?? ''}'),
           ),
           const Divider(),
-          FutureBuilder<List<CatalogDocument>>(
-            future: const CatalogService().activeProducts(storeId: storeId, limit: 5000),
+          StreamBuilder<List<Map<String, dynamic>>>(
+            stream: SupabaseService.client
+                .from('products')
+                .stream(primaryKey: ['id'])
+                .eq('store_id', storeId)
+                .order('name')
+                .limit(5000),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
               if (snapshot.hasError) return Text('تعذر تحميل الأصناف: ${snapshot.error}');
-              final products = snapshot.data ?? const <CatalogDocument>[];
+              final products = (snapshot.data ?? const <Map<String, dynamic>>[])
+                  .where((row) => (row['status'] ?? 'active') == 'active')
+                  .map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row)))
+                  .toList();
               if (products.isEmpty) {
                 return const Padding(
                   padding: EdgeInsets.all(8),

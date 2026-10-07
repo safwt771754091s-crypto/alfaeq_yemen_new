@@ -180,6 +180,8 @@ class OrderService {
       .map((item) => {
             'product_id': item['productId'] ?? item['product_id'],
             'quantity': item['quantity'],
+            if ((item['quantityBase'] ?? item['quantity_base']) != null)
+              'quantity_base': item['quantityBase'] ?? item['quantity_base'],
           })
       .toList();
 
