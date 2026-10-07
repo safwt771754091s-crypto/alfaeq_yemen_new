@@ -400,6 +400,15 @@ void main() {
       expect(migration, contains('private.fx_convert(v_total, v_curr, v_wallet_curr)'));
     });
 
+    test('the 3.75x catalog over-correction is reversed once', () {
+      // The earlier migration multiplied the already-SAR source prices by 3.75,
+      // inflating the whole supermarket catalog. The fix divides back once.
+      final fix = File('supabase/migrations/20261007020000_catalog_price_overcorrection_fix_v1.sql').readAsStringSync();
+      expect(fix, contains('price / coalesce((public.get_fx_rates()'));
+      expect(fix, contains("'price_overcorrection_fixed'"));
+      expect(fix, contains("(metadata ->> 'price_overcorrection_fixed')::boolean, false) = false"));
+    });
+
     test('product authoring forms persist the chosen price currency', () {
       final merchant = File('lib/screens/merchant_center_page.dart').readAsStringSync();
       final edit = File('lib/screens/product_edit_page.dart').readAsStringSync();
