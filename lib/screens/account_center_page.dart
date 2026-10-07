@@ -37,7 +37,7 @@ class _AccountCenterPageState extends State<AccountCenterPage> {
   final _profile = ProfileService();
   final _auth = AuthService();
   Map<String, dynamic> _data = const {};
-  Map<String, dynamic> _stats = const {'orders': 0, 'balance': 0};
+  Map<String, dynamic> _stats = const {'orders': 0, 'balance': 0, 'currency': 'USD'};
   String _version = '';
   bool _loading = true;
   bool _uploadingAvatar = false;
@@ -292,7 +292,7 @@ class _AccountCenterPageState extends State<AccountCenterPage> {
               ]),
               _group('المحفظة والمدفوعات', [
                 _tile(Icons.account_balance_wallet_outlined, 'محفظتي',
-                    subtitle: '${CurrencyService.symbolFor(CurrencyService.instance.displayCurrency)} ${_stats['balance']}',
+                    subtitle: '${CurrencyService.symbolFor(CurrencyService.instance.displayCurrency)} ${CurrencyService.instance.convertBetween((_stats['balance'] as num? ?? 0).toDouble(), (_stats['currency'] ?? 'USD').toString(), CurrencyService.instance.displayCurrency)}',
                     onTap: () => _open(const WalletCenterPage())),
                 _tile(Icons.confirmation_number_outlined, 'رموز شحن المحفظة', onTap: () => _open(const WalletVouchersPage())),
                 _tile(Icons.currency_exchange, 'العملة المعروضة',
@@ -421,7 +421,9 @@ class _AccountCenterPageState extends State<AccountCenterPage> {
       child: Row(children: [
         cell('${_stats['orders']}', 'طلباتي', () => _open(const MyOrdersPage())),
         const SizedBox(height: 32, child: VerticalDivider()),
-        cell('${_stats['balance']}', 'رصيد المحفظة', () => _open(const WalletCenterPage())),
+        cell(
+            '${CurrencyService.instance.convertBetween((_stats['balance'] as num? ?? 0).toDouble(), (_stats['currency'] ?? 'USD').toString(), CurrencyService.instance.displayCurrency)} ${CurrencyService.symbolFor(CurrencyService.instance.displayCurrency)}',
+            'رصيد المحفظة', () => _open(const WalletCenterPage())),
         const SizedBox(height: 32, child: VerticalDivider()),
         cell('${_data['role'] ?? 'عميل'}', 'نوع الحساب', () {}),
       ]),

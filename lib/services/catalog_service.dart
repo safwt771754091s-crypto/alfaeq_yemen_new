@@ -84,6 +84,16 @@ class CatalogService {
         ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
         : <Map<String, dynamic>>[];
 
+    // A single cart has one currency; the server rejects mixed-currency orders,
+    // so block it here with a clear message instead of failing at checkout.
+    final productCurrency = (p['currency'] ?? 'YER').toString().toUpperCase();
+    final cartCurrency = items.isEmpty
+        ? productCurrency
+        : (items.first['currency'] ?? productCurrency).toString().toUpperCase();
+    if (items.isNotEmpty && cartCurrency != productCurrency) {
+      throw StateError('لا يمكن خلط أصناف بعملات مختلفة في سلة واحدة. أفرغ السلة أو أضف أصنافًا بعملة $cartCurrency.');
+    }
+
     final index = items.indexWhere(
       (item) => item['productId'] == product.id || item['product_id'] == product.id,
     );
