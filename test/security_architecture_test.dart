@@ -410,5 +410,27 @@ void main() {
       expect(edit, contains("'currency': _currency"));
       expect(bulk, contains("'currency': _priceCurrency"));
     });
+
+    test('admin quick data entry stores YER for its YER-labelled price', () {
+      final entry = File('lib/screens/admin_data_entry.dart').readAsStringSync();
+      expect(entry, contains('السعر الحقيقي بالريال اليمني'));
+      expect(entry, contains("'currency': 'YER'"));
+      expect(entry, isNot(contains("'currency': 'USD'")));
+    });
+
+    test('a cart cannot mix currencies and fail at checkout', () {
+      final catalog = File('lib/services/catalog_service.dart').readAsStringSync();
+      // The server rejects mixed-currency orders; block it when adding instead.
+      expect(catalog, contains('cartCurrency != productCurrency'));
+      expect(catalog, contains('لا يمكن خلط أصناف بعملات مختلفة'));
+    });
+
+    test('profile wallet balance is converted from the wallet currency', () {
+      final profile = File('lib/services/profile_service.dart').readAsStringSync();
+      final account = File('lib/screens/account_center_page.dart').readAsStringSync();
+      expect(profile, contains('available_balance,currency'));
+      expect(profile, contains("'currency': currency"));
+      expect(account, contains('convertBetween((_stats['));
+    });
   });
 }

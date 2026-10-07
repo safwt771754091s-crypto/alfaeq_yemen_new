@@ -197,7 +197,7 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
         'description': _description.text.trim(),
         'image_url': imageUrl,
         'price': price,
-        'currency': 'USD',
+        'currency': 'YER',
         'stock': stock,
         'stock_base': unit.toBase(stock).round(),
         'sale_unit': _saleUnit,

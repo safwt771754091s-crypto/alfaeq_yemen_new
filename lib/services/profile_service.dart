@@ -110,12 +110,15 @@ class ProfileService {
     await _db.auth.updateUser(UserAttributes(email: newEmail.trim()));
   }
 
-  /// Order count and wallet balance for the profile header stats.
+  /// Order count and wallet balance for the profile header stats. The wallet
+  /// currency is returned too, because balances are stored in the wallet's own
+  /// currency and must be converted before display.
   Future<Map<String, dynamic>> stats() async {
     final user = _user;
-    if (user == null) return const {'orders': 0, 'balance': 0};
+    if (user == null) return const {'orders': 0, 'balance': 0, 'currency': 'USD'};
     var orders = 0;
     num balance = 0;
+    var currency = 'USD';
     try {
       final rows = await _db
           .from('orders')
@@ -126,11 +129,12 @@ class ProfileService {
     try {
       final wallet = await _db
           .from('wallets')
-          .select('available_balance')
+          .select('available_balance,currency')
           .eq('uid', user.id)
           .maybeSingle();
       balance = (wallet?['available_balance'] as num?) ?? 0;
+      currency = (wallet?['currency'] ?? 'USD').toString().toUpperCase();
     } catch (_) {}
-    return {'orders': orders, 'balance': balance};
+    return {'orders': orders, 'balance': balance, 'currency': currency};
   }
 }
