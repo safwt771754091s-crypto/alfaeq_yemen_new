@@ -292,6 +292,7 @@ class _CartPageState extends State<CartPage> {
               currency: _walletCurrency,
               latitude: deliveryPoint?.latitude,
               longitude: deliveryPoint?.longitude,
+              displayCurrency: _displayCurrency,
             )
           : isOnline
               ? await service.createPendingOrder(
@@ -300,6 +301,7 @@ class _CartPageState extends State<CartPage> {
                   provider: provider!,
                   latitude: deliveryPoint?.latitude,
                   longitude: deliveryPoint?.longitude,
+                  displayCurrency: _displayCurrency,
                 )
               : await service.createOrder(
                   customerId: _uid,
@@ -308,6 +310,7 @@ class _CartPageState extends State<CartPage> {
                   paymentMethod: paymentMethod,
                   latitude: deliveryPoint?.latitude,
                   longitude: deliveryPoint?.longitude,
+                  displayCurrency: _displayCurrency,
                 );
       // Checkout clears the Supabase cart atomically inside create_order.
       if (mounted) setState(() => _items = []);

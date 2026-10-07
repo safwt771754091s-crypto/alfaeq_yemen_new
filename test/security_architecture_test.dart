@@ -432,5 +432,18 @@ void main() {
       expect(profile, contains("'currency': currency"));
       expect(account, contains('convertBetween((_stats['));
     });
+
+    test('checkout records orders in the user display currency', () {
+      final cart = File('lib/screens/cart_page.dart').readAsStringSync();
+      // All three checkout paths must forward the chosen display currency, or
+      // the server silently stores the order in the default (YER).
+      expect('displayCurrency: _displayCurrency'.allMatches(cart).length, 3);
+    });
+
+    test('the AI cart and order tools honor currency rules', () {
+      final tools = File('lib/ai/ai_tools.dart').readAsStringSync();
+      expect(tools, contains('لا يمكن خلط أصناف بعملات مختلفة'));
+      expect(tools, contains("'p_display_currency':CurrencyService.instance.displayCurrency"));
+    });
   });
 }
