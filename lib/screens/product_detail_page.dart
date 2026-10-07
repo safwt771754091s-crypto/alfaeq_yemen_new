@@ -139,9 +139,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   @override
   Widget build(BuildContext context) {
     final available = _stockBase > 0 || _data['stock'] == null;
-    final priceText = (_data['currency'] ?? 'USD').toString().toUpperCase() == 'USD'
-        ? CurrencyService.instance.format(_price.toDouble())
-        : CurrencyService.instance.formatNative(_price, _currency);
+    final priceText = CurrencyService.instance.formatNative(
+      CurrencyService.instance.convertBetween(_price.toDouble(), _currency, CurrencyService.instance.displayCurrency),
+      CurrencyService.instance.displayCurrency,
+    );
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(

@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
+import '../services/currency_service.dart';
 import '../services/supabase_service.dart';
 
 class BulkProductImportPage extends StatefulWidget {
@@ -17,6 +18,7 @@ class BulkProductImportPage extends StatefulWidget {
 class _BulkProductImportPageState extends State<BulkProductImportPage> {
   String? _selectedStoreId;
   String? _selectedSectionId;
+  String _priceCurrency = 'YER';
   bool _busy = false;
   String? _fileName;
   List<_ImportRow> _preview = [];
@@ -211,7 +213,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
           'description': row.description,
           'image_url': row.imageUrl,
           'price': row.price,
-          'currency': 'USD',
+          'currency': _priceCurrency,
           'stock': row.stock,
           'stock_base': row.stock,
           'sale_unit': 'piece',
@@ -292,6 +294,13 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
                     onChanged: _busy ? null : (v) => setState(() => _selectedSectionId = v),
                   ),
                   const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: _priceCurrency,
+                    decoration: const InputDecoration(labelText: 'عملة أسعار الملف'),
+                    items: [for (final c in CurrencyService.supported) DropdownMenuItem(value: c, child: Text('${CurrencyService.labelFor(c)} (${CurrencyService.symbolFor(c)})'))],
+                    onChanged: _busy ? null : (v) { if (v != null) setState(() => _priceCurrency = v); },
+                  ),
+                  const SizedBox(height: 8),
                   FutureBuilder<List<Map<String, dynamic>>>(
                     future: SupabaseService.client.from('stores').select('id,name,status').inFilter('status', ['approved', 'active']).order('name'),
                     builder: (context, snapshot) {
@@ -325,7 +334,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
               ..._preview.take(50).map((row) => Card(child: ListTile(
                 leading: row.imageUrl.isEmpty ? const Icon(Icons.inventory_2_outlined) : Image.network(row.imageUrl, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined)),
                 title: Text('${row.name} • ${row.reference}', style: const TextStyle(fontWeight: FontWeight.w800)),
-                subtitle: Text('الكمية: ${row.stock} • السعر: ${row.price} USD\nالمتجر: ${row.storeId}'),
+                subtitle: Text('الكمية: ${row.stock} • السعر: ${row.price} ${CurrencyService.symbolFor(_priceCurrency)}\nالمتجر: ${row.storeId}'),
                 isThreeLine: true,
               ))),
               const SizedBox(height: 12),

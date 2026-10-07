@@ -546,7 +546,7 @@ class _StoreCatalogCard extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text('${CurrencyService.instance.formatNative(num.tryParse('$price') ?? 0, '$currency'.toUpperCase() == 'USD' ? CurrencyService.instance.displayCurrency : '$currency')} / ${unit.label}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                          Text('${CurrencyService.instance.formatNative(CurrencyService.instance.convertBetween((num.tryParse('$price') ?? 0).toDouble(), '$currency', CurrencyService.instance.displayCurrency), CurrencyService.instance.displayCurrency)} / ${unit.label}', style: const TextStyle(fontWeight: FontWeight.w900)),
                           const SizedBox(height: 5),
                           SizedBox(
                             height: 34,

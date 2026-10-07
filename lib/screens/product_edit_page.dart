@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
 import '../core/product_units.dart';
+import '../services/currency_service.dart';
 import '../services/media_service.dart';
 import '../services/supabase_service.dart';
 
@@ -39,6 +40,7 @@ class _ProductEditPageState extends State<ProductEditPage> {
 
   late String _saleUnit;
   late String _sectionId;
+  late String _currency;
   String _imageUrl = '';
   bool _uploading = false;
   bool _saving = false;
@@ -55,6 +57,8 @@ class _ProductEditPageState extends State<ProductEditPage> {
     final barcode = meta is Map ? meta['barcode'] : null;
     _barcode = TextEditingController(text: '${barcode ?? ''}');
     _saleUnit = (p['sale_unit'] ?? 'piece').toString();
+    final cur = (p['currency'] ?? 'USD').toString().toUpperCase();
+    _currency = CurrencyService.supported.contains(cur) ? cur : 'USD';
     final section = (p['section_id'] ?? '').toString();
     _sectionId = appSections.any((s) => s.id == section) ? section : appSections.first.id;
     _imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
@@ -125,6 +129,7 @@ class _ProductEditPageState extends State<ProductEditPage> {
         'name': name,
         'description': _description.text.trim(),
         'price': price,
+        'currency': _currency,
         'stock': stock,
         'stock_base': unit.toBase(stock).round(),
         'sale_unit': _saleUnit,
@@ -182,7 +187,17 @@ class _ProductEditPageState extends State<ProductEditPage> {
             TextField(controller: _barcode, decoration: const InputDecoration(labelText: 'الباركود (اختياري)', border: OutlineInputBorder())),
             const SizedBox(height: 12),
             Row(children: [
-              Expanded(child: TextField(controller: _price, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'السعر (USD)', border: OutlineInputBorder()))),
+              Expanded(child: TextField(controller: _price, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'السعر', border: OutlineInputBorder()))),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 170,
+                child: DropdownButtonFormField<String>(
+                  initialValue: _currency,
+                  decoration: const InputDecoration(labelText: 'عملة السعر', border: OutlineInputBorder()),
+                  items: [for (final c in CurrencyService.supported) DropdownMenuItem(value: c, child: Text('${CurrencyService.labelFor(c)} (${CurrencyService.symbolFor(c)})'))],
+                  onChanged: (value) { if (value != null) setState(() => _currency = value); },
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(child: TextField(controller: _stock, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'المخزون (${ProductUnit.fromId(_saleUnit).label})', border: const OutlineInputBorder()))),
             ]),

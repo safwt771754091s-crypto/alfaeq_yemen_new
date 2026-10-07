@@ -21,8 +21,8 @@ class CurrencyService extends ChangeNotifier {
 
   static const String _prefsKey = 'display_currency';
 
-  /// Kept in sync with the migration default: 1 USD = 3.75 SAR = 1537.5 YER.
-  static const Map<String, double> defaultRates = {usd: 1, sar: 410, yer: 1537.5};
+  /// Kept in sync with the server rates (base USD): 1 USD = 3.75 SAR = 1537.5 YER.
+  static const Map<String, double> defaultRates = {usd: 1, sar: 3.75, yer: 1537.5};
 
   String _display = usd;
   Map<String, double> _rates = Map<String, double>.from(defaultRates);
@@ -78,6 +78,14 @@ class CurrencyService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Converts an amount from [from] into [to] using the USD-based rates.
+  double convertBetween(double amount, String from, String to) {
+    final f = _normalize(from);
+    final t = _normalize(to);
+    if (f == t) return _round(amount);
+    return _round(amount * rateFor(t) / rateFor(f));
+  }
+
   /// Converts a base-USD amount into [code] and formats it (e.g. "33,579 ر.ي").
   String format(double usdAmount, {String? currency}) =>
       formatNative(convert(usdAmount, currency ?? _display), currency ?? _display);
@@ -86,20 +94,18 @@ class CurrencyService extends ChangeNotifier {
   String formatNative(num amount, String code) =>
       '${formatAmount(_round(amount.toDouble()))} ${symbolFor(code)}';
 
-  /// Formats a product price. Base-USD prices are converted to the selected
-  /// display currency; products already priced in another currency are shown
-  /// as-is.
+  /// Formats a product price by converting its own currency into the selected
+  /// display currency (catalog rows may be priced in SAR, USD, or YER).
   String formatProduct(Map product, {String fallback = 'عند الطلب'}) {
     final price = product['price'];
     if (price is! num) return fallback;
-    final src = (product['currency'] ?? usd).toString().toUpperCase();
-    if (src == usd) return format(price.toDouble());
-    return formatNative(price, src);
+    final src = _normalize((product['currency'] ?? usd).toString());
+    return formatNative(convertBetween(price.toDouble(), src, _display), _display);
   }
 
   double convert(double usdAmount, String code) => _round(usdAmount * rateFor(code));
 
-  /// Matches the server (`private.fx_convert_usd`, round to 2 decimals) so the
+  /// Matches the server (`private.fx_convert`, round to 2 decimals) so the
   /// amount shown is exactly the amount charged.
   double _round(double value) => (value * 100).round() / 100;
 

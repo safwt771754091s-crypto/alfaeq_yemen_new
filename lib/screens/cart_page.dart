@@ -93,13 +93,12 @@ class _CartPageState extends State<CartPage> {
   }
 
   String get _displayCurrency => CurrencyService.instance.displayCurrency;
-  bool get _baseIsUsd => _currency.toUpperCase() == 'USD';
-  num get _displayTotal => _baseIsUsd ? CurrencyService.instance.convert(_total.toDouble(), _displayCurrency) : _total;
-  num get _payTotal => _walletCurrency == _currency ? _total : CurrencyService.instance.convert(_total.toDouble(), _walletCurrency);
+  num get _displayTotal => CurrencyService.instance.convertBetween(_total.toDouble(), _currency, _displayCurrency);
+  num get _payTotal => _walletCurrency.toUpperCase() == _currency.toUpperCase()
+      ? _total
+      : CurrencyService.instance.convertBetween(_total.toDouble(), _currency, _walletCurrency);
   bool get _walletCovers {
-    if (_walletCurrency == _currency) return _walletBalance >= _total;
-    // Cross-currency debit only applies to USD-priced carts (the catalog base).
-    if (!_baseIsUsd) return false;
+    if (_walletCurrency.toUpperCase() == _currency.toUpperCase()) return _walletBalance >= _total;
     return _walletBalance >= _payTotal;
   }
 
@@ -388,7 +387,7 @@ class _CartPageState extends State<CartPage> {
                             return Card(child: ListTile(
                               leading: const CircleAvatar(child: Icon(Icons.shopping_bag_outlined)),
                               title: Text(name, style: const TextStyle(fontWeight: FontWeight.w900)),
-                              subtitle: Text('$quantity ${unit.label} × ${CurrencyService.instance.formatProduct(item)}/${unit.label} = ${CurrencyService.instance.format(price.toDouble() * quantity)}'),
+                              subtitle: Text('$quantity ${unit.label} × ${CurrencyService.instance.formatProduct(item)}/${unit.label} = ${CurrencyService.instance.formatNative(CurrencyService.instance.convertBetween(price.toDouble() * quantity, (item['currency'] ?? 'USD').toString(), _displayCurrency), _displayCurrency)}'),
                               trailing: SizedBox(width: 150, child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
                                 IconButton(onPressed: _busy ? null : () => _changeQuantity(index, -1), icon: const Icon(Icons.remove_circle_outline)),
                                 Text('$quantity', style: const TextStyle(fontWeight: FontWeight.w900)),

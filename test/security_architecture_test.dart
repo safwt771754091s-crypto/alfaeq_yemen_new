@@ -50,10 +50,10 @@ void main() {
 
     test('wallet checkout is currency-aware and converts USD totals', () {
       final cart = File('lib/screens/cart_page.dart').readAsStringSync();
-      // Same-currency debit uses the raw total; otherwise the USD total is
-      // converted into the wallet currency before the balance check.
-      expect(cart, contains('_walletCurrency == _currency'));
-      expect(cart, contains('convert(_total.toDouble(), _walletCurrency)'));
+      // Same-currency debit uses the raw total; otherwise the cart total is
+      // converted from the cart currency into the wallet currency.
+      expect(cart, contains('_walletCurrency.toUpperCase() == _currency.toUpperCase()'));
+      expect(cart, contains('convertBetween(_total.toDouble(), _currency, _walletCurrency)'));
       expect(cart, contains('_walletCovers'));
     });
 
@@ -386,6 +386,29 @@ void main() {
       expect(page, contains("rpc('get_order_invoice'"));
       expect(page, contains('_showInvoice'));
       expect(page, contains('فاتورة الطلب'));
+    });
+
+    test('catalog currency correction converts SAR-sourced prices to SAR', () {
+      final migration = File('supabase/migrations/20261005300000_catalog_currency_correction_v1.sql').readAsStringSync();
+      // Imported catalog rows were labelled USD but hold SAR prices: convert once.
+      expect(migration, contains("currency = 'SAR'"));
+      expect(migration, contains("price_currency_corrected"));
+      // Order pricing converts from the product currency, not a hardcoded USD.
+      expect(migration, contains('private.fx_convert(v_product.price, v_item_currency, v_disp)'));
+      expect(migration, contains('private.fx_convert(v_total, coalesce(v_currency'));
+      expect(migration, contains('private.fx_convert(v_total, v_curr, v_wallet_curr)'));
+    });
+
+    test('product authoring forms persist the chosen price currency', () {
+      final merchant = File('lib/screens/merchant_center_page.dart').readAsStringSync();
+      final edit = File('lib/screens/product_edit_page.dart').readAsStringSync();
+      final bulk = File('lib/screens/bulk_product_import_page.dart').readAsStringSync();
+      // No authoring surface may silently label a price as USD.
+      expect(merchant, isNot(contains("'currency': 'USD'")));
+      expect(bulk, isNot(contains("'currency': 'USD'")));
+      expect(merchant, contains("'currency': _priceCurrency"));
+      expect(edit, contains("'currency': _currency"));
+      expect(bulk, contains("'currency': _priceCurrency"));
     });
   });
 }
