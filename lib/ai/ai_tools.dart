@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/currency_service.dart';
 import '../services/supabase_service.dart';
 
 class AlfaeqAiToolRegistry {
@@ -114,7 +115,7 @@ class AlfaeqAiToolRegistry {
     if(!confirmed)return {'ok':false,'permission':'confirmation_required','error':'ينتظر تأكيد المستخدم.'};
     final u=_db.auth.currentUser;if(u==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};final id=(a['productId']??'').toString();final qty=(a['quantity'] as num?)?.toInt();
     final row=await _db.from('carts').select('items').eq('uid',u.id).maybeSingle();final raw=row?['items'];final items=List<Map<String,dynamic>>.from((raw is List?raw:const []).whereType<Map>().map((e)=>Map<String,dynamic>.from(e)));
-    if(action=='add'){final pRows=await _db.from('products').select('id,name,price,currency,store_id,stock_base').eq('id',id).eq('status','active').limit(1);if(pRows.isEmpty)return {'ok':false,'error':'المنتج غير متاح.'};final p=Map<String,dynamic>.from(pRows.first);final stock=(p['stock_base'] as num?)?.toDouble()??0;final add=qty??0;final i=items.indexWhere((e)=>e['productId']==id);final old=i<0?0:((items[i]['quantity'] as num?)?.toInt()??0);final next=old+add;if(add<1||next>100||next>stock)return {'ok':false,'error':'الكمية تتجاوز المخزون أو الحد المسموح.'};final item={'productId':id,'name':p['name'],'quantity':next,'price':p['price'],'currency':p['currency']??'YER','storeId':p['store_id']};if(i<0)items.add(item);else items[i]=item;}
+    if(action=='add'){final pRows=await _db.from('products').select('id,name,price,currency,store_id,stock_base').eq('id',id).eq('status','active').limit(1);if(pRows.isEmpty)return {'ok':false,'error':'المنتج غير متاح.'};final p=Map<String,dynamic>.from(pRows.first);final stock=(p['stock_base'] as num?)?.toDouble()??0;final add=qty??0;final i=items.indexWhere((e)=>e['productId']==id);final old=i<0?0:((items[i]['quantity'] as num?)?.toInt()??0);final next=old+add;if(add<1||next>100||next>stock)return {'ok':false,'error':'الكمية تتجاوز المخزون أو الحد المسموح.'};final productCurrency=(p['currency']??'YER').toString().toUpperCase();if(items.isNotEmpty&&items.first['currency'].toString().toUpperCase()!=productCurrency)return {'ok':false,'error':'لا يمكن خلط أصناف بعملات مختلفة في سلة واحدة.'};final item={'productId':id,'name':p['name'],'quantity':next,'price':p['price'],'currency':p['currency']??'YER','storeId':p['store_id']};if(i<0)items.add(item);else items[i]=item;}
     else if(action=='update'){final i=items.indexWhere((e)=>e['productId']==id);if(i<0||qty==null||qty<1||qty>100)return {'ok':false,'error':'عنصر السلة غير صالح.'};items[i]['quantity']=qty;}
     else {final before=items.length;items.removeWhere((e)=>e['productId']==id);if(before==items.length)return {'ok':false,'error':'المنتج غير موجود في السلة.'};}
     await _db.from('carts').upsert({'uid':u.id,'owner_id':u.id,'items':items,'updated_at':DateTime.now().toUtc().toIso8601String()},onConflict:'uid');return {'ok':true,'action':action,'items':items};
@@ -123,7 +124,7 @@ class AlfaeqAiToolRegistry {
   Future<Map<String,Object?>> _createOrder(Map<String,Object?> a,bool confirmed) async {
     if(!confirmed)return {'ok':false,'permission':'confirmation_required','error':'ينتظر تأكيد المستخدم.'};final u=_db.auth.currentUser;if(u==null)return {'ok':false,'error':'يجب تسجيل الدخول أولاً.'};
     final raw=a['items'];final address=(a['address']??'').toString().trim();final payment=(a['paymentMethod']??'').toString();if(raw is! List||raw.isEmpty||address.isEmpty)return {'ok':false,'error':'بيانات الطلب غير مكتملة.'};
-    final rpcItems=raw.whereType<Map>().map((e)=>{'product_id':e['productId'],'quantity':e['quantity']}).toList();final orderId=await _db.rpc('create_order',params:{'p_items':rpcItems,'p_address':address,'p_payment_method':payment});await _db.from('carts').delete().eq('uid',u.id);
+    final rpcItems=raw.whereType<Map>().map((e)=>{'product_id':e['productId'],'quantity':e['quantity']}).toList();final orderId=await _db.rpc('create_order',params:{'p_items':rpcItems,'p_address':address,'p_payment_method':payment,'p_display_currency':CurrencyService.instance.displayCurrency});await _db.from('carts').delete().eq('uid',u.id);
     return {'ok':true,'orderId':orderId.toString(),'status':'pending','paymentProcessed':false,'message':'تم إنشاء الطلب عبر المعاملة الحقيقية في Supabase.'};
   }
 }
