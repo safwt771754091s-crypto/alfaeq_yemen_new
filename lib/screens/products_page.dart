@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
+import '../core/product_units.dart';
 import '../services/currency_service.dart';
 import '../services/catalog_service.dart';
 import '../services/review_service.dart';
@@ -24,6 +25,13 @@ class _ProductsPageState extends State<ProductsPage> {
   final _search = TextEditingController();
   String _query = '';
   String _sectionId = 'all';
+  Map<String, ({double average, int count})> _ratings = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRatings();
+  }
 
   @override
   void dispose() {
@@ -31,14 +39,20 @@ class _ProductsPageState extends State<ProductsPage> {
     super.dispose();
   }
 
-  Future<({List<CatalogDocument> products, Map<String, ({double average, int count})> ratings})> _loadCatalog() async {
-    final products = await const CatalogService().activeProducts(limit: 500);
-    Map<String, ({double average, int count})> ratings = const {};
+  Future<void> _loadRatings() async {
     try {
-      ratings = await const ReviewService().summary(products.map((p) => p.id).toList());
+      final rows = await SupabaseService.client.from('products').select('id').eq('status', 'active').limit(500);
+      final ids = rows.map((e) => e['id'].toString()).toList();
+      final ratings = await const ReviewService().summary(ids);
+      if (mounted) setState(() => _ratings = ratings);
     } catch (_) {/* rating badges are best-effort */}
-    return (products: products, ratings: ratings);
   }
+
+  Stream<List<Map<String, dynamic>>> get _productsStream => SupabaseService.client
+      .from('products')
+      .stream(primaryKey: ['id'])
+      .order('name')
+      .limit(1000);
 
   Future<void> _addToCart(CatalogDocument product) async {
     final user = SupabaseService.client.auth.currentUser;
@@ -104,15 +118,18 @@ class _ProductsPageState extends State<ProductsPage> {
                 ),
               ),
               const SizedBox(height: 18),
-              FutureBuilder<({List<CatalogDocument> products, Map<String, ({double average, int count})> ratings})>(
-                future: _loadCatalog(),
+              StreamBuilder<List<Map<String, dynamic>>>(
+                stream: _productsStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()));
                   }
                   if (snapshot.hasError) return const Text('تعذر تحميل المنتجات.');
-                  var products = snapshot.data?.products ?? const <CatalogDocument>[];
-                  final ratings = snapshot.data?.ratings ?? const <String, ({double average, int count})>{};
+                  final ratings = _ratings;
+                  var products = (snapshot.data ?? const <Map<String, dynamic>>[])
+                      .where((row) => (row['status'] ?? 'active') == 'active')
+                      .map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row)))
+                      .toList();
                   if (_sectionId != 'all') {
                     products = products.where((p) => (p.data['section_id'] ?? '').toString() == _sectionId).toList();
                   }
@@ -154,6 +171,7 @@ class _ProductCard extends StatelessWidget {
     final p = product.data;
     final imageUrl = (p['image_url'] ?? '').toString();
     final priceText = CurrencyService.instance.formatProduct(p);
+    final stockBase = ProductUnit.stockBase(p);
     return Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE3E8EF))),
       child: InkWell(
@@ -184,14 +202,16 @@ class _ProductCard extends StatelessWidget {
                       Text('${rating!.average.toStringAsFixed(1)} (${rating!.count})', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.black54)),
                     ]),
                   Text(priceText, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+                  Text(stockBase > 0 ? 'المتوفر: ${ProductUnit.formatBase(p, stockBase)}' : 'نفد المخزون',
+                      style: TextStyle(color: stockBase > 0 ? Colors.black54 : Colors.red.shade700, fontSize: 11)),
                   const SizedBox(height: 5),
                   SizedBox(
                     width: double.infinity,
                     height: 30,
                     child: FilledButton.icon(
-                      onPressed: onAdd,
+                      onPressed: stockBase > 0 ? onAdd : null,
                       icon: const Icon(Icons.add_shopping_cart, size: 15),
-                      label: const Text('أضف', style: TextStyle(fontSize: 12)),
+                      label: Text(stockBase > 0 ? 'أضف' : 'نفد', style: const TextStyle(fontSize: 12)),
                       style: FilledButton.styleFrom(padding: EdgeInsets.zero),
                     ),
                   ),

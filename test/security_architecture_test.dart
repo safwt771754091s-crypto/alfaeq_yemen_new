@@ -107,7 +107,8 @@ void main() {
 
     test('store and section listings filter server-side instead of truncating', () {
       final store = File('lib/screens/store_detail_page.dart').readAsStringSync();
-      expect(store, contains('activeProducts(storeId: widget.store.id'));
+      // Live stock view filters by store on the server, not by truncating a page.
+      expect(store, contains(".eq('store_id', widget.store.id)"));
       expect(store, isNot(contains('activeProducts(limit: 5000)')));
       final program = File('lib/screens/mini_programs_page.dart').readAsStringSync();
       expect(program, contains('activeProducts(sectionId: widget.section.id'));
@@ -444,6 +445,40 @@ void main() {
       final tools = File('lib/ai/ai_tools.dart').readAsStringSync();
       expect(tools, contains('لا يمكن خلط أصناف بعملات مختلفة'));
       expect(tools, contains("'p_display_currency':CurrencyService.instance.displayCurrency"));
+    });
+
+    test('restaurants are a distinct section from groceries/markets', () {
+      final sections = File('lib/core/app_sections.dart').readAsStringSync();
+      // The two must not be merged into one label any more.
+      expect(sections, isNot(contains('المطاعم والبقالات')));
+      expect(sections, contains("AppSection('restaurants', 'المطاعم'"));
+      expect(sections, contains("AppSection('markets', 'المتاجر والبقالات'"));
+      final migration = File('supabase/migrations/20261007010000_separate_restaurants_and_markets_v1.sql').readAsStringSync();
+      expect(migration, contains("set section_id = 'markets'"));
+      expect(migration, contains("title = 'المطاعم'"));
+    });
+
+    test('product lists reflect live stock after a purchase', () {
+      // A purchase decrements products.stock_base; the lists must observe the
+      // change, so they subscribe to a realtime stream instead of a one-shot future.
+      final store = File('lib/screens/store_detail_page.dart').readAsStringSync();
+      final all = File('lib/screens/products_page.dart').readAsStringSync();
+      final home = File('lib/main.dart').readAsStringSync();
+      for (final src in [store, all, home]) {
+        expect(src, contains('StreamBuilder<List<Map<String, dynamic>>>'));
+        expect(src, contains(".stream(primaryKey: ['id'])"));
+        expect(src, contains('ProductUnit.stockBase(p)'));
+      }
+      // Out-of-stock products cannot be added.
+      expect(store, contains('stockBase > 0 ? onAdd : null'));
+      expect(all, contains('stockBase > 0 ? onAdd : null'));
+    });
+
+    test('weighted cart quantities forward quantity_base to the order RPC', () {
+      final orders = File('lib/services/order_service.dart').readAsStringSync();
+      // Without quantity_base the server would reserve sale-unit counts, so a
+      // 2 kg line would only hold 2 g against stock.
+      expect(orders, contains("'quantity_base': item['quantityBase'] ?? item['quantity_base']"));
     });
   });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/product_units.dart';
 import '../services/currency_service.dart';
 import '../services/catalog_service.dart';
 import '../services/review_service.dart';
@@ -144,12 +145,20 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
               ]),
             ),
             const Padding(padding: EdgeInsets.fromLTRB(16, 16, 16, 8), child: Text('منتجات المتجر', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16))),
-            FutureBuilder<List<CatalogDocument>>(
-              future: CatalogService().activeProducts(storeId: widget.store.id, limit: 2000),
+            StreamBuilder<List<Map<String, dynamic>>>(
+              stream: SupabaseService.client
+                  .from('products')
+                  .stream(primaryKey: ['id'])
+                  .eq('store_id', widget.store.id)
+                  .order('name')
+                  .limit(2000),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()));
                 if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(16), child: Text('تعذر تحميل المنتجات.'));
-                final products = snapshot.data ?? const <CatalogDocument>[];
+                final products = (snapshot.data ?? const <Map<String, dynamic>>[])
+                    .map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row)))
+                    .where((doc) => (doc.data['status'] ?? 'active') == 'active')
+                    .toList();
                 if (products.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد منتجات نشطة في هذا المتجر.', style: TextStyle(color: Colors.black54)));
                 return GridView.builder(
                   shrinkWrap: true,
@@ -186,6 +195,7 @@ class _StoreProductCard extends StatelessWidget {
     final p = product.data;
     final imageUrl = (p['image_url'] ?? '').toString();
     final priceText = CurrencyService.instance.formatProduct(p);
+    final stockBase = ProductUnit.stockBase(p);
     return Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE3E8EF))),
       child: InkWell(
@@ -202,11 +212,14 @@ class _StoreProductCard extends StatelessWidget {
             Text(p['name']?.toString() ?? 'منتج', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontWeight: FontWeight.w800, fontSize: 13)),
             const SizedBox(height: 3),
             Text(priceText, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+            const SizedBox(height: 2),
+            Text(stockBase > 0 ? 'المتوفر: ${ProductUnit.formatBase(p, stockBase)}' : 'نفد المخزون',
+                style: TextStyle(color: stockBase > 0 ? Colors.black54 : Colors.red.shade700, fontSize: 11)),
             const SizedBox(height: 5),
             SizedBox(width: double.infinity, height: 30, child: FilledButton.icon(
-              onPressed: onAdd,
+              onPressed: stockBase > 0 ? onAdd : null,
               icon: const Icon(Icons.add_shopping_cart, size: 15),
-              label: const Text('أضف', style: TextStyle(fontSize: 12)),
+              label: Text(stockBase > 0 ? 'أضف' : 'نفد', style: const TextStyle(fontSize: 12)),
               style: FilledButton.styleFrom(padding: EdgeInsets.zero),
             )),
           ])),

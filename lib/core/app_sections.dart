@@ -7,8 +7,8 @@ class AppSection {
 }
 
 const appSections = <AppSection>[
-  AppSection('markets', 'المتاجر والأسواق', 'شراء من المتاجر المحلية', 'storefront'),
-  AppSection('restaurants', 'المطاعم والبقالات', 'طلبات الطعام والمواد اليومية', 'restaurant'),
+  AppSection('markets', 'المتاجر والبقالات', 'شراء من المتاجر والسوبرماركت والبقالات', 'storefront'),
+  AppSection('restaurants', 'المطاعم', 'طلبات الطعام الجاهزة من المطاعم', 'restaurant'),
   AppSection('pharmacies', 'الصيدليات', 'منتجات وخدمات الصيدليات', 'pharmacy'),
   AppSection('beauty', 'التجميل والعناية', 'العناية والجمال', 'beauty'),
   AppSection('construction', 'مواد البناء والنقل الثقيل', 'مواد ومركبات النقل', 'construction'),
