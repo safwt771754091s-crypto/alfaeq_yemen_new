@@ -526,5 +526,33 @@ void main() {
       expect(migration, contains('alter table public.products add column if not exists reference text'));
       expect(migration, contains('products_store_reference_uidx'));
     });
+
+    test('android release builds sign with a keystore supplied via CI secrets', () {
+      final script = File('tools/configure_android_signing.py').readAsStringSync();
+      expect(script, contains('ANDROID_KEYSTORE_BASE64'));
+      // Passwords must come from the environment, never be written to source.
+      expect(script, contains('System.getenv("ALFAEQ_STORE_PASSWORD")'));
+      expect(script, isNot(contains('storePassword = "')));
+      expect(script, contains('using debug signing'));
+      final workflow = File('.github/workflows/android-release.yml').readAsStringSync();
+      expect(workflow, contains('tools/configure_android_signing.py'));
+      expect(workflow, contains('secrets.ANDROID_KEYSTORE_BASE64'));
+      expect(workflow, contains('ALFAEQ_STORE_PASSWORD'));
+    });
+
+    test('keystores and key.properties can never be committed', () {
+      final ignore = File('.gitignore').readAsStringSync();
+      expect(ignore, contains('android/key.properties'));
+      expect(ignore, contains('*.keystore'));
+      expect(ignore, contains('*.jks'));
+      expect(File('tools/android_keystore.sh').existsSync(), isTrue);
+    });
+
+    test('the app version tracks the published release', () {
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      final match = RegExp(r'^version:\s*(\d+)\.(\d+)\.(\d+)\+(\d+)\s*$', multiLine: true).firstMatch(pubspec);
+      expect(match, isNotNull, reason: 'pubspec.yaml must declare version: x.y.z+build');
+      expect(int.parse(match!.group(4)!), greaterThanOrEqualTo(5));
+    });
   });
 }

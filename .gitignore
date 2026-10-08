@@ -4,6 +4,11 @@ build/
 .pub-cache/
 android/.gradle/
 android/local.properties
+android/key.properties
+android/app/*.keystore
+android/app/*.jks
+*.keystore
+*.jks
 web/
 
 # AI provider secrets (local deploy helper)
