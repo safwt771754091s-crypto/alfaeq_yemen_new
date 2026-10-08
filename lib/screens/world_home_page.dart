@@ -938,7 +938,7 @@ class _WorldSectionPageState extends State<WorldSectionPage> {
   @override
   void initState() {
     super.initState();
-    _productsFuture = CatalogService().activeProducts(sectionId: widget.section.id, limit: 2000);
+    _productsFuture = CatalogService().activeProducts(sectionId: widget.section.id, limit: 5000);
     _storesFuture = CatalogService().approvedStores(widget.section.id, limit: 30);
   }
 
@@ -1004,7 +1004,18 @@ class _WorldSectionPageState extends State<WorldSectionPage> {
                   if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المنتجات', text: 'تحقق من اتصال قاعدة البيانات.');
                   final products = _filter(snapshot.data ?? const <CatalogDocument>[]);
                   if (products.isEmpty) return const _Info(title: 'لا توجد منتجات مطابقة', text: 'جرّب كلمة أخرى أو تحقق من الاسم أو الباركود.');
-                  return Column(children: products.map((product) => _SectionProductTile(product: product)).toList());
+                  // The section list is inside a Column: never build thousands of
+                  // tiles. Cap the render and let search narrow the catalog.
+                  const maxTiles = 300;
+                  final visible = products.take(maxTiles).toList();
+                  return Column(children: [
+                    ...visible.map((product) => _SectionProductTile(product: product)),
+                    if (products.length > visible.length)
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Text('يُعرض أول ${visible.length} من ${products.length} صنفًا — استخدم البحث أعلاه للوصول إلى الباقي.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
+                      ),
+                  ]);
                 },
               ),
               const SizedBox(height: 18),
@@ -1096,7 +1107,10 @@ class _StoreCard extends StatelessWidget {
               if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(16), child: Text('تعذر تحميل الأصناف.'));
               final products = snapshot.data ?? const <CatalogDocument>[];
               if (products.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد أصناف نشطة حالياً.'));
-              return Column(children: products.map((product) {
+              // Cap the inline preview; the full catalog is a lazy list on the store page.
+              final preview = products.take(8).toList();
+              return Column(children: [
+                ...preview.map((product) {
                 final p = product.data;
                 final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
                             final leading = imageUrl.isEmpty
@@ -1114,7 +1128,19 @@ class _StoreCard extends StatelessWidget {
                   ]),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: product))),
                 );
-              }).toList());
+              }),
+                if (products.length > preview.length)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreDetailPage(store: store))),
+                        child: Text('عرض كل الأصناف (${products.length})'),
+                      ),
+                    ),
+                  ),
+              ]);
             },
           ),
         ],

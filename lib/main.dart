@@ -11,6 +11,7 @@ import 'screens/developer_page.dart';
 import 'screens/merchant_invite_page.dart';
 import 'screens/my_orders_page.dart';
 import 'screens/notifications_page.dart';
+import 'screens/store_detail_page.dart';
 import 'services/auth_service.dart';
 import 'services/currency_service.dart';
 import 'services/push_service.dart';
@@ -518,8 +519,12 @@ class _StoreCatalogCard extends StatelessWidget {
                   child: Text('لا توجد أصناف مضافة لهذا المتجر بعد.'),
                 );
               }
+              // Show a small preview here; the full catalog lives on the store
+              // page so we never build thousands of rows inside the home card.
+              final preview = products.take(8).toList();
               return Column(
-                children: products.map((product) {
+                children: [
+                  ...preview.map((product) {
                   final p = product.data;
                   final stockBase = ProductUnit.stockBase(p);
                   final unit = ProductUnit.fromProduct(p);
@@ -568,7 +573,22 @@ class _StoreCatalogCard extends StatelessWidget {
                       ),
                     ),
                   );
-                }).toList(),
+                }),
+                  if (products.length > preview.length)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => StoreDetailPage(store: store)),
+                          ),
+                          child: Text('عرض كل الأصناف (${products.length})'),
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
           ),
