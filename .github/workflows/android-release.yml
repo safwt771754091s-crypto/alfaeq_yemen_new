@@ -52,6 +52,12 @@ jobs:
           print(f'Valid AndroidManifest.xml: {path.stat().st_size} bytes')
           PY
 
+      - name: Configure release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: python3 tools/configure_android_signing.py
+
       - name: Flutter pub get
         run: flutter pub get
 
@@ -61,11 +67,17 @@ jobs:
       - name: Build APK
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          ALFAEQ_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALFAEQ_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ALFAEQ_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: flutter build apk --release --dart-define=SUPABASE_URL="https://esvljorjykzgrpnrxnma.supabase.co" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
 
       - name: Build AAB
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          ALFAEQ_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALFAEQ_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ALFAEQ_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: flutter build appbundle --release --dart-define=SUPABASE_URL="https://esvljorjykzgrpnrxnma.supabase.co" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
 
       - name: Upload APK
