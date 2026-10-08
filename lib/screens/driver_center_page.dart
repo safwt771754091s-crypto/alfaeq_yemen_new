@@ -60,6 +60,17 @@ class _DriverCenterPageState extends State<DriverCenterPage>{
       _message('تم تحديث موقع المندوب.');
     }
   }
+  Future<void> _acceptOrder(String orderId) async {
+    final user=SupabaseService.client.auth.currentUser;if(user==null)return;
+    setState(()=>_busy=true);
+    try{
+      if(SupabaseService.isInitialized){
+        await SupabaseService.client.rpc('assign_order_driver',params:{'p_order_id':orderId,'p_driver_id':user.id});
+      }
+      _message('تم استلام المهمة وإسنادها إليك.');
+    }catch(e){_message('تعذر استلام المهمة: $e');}finally{if(mounted)setState(()=>_busy=false);}
+  }
+
   Future<void> _setStatus(String orderId,String status) async {
     final user=SupabaseService.client.auth.currentUser;if(user==null)return;
     setState(()=>_busy=true);
@@ -103,6 +114,27 @@ class _DriverCenterPageState extends State<DriverCenterPage>{
                 ]))),
                 const SizedBox(height:12),
                 Card(child:ListTile(leading:const Icon(Icons.assignment_outlined),title:const Text('الطلبات النشطة'),trailing:Text('$active',style:const TextStyle(fontSize:22,fontWeight:FontWeight.w900)))),
+                Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                  const Text('طلبات متاحة للاستلام',style:TextStyle(fontSize:19,fontWeight:FontWeight.w900)),const SizedBox(height:10),
+                  if(!approved)const Text('اعتماد حسابك مطلوب قبل استلام الطلبات.',style:TextStyle(color:Colors.black54))
+                  else StreamBuilder<List<Map<String,dynamic>>>(
+                    stream:SupabaseService.client.from('orders').stream(primaryKey:['id']).inFilter('delivery_status',['pending','awaiting_assignment']).order('created_at',ascending:false).limit(30),
+                    builder:(context,avail){
+                      if(avail.hasError)return Text('تعذر تحميل الطلبات: ${avail.error}');
+                      final docs=(avail.data??const <Map<String,dynamic>>[]).where((o)=>(o['driver_id']??'')=='').toList();
+                      if(docs.isEmpty)return const Text('لا توجد طلبات متاحة حالياً.');
+                      return Column(children:docs.map((o){
+                        final id=o['id'].toString();
+                        return Card(elevation:0,child:ListTile(
+                          leading:const Icon(Icons.inbox_outlined),
+                          title:Text('طلب #'+id.substring(0,id.length>8?8:id.length)),
+                          subtitle:Text((o['address']??'—').toString()),
+                          trailing:FilledButton(onPressed:_busy?null:()=>_acceptOrder(id),child:const Text('استلام')),
+                        ));
+                      }).toList());
+                    },
+                  ),
+                ]))),
                 Card(child:ListTile(leading:const Icon(Icons.my_location),title:const Text('موقع المندوب'),subtitle:Text(d['current_location'] is Map?'الموقع مسجل ويُحدّث عند الاتصال.':'لم يتم تسجيل موقع بعد.'),onTap:approved?_updateLocation:null)),
                 const SizedBox(height:12),
                 StreamBuilder<List<Map<String,dynamic>>>(
