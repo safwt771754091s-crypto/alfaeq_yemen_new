@@ -52,7 +52,7 @@ class _ProductsPageState extends State<ProductsPage> {
       .from('products')
       .stream(primaryKey: ['id'])
       .order('name')
-      .limit(1000);
+      .limit(5000);
 
   Future<void> _addToCart(CatalogDocument product) async {
     final user = SupabaseService.client.auth.currentUser;
@@ -134,23 +134,39 @@ class _ProductsPageState extends State<ProductsPage> {
                     products = products.where((p) => (p.data['section_id'] ?? '').toString() == _sectionId).toList();
                   }
                   if (_query.isNotEmpty) {
-                    products = products.where((p) => (p.data['name'] ?? '').toString().contains(_query)).toList();
+                    final q = _query.toLowerCase();
+                    products = products.where((p) {
+                      final name = (p.data['name'] ?? '').toString().toLowerCase();
+                      final meta = p.data['metadata'];
+                      final barcode = (meta is Map ? (meta['barcode'] ?? '') : '').toString().toLowerCase();
+                      return name.contains(q) || barcode.contains(q);
+                    }).toList();
                   }
                   if (products.isEmpty) {
                     return const Text('لا توجد منتجات مطابقة.', style: TextStyle(color: Colors.black54));
                   }
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: products.length,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .78),
-                    itemBuilder: (context, i) => _ProductCard(
-                      product: products[i],
-                      rating: ratings[products[i].id],
-                      onOpen: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: products[i]))),
-                      onAdd: () => _addToCart(products[i]),
+                  // shrinkWrap grid inside a ListView: cap the render, refine by search.
+                  const maxCards = 300;
+                  final visible = products.take(maxCards).toList();
+                  return Column(children: [
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: visible.length,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .78),
+                      itemBuilder: (context, i) => _ProductCard(
+                        product: visible[i],
+                        rating: ratings[visible[i].id],
+                        onOpen: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: visible[i]))),
+                        onAdd: () => _addToCart(visible[i]),
+                      ),
                     ),
-                  );
+                    if (products.length > visible.length)
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Text('يُعرض أول ${visible.length} من ${products.length} منتجًا — استخدم البحث للوصول إلى الباقي.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
+                      ),
+                  ]);
                 },
               ),
             ],

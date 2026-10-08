@@ -115,7 +115,7 @@ class _MiniProgramPageState extends State<MiniProgramPage> {
   @override
   void initState() {
     super.initState();
-    _productsFuture = CatalogService().activeProducts(sectionId: widget.section.id, limit: 2000);
+    _productsFuture = CatalogService().activeProducts(sectionId: widget.section.id, limit: 5000);
   }
 
   @override
@@ -242,13 +242,23 @@ class _MiniProgramPageState extends State<MiniProgramPage> {
                 if (products.isEmpty) {
                   return const Text('لا توجد أصناف نشطة في هذا البرنامج بعد.', style: TextStyle(color: Colors.black54));
                 }
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: products.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .78),
-                  itemBuilder: (context, i) => _ProgramProductCard(product: products[i], onAdd: () => _addToCart(products[i])),
-                );
+                // shrinkWrap grid inside a ListView: cap the render, refine by search.
+                const maxCards = 300;
+                final visible = products.take(maxCards).toList();
+                return Column(children: [
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: visible.length,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .78),
+                    itemBuilder: (context, i) => _ProgramProductCard(product: visible[i], onAdd: () => _addToCart(visible[i])),
+                  ),
+                  if (products.length > visible.length)
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text('يُعرض أول ${visible.length} من ${products.length} صنفًا — استخدم البحث للوصول إلى الباقي.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
+                    ),
+                ]);
               },
             ),
           ],
