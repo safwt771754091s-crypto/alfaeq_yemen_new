@@ -1096,7 +1096,10 @@ class _StoreCard extends StatelessWidget {
               if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(16), child: Text('تعذر تحميل الأصناف.'));
               final products = snapshot.data ?? const <CatalogDocument>[];
               if (products.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد أصناف نشطة حالياً.'));
-              return Column(children: products.map((product) {
+              // Cap the inline preview; the full catalog is a lazy list on the store page.
+              final preview = products.take(8).toList();
+              return Column(children: [
+                ...preview.map((product) {
                 final p = product.data;
                 final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
                             final leading = imageUrl.isEmpty
@@ -1114,7 +1117,19 @@ class _StoreCard extends StatelessWidget {
                   ]),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: product))),
                 );
-              }).toList());
+              }),
+                if (products.length > preview.length)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreDetailPage(store: store))),
+                        child: Text('عرض كل الأصناف (${products.length})'),
+                      ),
+                    ),
+                  ),
+              ]);
             },
           ),
         ],

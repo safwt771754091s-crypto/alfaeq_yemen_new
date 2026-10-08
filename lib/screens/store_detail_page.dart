@@ -24,6 +24,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   bool _busy = false;
   ({double average, int count, List<Map<String, dynamic>> items})? _reviews;
   bool _reviewsLoading = true;
+  final _searchController = TextEditingController();
+  String _query = '';
 
   Map<String, dynamic> get _data => widget.store.data;
   String get _name => (_data['name'] ?? 'متجر').toString();
@@ -32,6 +34,12 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   void initState() {
     super.initState();
     _loadReviews();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadReviews() async {
@@ -145,33 +153,71 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
               ]),
             ),
             const Padding(padding: EdgeInsets.fromLTRB(16, 16, 16, 8), child: Text('منتجات المتجر', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16))),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (v) => setState(() => _query = v.trim()),
+                decoration: InputDecoration(
+                  hintText: 'ابحث باسم الصنف أو الباركود...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _query.isEmpty ? null : IconButton(icon: const Icon(Icons.clear), onPressed: () { _searchController.clear(); setState(() => _query = ''); }),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  isDense: true,
+                ),
+              ),
+            ),
             StreamBuilder<List<Map<String, dynamic>>>(
               stream: SupabaseService.client
                   .from('products')
                   .stream(primaryKey: ['id'])
                   .eq('store_id', widget.store.id)
                   .order('name')
-                  .limit(2000),
+                  .limit(5000),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()));
                 if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(16), child: Text('تعذر تحميل المنتجات.'));
-                final products = (snapshot.data ?? const <Map<String, dynamic>>[])
+                final all = (snapshot.data ?? const <Map<String, dynamic>>[])
                     .map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row)))
                     .where((doc) => (doc.data['status'] ?? 'active') == 'active')
                     .toList();
-                if (products.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد منتجات نشطة في هذا المتجر.', style: TextStyle(color: Colors.black54)));
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: products.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .78),
-                  itemBuilder: (context, i) => _StoreProductCard(
-                    product: products[i],
-                    onOpen: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: products[i]))),
-                    onAdd: () => _addToCart(products[i]),
+                if (all.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد منتجات نشطة في هذا المتجر.', style: TextStyle(color: Colors.black54)));
+                final q = _query.toLowerCase();
+                final products = q.isEmpty
+                    ? all
+                    : all.where((doc) {
+                        final p = doc.data;
+                        final name = (p['name'] ?? '').toString().toLowerCase();
+                        final meta = p['metadata'];
+                        final barcode = (meta is Map ? (meta['barcode'] ?? '') : '').toString().toLowerCase();
+                        return name.contains(q) || barcode.contains(q);
+                      }).toList();
+                if (products.isEmpty) {
+                  return Padding(padding: const EdgeInsets.all(16), child: Text('لا نتائج مطابقة لـ «$_query».', style: const TextStyle(color: Colors.black54)));
+                }
+                // Inside the outer ListView the grid is shrink-wrapped, so it
+                // must not be lazy; cap the render and refine via search instead.
+                const maxCards = 300;
+                final visible = products.take(maxCards).toList();
+                return Column(children: [
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: visible.length,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .78),
+                    itemBuilder: (context, i) => _StoreProductCard(
+                      product: visible[i],
+                      onOpen: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: visible[i]))),
+                      onAdd: () => _addToCart(visible[i]),
+                    ),
                   ),
-                );
+                  if (products.length > visible.length)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text('يُعرض أول ${visible.length} من ${products.length} صنفًا — استخدم البحث للوصول إلى الباقي.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
+                    ),
+                ]);
               },
             ),
             const Divider(height: 32),
