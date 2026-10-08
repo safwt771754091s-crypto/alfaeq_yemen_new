@@ -51,17 +51,20 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
       final parsed = <_ImportRow>[];
       final errors = <_ImportError>[];
       final seenRefs = <String>{};
+      final seenBarcodes = <String>{};
       var duplicates = 0;
 
       for (var i = 0; i < rows.length; i++) {
         final rowNumber = i + 2;
         final map = rows[i];
-        final reference = _value(map, ['reference', 'ref', 'رقم المرجع', 'المرجع', 'sku']).trim();
-        final nameValue = _value(map, ['name', 'product_name', 'اسم الصنف', 'اسم المنتج']).trim();
-        final priceText = _value(map, ['price', 'السعر']).trim();
+        final barcode = _value(map, ['barcode', 'باركود', 'الباركود', 'ean', 'upc']).trim();
+        var reference = _value(map, ['reference', 'ref', 'رقم المرجع', 'المرجع', 'sku', 'مرجع داخلي']).trim();
+        final nameValue = _value(map, ['name', 'product_name', 'الاسم', 'اسم الصنف', 'اسم المنتج']).trim();
+        final priceText = _value(map, ['price', 'سعر البيع', 'السعر']).trim();
         final stockText = _value(map, ['stock', 'quantity', 'qty', 'الكمية', 'المخزون']).trim();
         final imageUrl = _value(map, ['imageUrl', 'image_url', 'image', 'الصورة', 'رابط الصورة']).trim();
-        final description = _value(map, ['description', 'الوصف']).trim();
+        final description = _value(map, ['description', 'الوصف', 'فئة المنتج']).trim();
+        final unitLabel = _value(map, ['unit', 'وحدة القياس', 'الوحدة']).trim();
         final storeId = _value(map, ['storeId', 'store_id', 'معرف المتجر']).trim().isNotEmpty
             ? _value(map, ['storeId', 'store_id', 'معرف المتجر']).trim()
             : (_selectedStoreId ?? '');
@@ -71,13 +74,16 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
         final price = num.tryParse(priceText.replaceAll(',', ''));
         final stock = int.tryParse(stockText.replaceAll(',', ''));
 
+        // Reference is optional: fall back to barcode, then a stable name hash.
+        if (reference.isEmpty) reference = barcode.isNotEmpty ? barcode : 'auto-${nameValue.hashCode.toUnsigned(32)}';
+
         String? error;
-        if (reference.isEmpty) error = 'رقم المرجع مطلوب';
-        else if (nameValue.isEmpty) error = 'اسم الصنف مطلوب';
+        if (nameValue.isEmpty) error = 'اسم الصنف مطلوب';
         else if (price == null || price < 0) error = 'السعر غير صالح';
-        else if (stock == null || stock < 0) error = 'الكمية غير صالحة';
+        else if (stockText.isNotEmpty && (stock == null || stock < 0)) error = 'الكمية غير صالحة';
         else if (storeId.isEmpty) error = 'حدد المتجر أو أضف storeId في الملف';
         else if (seenRefs.contains(reference)) error = 'رقم المرجع مكرر داخل الملف';
+        else if (barcode.isNotEmpty && seenBarcodes.contains(barcode)) error = 'الباركود مكرر داخل الملف';
 
         if (error != null) {
           errors.add(_ImportError(rowNumber, error));
@@ -85,14 +91,17 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
           continue;
         }
         seenRefs.add(reference);
+        if (barcode.isNotEmpty) seenBarcodes.add(barcode);
         parsed.add(_ImportRow(
           rowNumber: rowNumber,
           reference: reference,
+          barcode: barcode,
           name: nameValue,
           price: price!.toDouble(),
-          stock: stock!,
+          stock: stock ?? 0,
           imageUrl: imageUrl,
           description: description,
+          unitLabel: unitLabel,
           storeId: storeId,
           sectionId: sectionId,
         ));
@@ -167,6 +176,14 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
 
   String _normalizeHeader(String value) => value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
 
+  /// Arabic-aware name normalisation used to detect duplicates across files.
+  String _normalizeName(String value) {
+    var v = value.trim().toLowerCase();
+    v = v.replaceAll(RegExp(r'[\u064B-\u0652\u0640]'), '');
+    v = v.replaceAll('أ', 'ا').replaceAll('إ', 'ا').replaceAll('آ', 'ا').replaceAll('ى', 'ي').replaceAll('ة', 'ه');
+    return v.replaceAll(RegExp(r'\s+'), ' ');
+  }
+
   String _value(Map<String, String> row, List<String> keys) {
     for (final key in keys) {
       final normalized = _normalizeHeader(key);
@@ -190,15 +207,44 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
     if (user == null || _preview.isEmpty) return;
     setState(() => _busy = true);
     try {
+      // Deduplicate against the live catalog by barcode first, then reference,
+      // then normalised name, so re-uploading a file never creates duplicates.
+      final barcodes = _preview.map((r) => r.barcode).where((b) => b.isNotEmpty).toList();
       final references = _preview.map((r) => r.reference).toList();
-      final existing = <String>{};
+      final existingBarcodes = <String>{};
+      final existingRefs = <String>{};
+      final existingNames = <String>{};
       for (var start = 0; start < references.length; start += 100) {
         final chunk = references.sublist(start, (start + 100).clamp(0, references.length));
-        final rows = await SupabaseService.client.from('products').select('reference').inFilter('reference', chunk);
-        existing.addAll(rows.map((r) => (r['reference'] ?? '').toString()));
+        final rows = await SupabaseService.client
+            .from('products')
+            .select('reference,name,metadata')
+            .inFilter('reference', chunk);
+        for (final r in rows) {
+          existingRefs.add((r['reference'] ?? '').toString());
+          existingNames.add(_normalizeName((r['name'] ?? '').toString()));
+          final meta = r['metadata'];
+          if (meta is Map && meta['barcode'] != null) existingBarcodes.add(meta['barcode'].toString());
+        }
+      }
+      for (var start = 0; start < barcodes.length; start += 100) {
+        final chunk = barcodes.sublist(start, (start + 100).clamp(0, barcodes.length));
+        final rows = await SupabaseService.client
+            .from('products')
+            .select('metadata')
+            .inFilter('metadata->>barcode', chunk);
+        for (final r in rows) {
+          final meta = r['metadata'];
+          if (meta is Map && meta['barcode'] != null) existingBarcodes.add(meta['barcode'].toString());
+        }
       }
 
-      final importable = _preview.where((row) => !existing.contains(row.reference)).toList();
+      bool isDuplicate(_ImportRow row) =>
+          (row.barcode.isNotEmpty && existingBarcodes.contains(row.barcode)) ||
+          existingRefs.contains(row.reference) ||
+          existingNames.contains(_normalizeName(row.name));
+
+      final importable = _preview.where((row) => !isDuplicate(row)).toList();
       final skipped = _preview.length - importable.length;
 
       for (var start = 0; start < importable.length; start += 100) {
@@ -217,7 +263,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
           'stock': row.stock,
           'stock_base': row.stock,
           'sale_unit': 'piece',
-          'unit_label': 'قطعة',
+          'unit_label': row.unitLabel.isEmpty ? 'حبة' : row.unitLabel,
           'base_unit': 'piece',
           'unit_scale': 1,
           'step_base': 1,
@@ -225,9 +271,9 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
           'sold_quantity': 0,
           'sold_quantity_base': 0,
           'status': 'active',
-          'metadata': {'created_by': user.id, 'source': 'admin_bulk_import'},
+          'metadata': {'created_by': user.id, 'source': 'admin_bulk_import', if (row.barcode.isNotEmpty) 'barcode': row.barcode},
         }).toList();
-        await SupabaseService.client.from('products').insert(payload);
+        await SupabaseService.client.from('products').upsert(payload);
       }
 
       await SupabaseService.client.from('audit_logs').insert({
@@ -273,7 +319,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text('استيراد حقيقي إلى Supabase', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 8),
-                  const Text('ارفع Excel أو CSV يحتوي على رقم المرجع، اسم الصنف، الكمية، السعر والصورة. ستتم المعاينة والتحقق قبل الحفظ.'),
+                  const Text('ارفع Excel أو CSV. الأعمدة المتوافقة: الاسم، باركود، سعر البيع، الكمية، وحدة القياس، فئة المنتج، رابط الصورة. يُكتشف التكرار تلقائيًا بالباركود ثم الاسم قبل الحفظ.'),
                   const SizedBox(height: 12),
                   Wrap(spacing: 8, runSpacing: 8, children: [
                     
@@ -333,8 +379,8 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
               const SizedBox(height: 8),
               ..._preview.take(50).map((row) => Card(child: ListTile(
                 leading: row.imageUrl.isEmpty ? const Icon(Icons.inventory_2_outlined) : Image.network(row.imageUrl, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined)),
-                title: Text('${row.name} • ${row.reference}', style: const TextStyle(fontWeight: FontWeight.w800)),
-                subtitle: Text('الكمية: ${row.stock} • السعر: ${row.price} ${CurrencyService.symbolFor(_priceCurrency)}\nالمتجر: ${row.storeId}'),
+                title: Text('${row.name} • ${row.barcode.isNotEmpty ? row.barcode : row.reference}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: Text('الكمية: ${row.stock} • السعر: ${row.price} ${CurrencyService.symbolFor(_priceCurrency)} • الوحدة: ${row.unitLabel.isEmpty ? 'حبة' : row.unitLabel}\nالمتجر: ${row.storeId}'),
                 isThreeLine: true,
               ))),
               const SizedBox(height: 12),
@@ -350,14 +396,16 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
 class _ImportRow {
   final int rowNumber;
   final String reference;
+  final String barcode;
   final String name;
   final double price;
   final int stock;
   final String imageUrl;
   final String description;
+  final String unitLabel;
   final String storeId;
   final String sectionId;
-  const _ImportRow({required this.rowNumber, required this.reference, required this.name, required this.price, required this.stock, required this.imageUrl, required this.description, required this.storeId, required this.sectionId});
+  const _ImportRow({required this.rowNumber, required this.reference, required this.barcode, required this.name, required this.price, required this.stock, required this.imageUrl, required this.description, required this.unitLabel, required this.storeId, required this.sectionId});
 }
 
 class _ImportError {
