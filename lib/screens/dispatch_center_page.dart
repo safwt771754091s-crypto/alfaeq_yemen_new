@@ -45,14 +45,45 @@ class _DispatchCenterPageState extends State<DispatchCenterPage> {
     } catch(e){_message('تعذر حفظ الموقع: $e');} finally{if(mounted)setState(()=>_busy=false);}
   }
 
-  Future<void> _assign(Map<String,dynamic> order) async {
+  Future<void> _assignAuto(Map<String,dynamic> order) async {
     final p=_location(order);
-    if(p==null){_message('حدد موقع استلام الطلب أولاً.');return;}
+    if(p==null){_message('حدد موقع استلام الطلب أولاً أو اختر مندوباً يدوياً.');return;}
     setState(()=>_busy=true);
     try {
       final candidate=await _dispatch.assignBestDriver(orderId:order['id'].toString(),latitude:p.latitude,longitude:p.longitude);
       _message(candidate==null?'لا يوجد مندوب معتمد ومتصل وبموقع صالح حالياً.':'تم تعيين المندوب '+candidate.driverId+' على الطلب ('+candidate.distanceKm.toStringAsFixed(2)+' كم).');
     } catch(e){_message('تعذر تعيين المندوب: $e');} finally{if(mounted)setState(()=>_busy=false);}
+  }
+
+  Future<void> _assignManual(Map<String,dynamic> order) async {
+    setState(()=>_busy=true);
+    List<Map<String,dynamic>> couriers;
+    try{couriers=await _dispatch.listCouriers();}
+    catch(e){_message('تعذر تحميل المندوبين: $e');if(mounted)setState(()=>_busy=false);return;}
+    if(!mounted){setState(()=>_busy=false);return;}
+    final approved=couriers.where((c)=>c['approved']==true).toList();
+    if(approved.isEmpty){_message('لا يوجد مندوبون معتمدون. اعتمد مندوباً من تبويب المندوبين أولاً.');setState(()=>_busy=false);return;}
+    final picked=await showModalBottomSheet<Map<String,dynamic>>(context:context,builder:(ctx)=>Directionality(textDirection:TextDirection.rtl,child:ListView(children:[
+      const Padding(padding:EdgeInsets.all(16),child:Text('اختر مندوباً لتعيينه',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18))),
+      ...approved.map((c){
+        final name=(c['display_name']??c['email']??c['uid']).toString();
+        final online=c['is_online']==true;
+        final active=(c['active_order_count'] as num?)?.toInt()??0;
+        return ListTile(
+          leading:Icon(Icons.delivery_dining,color:online?Colors.green:Colors.grey),
+          title:Text(name,style:const TextStyle(fontWeight:FontWeight.w800)),
+          subtitle:Text('${online?'متصل':'غير متصل'} • مهام نشطة: $active'),
+          onTap:()=>Navigator.pop(ctx,c),
+        );
+      }),
+    ])));
+    setState(()=>_busy=false);
+    if(picked==null)return;
+    setState(()=>_busy=true);
+    try{
+      await _dispatch.assignDriver(orderId:order['id'].toString(),driverId:picked['uid'].toString());
+      _message('تم تعيين المندوب ${(picked['display_name']??picked['uid'])} على الطلب.');
+    }catch(e){_message('تعذر تعيين المندوب: $e');}finally{if(mounted)setState(()=>_busy=false);}
   }
 
   void _message(String s){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));}
@@ -62,31 +93,68 @@ class _DispatchCenterPageState extends State<DispatchCenterPage> {
     builder:(context,access){
       if(access.connectionState!=ConnectionState.done)return const Scaffold(body:Center(child:CircularProgressIndicator()));
       if(access.data!=true)return const Scaffold(body:Center(child:Text('مركز التوزيع مخصص للحسابات المخولة.')));
-      return Scaffold(
-        appBar:AppBar(title:const Text('التوزيع والمندوبون'),actions:[IconButton(tooltip:'خريطة المندوبين',onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const DriverFleetMapPage())),icon:const Icon(Icons.map_outlined))]),
-        body:StreamBuilder<List<Map<String,dynamic>>>(
-          stream:_dispatch.pendingOrdersStream(),
-          builder:(context,snapshot){
-            if(snapshot.hasError)return Center(child:Padding(padding:const EdgeInsets.all(24),child:Text('تعذر تحميل طابور التوزيع.\n${snapshot.error}')));
-            if(snapshot.connectionState==ConnectionState.waiting)return const Center(child:CircularProgressIndicator());
-            final orders=snapshot.data??const <Map<String,dynamic>>[];
-            if(orders.isEmpty)return const Center(child:Padding(padding:EdgeInsets.all(24),child:Text('لا توجد طلبات بانتظار التوزيع حالياً.')));
-            return ListView.builder(padding:const EdgeInsets.all(16),itemCount:orders.length,itemBuilder:(context,i){
-              final o=orders[i]; final p=_location(o); final id=o['id'].toString();
-              return Card(margin:const EdgeInsets.only(bottom:12),child:ListTile(
-                leading:CircleAvatar(child:Icon(p==null?Icons.location_off_outlined:Icons.route_outlined)),
-                title:Text('طلب #'+id.substring(0,id.length>8?8:id.length),style:const TextStyle(fontWeight:FontWeight.w900)),
-                subtitle:Text((o['address']??'—').toString()+'\n'+(p==null?'يحتاج تحديد الموقع':'موقع الاستلام جاهز')),
-                isThreeLine:true,
-                trailing:Wrap(spacing:4,children:[
-                  IconButton(tooltip:'تحديد موقع الاستلام',onPressed:_busy?null:()=>_setLocation(o),icon:const Icon(Icons.edit_location_alt_outlined)),
-                  FilledButton.icon(onPressed:_busy||p==null?null:()=>_assign(o),icon:const Icon(Icons.local_shipping_outlined),label:const Text('تعيين')),
-                ]),
-               ));
-            });
-          },
+      return DefaultTabController(
+        length:2,
+        child:Scaffold(
+          appBar:AppBar(
+            title:const Text('التوزيع والمندوبون'),
+            actions:[IconButton(tooltip:'خريطة المندوبين',onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const DriverFleetMapPage())),icon:const Icon(Icons.map_outlined))],
+            bottom:const TabBar(tabs:[Tab(text:'طلبات بانتظار مندوب'),Tab(text:'المندوبون')]),
+          ),
+          body:TabBarView(children:[_ordersTab(),_couriersTab()]),
         ),
       );
     },
   ));
+
+  Widget _ordersTab()=>StreamBuilder<List<Map<String,dynamic>>>(
+    stream:_dispatch.pendingOrdersStream(),
+    builder:(context,snapshot){
+      if(snapshot.hasError)return Center(child:Padding(padding:const EdgeInsets.all(24),child:Text('تعذر تحميل طابور التوزيع.\n${snapshot.error}')));
+      if(snapshot.connectionState==ConnectionState.waiting)return const Center(child:CircularProgressIndicator());
+      final orders=snapshot.data??const <Map<String,dynamic>>[];
+      if(orders.isEmpty)return const Center(child:Padding(padding:EdgeInsets.all(24),child:Text('لا توجد طلبات بانتظار التوزيع حالياً.')));
+      return ListView.builder(padding:const EdgeInsets.all(16),itemCount:orders.length,itemBuilder:(context,i){
+        final o=orders[i]; final p=_location(o); final id=o['id'].toString();
+        return Card(margin:const EdgeInsets.only(bottom:12),child:ListTile(
+          leading:CircleAvatar(child:Icon(p==null?Icons.location_off_outlined:Icons.route_outlined)),
+          title:Text('طلب #'+id.substring(0,id.length>8?8:id.length),style:const TextStyle(fontWeight:FontWeight.w900)),
+          subtitle:Text((o['address']??'—').toString()+'\n'+(p==null?'يحتاج تحديد الموقع':'موقع الاستلام جاهز')),
+          isThreeLine:true,
+          trailing:Wrap(spacing:4,children:[
+            IconButton(tooltip:'تحديد موقع الاستلام',onPressed:_busy?null:()=>_setLocation(o),icon:const Icon(Icons.edit_location_alt_outlined)),
+            FilledButton.icon(onPressed:_busy?null:()=>_assignAuto(o),icon:const Icon(Icons.auto_awesome),label:const Text('تلقائي')),
+            OutlinedButton.icon(onPressed:_busy?null:()=>_assignManual(o),icon:const Icon(Icons.person_pin_circle_outlined),label:const Text('يدوي')),
+          ]),
+        ));
+      });
+    },
+  );
+
+  Widget _couriersTab()=>StreamBuilder<List<Map<String,dynamic>>>(
+    stream:_dispatch.couriersStream(),
+    builder:(context,snapshot){
+      if(snapshot.hasError)return Center(child:Padding(padding:const EdgeInsets.all(24),child:Text('تعذر تحميل المندوبين.\n${snapshot.error}')));
+      if(snapshot.connectionState==ConnectionState.waiting)return const Center(child:CircularProgressIndicator());
+      final couriers=snapshot.data??const <Map<String,dynamic>>[];
+      if(couriers.isEmpty)return const Center(child:Padding(padding:EdgeInsets.all(24),child:Text('لا يوجد مندوبون بعد. اعتماد المناديب يتم من هنا بعد تسجيلهم أو من إدارة المستخدمين.')));
+      return ListView.builder(padding:const EdgeInsets.all(16),itemCount:couriers.length,itemBuilder:(context,i){
+        final c=couriers[i]; final uid=c['uid'].toString();
+        final approved=c['approved']==true, online=c['is_online']==true;
+        final active=(c['active_order_count'] as num?)?.toInt()??0;
+        return Card(margin:const EdgeInsets.only(bottom:10),child:ListTile(
+          leading:Icon(Icons.delivery_dining,color:approved?(online?Colors.green:Colors.blueGrey):Colors.orange),
+          title:Text(uid,style:const TextStyle(fontWeight:FontWeight.w800),overflow:TextOverflow.ellipsis),
+          subtitle:Text('${approved?'معتمد':'بانتظار الاعتماد'} • ${online?'متصل':'غير متصل'} • مهام: $active'),
+          trailing:Switch(value:approved,onChanged:_busy?null:(v)=>_toggleCourier(uid,v)),
+        ));
+      });
+    },
+  );
+
+  Future<void> _toggleCourier(String uid,bool approved) async {
+    setState(()=>_busy=true);
+    try{await _dispatch.approveCourier(driverId:uid,approved:approved);_message(approved?'تم اعتماد المندوب.':'تم إيقاف اعتماد المندوب.');}
+    catch(e){_message('تعذر تحديث اعتماد المندوب: $e');}finally{if(mounted)setState(()=>_busy=false);}
+  }
 }

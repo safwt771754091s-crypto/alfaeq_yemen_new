@@ -35,7 +35,7 @@ class DriverFleetMapPage extends StatelessWidget {
               return const Center(child: Text('لا تملك صلاحية متابعة المندوبين.'));
             }
             return StreamBuilder<List<Map<String, dynamic>>>(
-              stream: SupabaseService.client.from('drivers').stream(primaryKey: ['id']),
+              stream: SupabaseService.client.from('drivers').stream(primaryKey: ['uid']),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('تعذر تحميل المندوبين.\\n${snapshot.error}')));
@@ -47,11 +47,14 @@ class DriverFleetMapPage extends StatelessWidget {
                 final drivers = snapshot.data ?? const <Map<String, dynamic>>[];
                 final points = <_DriverPoint>[];
                 for (final data in drivers) {
-                  final lat = (data['latitude'] as num?)?.toDouble();
-                  final lng = (data['longitude'] as num?)?.toDouble();
+                  // Driver coordinates live in the current_location jsonb column.
+                  final loc = data['current_location'];
+                  if (loc is! Map) continue;
+                  final lat = (loc['latitude'] as num?)?.toDouble();
+                  final lng = (loc['longitude'] as num?)?.toDouble();
                   if (lat != null && lng != null) {
                     points.add(_DriverPoint(
-                      id: data['id']?.toString() ?? '',
+                      id: data['uid']?.toString() ?? '',
                       point: LatLng(lat, lng),
                       online: data['is_online'] == true,
                       approved: data['approved'] == true,

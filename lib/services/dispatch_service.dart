@@ -12,7 +12,22 @@ class DispatchService {
   }
 
   Stream<List<Map<String,dynamic>>> pendingOrdersStream() {
-    return SupabaseService.client.from('orders').stream(primaryKey:['id']).eq('delivery_status','awaiting_assignment').order('created_at',ascending:false).limit(100);
+    // Orders awaiting a courier can be created with either delivery_status:
+    // 'pending' (default) or 'awaiting_assignment' (merchant marked ready).
+    return SupabaseService.client.from('orders').stream(primaryKey:['id']).inFilter('delivery_status',['pending','awaiting_assignment']).order('created_at',ascending:false).limit(100);
+  }
+
+  Stream<List<Map<String,dynamic>>> couriersStream() {
+    return SupabaseService.client.from('drivers').stream(primaryKey:['uid']).order('created_at',ascending:false).limit(200);
+  }
+
+  Future<void> approveCourier({required String driverId, required bool approved}) async {
+    await SupabaseService.client.rpc('approve_courier',params:{'p_driver_id':driverId,'p_approved':approved});
+  }
+
+  Future<List<Map<String,dynamic>>> listCouriers() async {
+    final rows = await SupabaseService.client.rpc('list_couriers');
+    return (rows as List).map((e) => Map<String,dynamic>.from(e as Map)).toList();
   }
 
   Future<void> setDeliveryLocation({required String orderId,required double latitude,required double longitude}) async {
@@ -25,10 +40,14 @@ class DispatchService {
     for(final raw in rows){final d=Map<String,dynamic>.from(raw),loc=d['current_location'];if(loc is! Map)continue;final distance=_distance(Map<String,dynamic>.from(loc),latitude,longitude);final active=(d['active_order_count'] as num?)?.toInt()??0;if(!distance.isFinite||active>=3)continue;final c=DispatchCandidate(driverId:d['uid'].toString(),distanceKm:distance,score:distance+active*2.5,activeOrderCount:active);if(best==null||c.score<best.score)best=c;}return best;
   }
 
+  Future<void> assignDriver({required String orderId, required String driverId}) async {
+    await SupabaseService.client.rpc('assign_order_driver',params:{'p_order_id':orderId,'p_driver_id':driverId});
+  }
+
   Future<DispatchCandidate?> assignBestDriver({required String orderId,required double latitude,required double longitude}) async {
     final c=await findBestDriver(latitude,longitude);
     if(c==null)return null;
-    await SupabaseService.client.rpc('assign_order_driver',params:{'p_order_id':orderId,'p_driver_id':c.driverId});
+    await assignDriver(orderId:orderId,driverId:c.driverId);
     return c;
   }
 }

@@ -489,5 +489,42 @@ void main() {
       // 2 kg line would only hold 2 g against stock.
       expect(orders, contains("'quantity_base': item['quantityBase'] ?? item['quantity_base']"));
     });
+
+    test('assigning a courier moves the order into the delivery pipeline', () {
+      final migration = File('supabase/migrations/20261008010000_courier_assignment_and_product_reference_v1.sql').readAsStringSync();
+      // assign_order_driver must flip delivery_status or the courier app never
+      // shows action buttons for the order.
+      expect(migration, contains('delivery_status = case'));
+      expect(migration, contains("else 'assigned'"));
+      // Couriers may self-accept; staff may assign to anyone.
+      expect(migration, contains("auth.uid()::text is distinct from p_driver_id"));
+      expect(migration, contains("raise exception 'staff_required'"));
+    });
+
+    test('couriers can be listed and approved by platform staff', () {
+      final migration = File('supabase/migrations/20261008010000_courier_assignment_and_product_reference_v1.sql').readAsStringSync();
+      expect(migration, contains('create or replace function private.list_couriers'));
+      expect(migration, contains('create or replace function private.approve_courier'));
+      expect(migration, contains('create or replace function public.approve_courier'));
+      final service = File('lib/services/dispatch_service.dart').readAsStringSync();
+      expect(service, contains("rpc('approve_courier'"));
+      expect(service, contains('couriersStream'));
+      // Dispatch queue must include freshly-created orders too.
+      expect(service, contains("inFilter('delivery_status',['pending','awaiting_assignment'])"));
+    });
+
+    test('the courier fleet map reads the drivers table correctly', () {
+      final page = File('lib/screens/driver_fleet_map_page.dart').readAsStringSync();
+      // PK is uid, not id, and coordinates live in current_location.
+      expect(page, contains(".from('drivers').stream(primaryKey: ['uid'])"));
+      expect(page, contains("data['current_location']"));
+      expect(page, contains("data['uid']"));
+    });
+
+    test('bulk product import persists a reference column', () {
+      final migration = File('supabase/migrations/20261008010000_courier_assignment_and_product_reference_v1.sql').readAsStringSync();
+      expect(migration, contains('alter table public.products add column if not exists reference text'));
+      expect(migration, contains('products_store_reference_uidx'));
+    });
   });
 }
