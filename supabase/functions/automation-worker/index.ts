@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
   for (const event of inboxRows ?? []) {
     const nextAttempt = (Number(event.attempts) || 0) + 1;
     const { data: claimedRows, error: claimError } = await admin.from("automation_event_inbox")
-      .update({ status: "processing", attempts: nextAttempt, last_error: null })
+      .update({ status: "processing", attempts: nextAttempt, last_error: null, processing_at: new Date().toISOString() })
       .eq("id", event.id).eq("status", "received").select("id");
 
     if (claimError || !claimedRows?.length) continue;
@@ -77,7 +77,7 @@ Deno.serve(async (req: Request) => {
       const response = await send(payload);
       if (response.ok) {
         await admin.from("automation_event_inbox").update({
-          status: "processed", processed_at: new Date().toISOString(), last_error: null,
+          status: "processed", processed_at: new Date().toISOString(), last_error: null, processing_at: null,
         }).eq("id", event.id);
         processed++;
       } else {
@@ -86,6 +86,7 @@ Deno.serve(async (req: Request) => {
           status: nextAttempt >= 10 ? "failed" : "received",
           available_at: new Date(Date.now() + delay * 1000).toISOString(),
           last_error: `HTTP ${response.status}: ${response.text.slice(0, 1000)}`.slice(0, 2000),
+          processing_at: null,
         }).eq("id", event.id);
         failed++;
         errors.push({ eventId: String(event.event_id), status: response.status, detail: response.text.slice(0, 1000) });
@@ -97,6 +98,7 @@ Deno.serve(async (req: Request) => {
         status: nextAttempt >= 10 ? "failed" : "received",
         available_at: new Date(Date.now() + Math.min(3600, Math.max(15, Math.pow(2, nextAttempt) * 15)) * 1000).toISOString(),
         last_error: String(error).slice(0, 2000),
+        processing_at: null,
       }).eq("id", event.id);
     }
   }
