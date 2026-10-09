@@ -30,6 +30,7 @@ Deno.serve(async (req: Request) => {
   const limit = Number.isFinite(requestedLimit) ? Math.min(5, Math.max(1, Math.floor(requestedLimit))) : 5;
   const includeLegacy = body?.includeLegacy === true;
 
+  const processQueue = async () => {
   const send = async (payload: Record<string, unknown>) => {
     const response = await fetch(endpoint.endpoint_url, {
       method: "POST",
@@ -164,7 +165,7 @@ Deno.serve(async (req: Request) => {
   }
 
   if (claimed === 0) await sleep(50);
-  return Response.json({
+  return {
     ok: failed === 0,
     workerId,
     candidates: (inboxRows?.length ?? 0) + (legacyRows?.length ?? 0),
@@ -172,5 +173,16 @@ Deno.serve(async (req: Request) => {
     processed,
     failed,
     errors: errors.slice(0, 3),
-  }, { status: failed === 0 ? 200 : 502 });
+  };
+  };
+
+  // The database trigger only needs a fast acknowledgement. External n8n delivery
+  // continues as a background task so pg_net does not wait on the whole workflow.
+  EdgeRuntime.waitUntil(
+    processQueue()
+      .then((result) => console.log("automation-worker completed", result))
+      .catch((error) => console.error("automation-worker background failure", error)),
+  );
+
+  return Response.json({ ok: true, accepted: true, workerId, limit }, { status: 202 });
 });
