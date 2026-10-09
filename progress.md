@@ -32,6 +32,9 @@ Connect order, inventory, and merchant through the production Event Bus without 
   - stale claim with `attempts = 10` -> untouched (attempt limit respected).
   - drain invoked `automation-worker` once with the correct URL and `x-alfaeq-worker-secret`.
   - migration applies cleanly; engineering-gate migration naming/`search_path` checks pass.
+- CI evidence (PR #125, all checks successful): Flutter CI analyze-and-test,
+  Flutter Build build-web + build-android-debug, Alfaeq Engineering Gates
+  contract-and-supply-chain, Security Audit Gate static-security.
 
 ## Next
 1. Run the production build checkpoint in GitHub Actions.
