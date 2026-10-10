@@ -168,7 +168,7 @@ class _AlfaeqYemenAppState extends State<AlfaeqYemenApp> {
     return MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'الفائق يمن',
-        theme: ThemeData(useMaterial3: true, colorSchemeSeed: const Color(0xFF0B6E4F), scaffoldBackgroundColor: const Color(0xFFF7F9F8)),
+        theme: ThemeData(useMaterial3: true, fontFamily: 'NotoSansArabic', colorSchemeSeed: const Color(0xFF0B6E4F), scaffoldBackgroundColor: const Color(0xFFF7F9F8)),
         home: _initialHome(),
       );
   }

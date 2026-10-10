@@ -57,3 +57,30 @@ Connect order, inventory, and merchant through the production Event Bus without 
   - `flutter test` -> All tests passed (8).
   - `flutter build web --release` -> Built build/web.
 - Server action still required: set `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` in Supabase and redeploy `ai-gateway`; without them the gateway returns `ai_provider_not_configured` (shown to the user in Arabic).
+
+## Web blank-page root cause: Google CDN dependency — 2026-10-09
+- Symptom (user report): the published app "looks deleted" — the page loads but
+  shows nothing. Arabic: "الصفحة انحذفت".
+- Root cause: `flutter build web` defaulted to `--web-resources-cdn`, so the
+  published bundle fetched the CanvasKit renderer from
+  `https://www.gstatic.com/flutter-canvaskit/...` and Arabic text fonts from
+  `https://fonts.gstatic.com/...`. When those Google domains are unreachable
+  (common on Yemeni / restricted networks), the Flutter engine never starts and
+  the page stays blank. The HTML shell, `main.dart.js` and the local `canvaskit/`
+  directory all return HTTP 200, so the app looks "present but deleted".
+- Evidence (Playwright, published Pages URL):
+  - Normal load -> `flt-glass-pane` present, login text rendered.
+  - gstatic.com blocked -> `flt-glass-pane` absent, body text empty (blank page).
+- Fix:
+  1. Build web with `--no-web-resources-cdn` (workflow `flutter_build.yml`) so
+     CanvasKit ships from the app's own origin.
+  2. Bundle an Arabic font (`assets/fonts/NotoSansArabic-Regular.ttf`) and set it
+     as the app `fontFamily`, removing the runtime dependency on fonts.gstatic.com.
+  3. Extend the `web-smoke` CI job to load the published page both normally and
+     with `gstatic.com` blocked, failing if the engine does not start.
+- Verification (local, Flutter 3.47.7 / Dart 3.13.x):
+  - `flutter analyze` -> No issues found.
+  - `flutter test` -> All 72 tests passed.
+  - Rebuilt web with `--no-web-resources-cdn`; Playwright with gstatic blocked
+    -> `flt-glass-pane` present, Arabic login screen renders, no console errors
+    except the expected placeholder Supabase host.
