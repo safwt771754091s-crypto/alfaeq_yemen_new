@@ -84,3 +84,8 @@ Connect order, inventory, and merchant through the production Event Bus without 
   - Rebuilt web with `--no-web-resources-cdn`; Playwright with gstatic blocked
     -> `flt-glass-pane` present, Arabic login screen renders, no console errors
     except the expected placeholder Supabase host.
+- CI evidence (PR #127, all required checks successful): Flutter CI analyze-and-test,
+  Flutter Build build-web + build-android-debug, Alfaeq Engineering Gates
+  contract-and-supply-chain, Security Audit Gate static-security. deploy-web /
+  web-smoke are main-only and skipped on the PR, so the CDN-blocked smoke
+  assertion runs on the next push to main.
