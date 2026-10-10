@@ -22,9 +22,10 @@ Supabase PostgreSQL is authoritative for orders, products/inventory, stores/merc
 3. `automation_events` is durable and consumed by `automation-worker`.
 4. `automation-worker` retries failed delivery with backoff and stops after its configured attempt limit.
 5. `automation_event_inbox.event_id` is unique for idempotent external ingestion.
-6. Inventory reservation is itself idempotent through the unique `sale_reservation` movement constraint and row locking.
-7. If inventory reservation fails, the PostgreSQL transaction rolls back; no `inventory.reserved` event is emitted for the failed reservation.
-8. No client is granted execution of privileged inventory functions or the event producer function.
+6. A claim that is left in `processing` (worker timeout, cold-start kill, redeploy) is recovered: `reap_stale_automation_inbox()` returns stale claims to `received`, and the scheduled `private.automation_inbox_drain_internal()` drain re-invokes the worker after retry backoff. This mirrors the legacy `claim_automation_events()` self-healing path so no accepted event is silently dropped.
+7. Inventory reservation is itself idempotent through the unique `sale_reservation` movement constraint and row locking.
+8. If inventory reservation fails, the PostgreSQL transaction rolls back; no `inventory.reserved` event is emitted for the failed reservation.
+9. No client is granted execution of privileged inventory functions or the event producer function.
 
 ## Verification required
 

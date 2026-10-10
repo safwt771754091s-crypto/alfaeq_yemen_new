@@ -19,6 +19,23 @@ Connect order, inventory, and merchant through the production Event Bus without 
 - Preserved the existing automation-worker retry/backoff path.
 - Kept privileged RPCs and event producer execution restricted from clients.
 
+## Event Bus reliability — stale inbox claim recovery — 2026-10-09
+- Scope: the canonical `automation_event_inbox` path had no recovery for rows stranded in `status='processing'`. `automation-worker` claims a row (status -> `processing`) before calling n8n; if the edge invocation dies mid-flight the row is never re-selected (the worker only reads `status='received'`), so the accepted event is silently dropped. The legacy `automation_events` queue self-heals via `claim_automation_events()`; the inbox had no equivalent.
+- Fix: migration `20261009120000_automation_inbox_stale_claim_recovery_v1.sql`
+  - adds `automation_event_inbox.processing_at`;
+  - adds `public.reap_stale_automation_inbox(p_stale_seconds)` (service_role only) returning stale claims to `received` for a bounded retry;
+  - adds `private.automation_inbox_drain_internal()` and a self-healing per-minute `pg_cron` drain (`alfaeq-automation-inbox-drain`) that reaps stale claims and re-invokes `automation-worker`, so retried rows are picked up after their `available_at` backoff (the insert trigger only fires once, at enqueue time).
+  - `automation-worker` now stamps `processing_at` on claim and clears it on success/failure.
+- Evidence (local PostgreSQL 17.11, stubbed `net.http_post`):
+  - stale `processing` claim (attempts 2) -> reaped to `received`, `processing_at` cleared.
+  - fresh `processing` claim -> untouched.
+  - stale claim with `attempts = 10` -> untouched (attempt limit respected).
+  - drain invoked `automation-worker` once with the correct URL and `x-alfaeq-worker-secret`.
+  - migration applies cleanly; engineering-gate migration naming/`search_path` checks pass.
+- CI evidence (PR #125, all checks successful): Flutter CI analyze-and-test,
+  Flutter Build build-web + build-android-debug, Alfaeq Engineering Gates
+  contract-and-supply-chain, Security Audit Gate static-security.
+
 ## Next
 1. Run the production build checkpoint in GitHub Actions.
 2. Inspect CI logs for analyze/test/web/APK failures.
