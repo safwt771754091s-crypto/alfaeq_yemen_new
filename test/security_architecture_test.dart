@@ -548,6 +548,25 @@ void main() {
       expect(File('tools/android_keystore.sh').existsSync(), isTrue);
     });
 
+    test('cancelling an order also settles its delivery status', () {
+      final migration = File('supabase/migrations/20261010010000_cancel_clears_delivery_status_v1.sql').readAsStringSync();
+      expect(migration, contains("p_delivery_status := 'cancelled'"));
+      expect(migration, contains('orders_settle_delivery_on_cancel'));
+      expect(migration, contains("set delivery_status = 'cancelled'"));
+    });
+
+    test('courier queues never offer cancelled orders', () {
+      for (final path in const [
+        'lib/services/dispatch_service.dart',
+        'lib/screens/driver_center_page.dart',
+        'lib/screens/smart_dispatch_page.dart',
+      ]) {
+        final source = File(path).readAsStringSync();
+        expect(source, contains("neq('status','cancelled')"),
+            reason: '$path must exclude cancelled orders from the courier queue');
+      }
+    });
+
     test('the app version tracks the published release', () {
       final pubspec = File('pubspec.yaml').readAsStringSync();
       final match = RegExp(r'^version:\s*(\d+)\.(\d+)\.(\d+)\+(\d+)\s*$', multiLine: true).firstMatch(pubspec);

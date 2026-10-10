@@ -97,7 +97,7 @@ class _SmartDispatchPageState extends State<SmartDispatchPage> {
         return Scaffold(
           appBar: AppBar(title: const Text('التوزيع الذكي')),
           body: StreamBuilder<List<Map<String,dynamic>>>(
-            stream: SupabaseService.client.from('orders').stream(primaryKey: ['id']).eq('delivery_status','awaiting_assignment').limit(50),
+            stream: SupabaseService.client.from('orders').stream(primaryKey: ['id']).inFilter('delivery_status',['pending','awaiting_assignment']).neq('status','cancelled').limit(50),
             builder: (context, orderSnap) {
               if (orderSnap.hasError) return Center(child: Text('تعذر تحميل الطلبات: ${orderSnap.error}'));
               final orders = orderSnap.data ?? const <Map<String,dynamic>>[];

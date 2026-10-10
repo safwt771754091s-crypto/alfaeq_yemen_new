@@ -14,7 +14,9 @@ class DispatchService {
   Stream<List<Map<String,dynamic>>> pendingOrdersStream() {
     // Orders awaiting a courier can be created with either delivery_status:
     // 'pending' (default) or 'awaiting_assignment' (merchant marked ready).
-    return SupabaseService.client.from('orders').stream(primaryKey:['id']).inFilter('delivery_status',['pending','awaiting_assignment']).order('created_at',ascending:false).limit(100);
+    // A cancelled order must never reach the courier queue, even if an older
+    // row still carries a stale 'pending' delivery_status.
+    return SupabaseService.client.from('orders').stream(primaryKey:['id']).inFilter('delivery_status',['pending','awaiting_assignment']).neq('status','cancelled').order('created_at',ascending:false).limit(100);
   }
 
   Stream<List<Map<String,dynamic>>> couriersStream() {
