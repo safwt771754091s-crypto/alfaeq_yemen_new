@@ -118,10 +118,10 @@ class _DriverCenterPageState extends State<DriverCenterPage>{
                   const Text('طلبات متاحة للاستلام',style:TextStyle(fontSize:19,fontWeight:FontWeight.w900)),const SizedBox(height:10),
                   if(!approved)const Text('اعتماد حسابك مطلوب قبل استلام الطلبات.',style:TextStyle(color:Colors.black54))
                   else StreamBuilder<List<Map<String,dynamic>>>(
-                    stream:SupabaseService.client.from('orders').stream(primaryKey:['id']).inFilter('delivery_status',['pending','awaiting_assignment']).order('created_at',ascending:false).limit(30),
+                    stream:SupabaseService.client.from('orders').stream(primaryKey:['id']).inFilter('delivery_status',['pending','awaiting_assignment']).neq('status','cancelled').order('created_at',ascending:false).limit(30),
                     builder:(context,avail){
                       if(avail.hasError)return Text('تعذر تحميل الطلبات: ${avail.error}');
-                      final docs=(avail.data??const <Map<String,dynamic>>[]).where((o)=>(o['driver_id']??'')=='').toList();
+                      final docs=(avail.data??const <Map<String,dynamic>>[]).where((o)=>(o['driver_id']??'')==''&&!['cancelled','delivered','completed'].contains((o['status']??'').toString())).toList();
                       if(docs.isEmpty)return const Text('لا توجد طلبات متاحة حالياً.');
                       return Column(children:docs.map((o){
                         final id=o['id'].toString();
