@@ -33,3 +33,7 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/data/super_alfaeq/
+  fonts:
+    - family: NotoSansArabic
+      fonts:
+        - asset: assets/fonts/NotoSansArabic-Regular.ttf

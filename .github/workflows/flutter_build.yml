@@ -38,7 +38,7 @@ jobs:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           RECAPTCHA_ENTERPRISE_SITE_KEY: ${{ secrets.RECAPTCHA_ENTERPRISE_SITE_KEY }}
         run: |
-          flutter build web --release --pwa-strategy=none --base-href /alfaeq_yemen_new/ --dart-define=SUPABASE_URL="https://esvljorjykzgrpnrxnma.supabase.co" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" --dart-define=RECAPTCHA_ENTERPRISE_SITE_KEY="$RECAPTCHA_ENTERPRISE_SITE_KEY"
+          flutter build web --release --pwa-strategy=none --no-web-resources-cdn --base-href /alfaeq_yemen_new/ --dart-define=SUPABASE_URL="https://esvljorjykzgrpnrxnma.supabase.co" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" --dart-define=RECAPTCHA_ENTERPRISE_SITE_KEY="$RECAPTCHA_ENTERPRISE_SITE_KEY"
           rm -f build/web/flutter_service_worker.js
       - uses: actions/upload-artifact@v4
         with:
@@ -93,23 +93,41 @@ jobs:
           const { chromium } = require('playwright');
           const url = process.env.APP_URL;
           if (!url) throw new Error('GitHub Pages did not return a deployment URL');
-          (async () => {
-            const browser = await chromium.launch({headless:true});
-            const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+
+          // Some networks (e.g. Yemen) block Google's CDN. The published app
+          // must render without reaching gstatic.com, otherwise users see a
+          // blank page that looks like the app was deleted. Assert both the
+          // normal load and a CDN-blocked load start the Flutter engine.
+          async function check(browser, { blockCdn }) {
+            const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+            const page = await context.newPage();
             const errors = [];
-            page.on('pageerror', e => errors.push(String(e)));
-            page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-            await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
-            await page.waitForTimeout(5000);
+            if (blockCdn) await page.route('**gstatic.com/**', (r) => r.abort());
+            page.on('pageerror', (e) => errors.push(String(e)));
+            page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await page.waitForTimeout(8000);
             const state = await page.evaluate(() => ({
               title: document.title,
               glass: !!document.querySelector('flt-glass-pane'),
               canvas: !!document.querySelector('canvas'),
-              bodyText: document.body.innerText || ''
             }));
-            console.log(JSON.stringify({url, state, errors}, null, 2));
-            if (!state.glass && !state.canvas) throw new Error('Flutter engine did not start: published page is effectively blank');
-            if (errors.length) throw new Error('Browser console/page errors detected: ' + errors.join(' | '));
+            await context.close();
+            return { blockCdn, state, errors };
+          }
+
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const normal = await check(browser, { blockCdn: false });
+            const blocked = await check(browser, { blockCdn: true });
+            console.log(JSON.stringify({ url, normal, blocked }, null, 2));
+            if (!normal.state.glass && !normal.state.canvas) {
+              throw new Error('Flutter engine did not start on a normal load: published page is blank');
+            }
+            if (!blocked.state.glass && !blocked.state.canvas) {
+              throw new Error('Flutter engine did not start when gstatic.com is blocked: the app must bundle its web resources (build with --no-web-resources-cdn)');
+            }
+            if (normal.errors.length) throw new Error('Browser console/page errors detected: ' + normal.errors.join(' | '));
             await browser.close();
           })();
           NODE
