@@ -1,0 +1,64 @@
+name: Product Image Automation
+
+# Finds an image for each product (by barcode and by name), downloads it,
+# uploads it to Supabase Storage and links it to the product. Runs daily and
+# on demand. Secrets are read from the repository and never printed.
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max products to process this run (0 = all)"
+        required: false
+        default: "200"
+      providers:
+        description: "Comma list: off,google,openverse"
+        required: false
+        default: "off,google,openverse"
+      dry_run:
+        description: "true = report only, no writes"
+        required: false
+        default: "false"
+      overwrite:
+        description: "true = replace existing product images"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-image-automation
+  cancel-in-progress: false
+
+jobs:
+  automate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Guard — service-role key must be present
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SERVICE_KEY" ]; then
+            echo "::error::Add repository secret SUPABASE_SERVICE_ROLE_KEY (Supabase -> Project Settings -> API)."
+            exit 1
+          fi
+
+      - name: Find, download and link product images
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
+        run: |
+          python3 tools/auto_product_images.py \
+            --limit "${{ inputs.limit || '200' }}" \
+            --providers "${{ inputs.providers || 'off,google,openverse' }}" \
+            ${{ inputs.dry_run == 'true' && '--dry-run' || '' }} \
+            ${{ inputs.overwrite == 'true' && '--overwrite' || '' }}
