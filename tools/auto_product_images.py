@@ -343,24 +343,6 @@ def probe_storage_write(base, service_key):
         return f"network: {error!r}"
 
 
-def probe_storage_write(base, service_key):
-    path = f".probe/{int(time.time())}.txt"
-    url = f"{base}/storage/v1/object/{BUCKET}/{urllib.parse.quote(path)}"
-    try:
-        request(url, {
-            "apikey": service_key,
-            "Authorization": f"Bearer {service_key}",
-            "Content-Type": "text/plain",
-            "x-upsert": "true",
-        }, method="POST", body=b"probe", timeout=30)
-        return "ok"
-    except urllib.error.HTTPError as error:
-        body = error.read()[:200].decode("utf-8", "replace")
-        return f"http {error.code}: {body}"
-    except (urllib.error.URLError, OSError) as error:
-        return f"network: {error!r}"
-
-
 def main():
     parser = argparse.ArgumentParser(description="Auto-attach product images.")
     parser.add_argument("--url", default=os.environ.get("SUPABASE_URL", DEFAULT_URL))
