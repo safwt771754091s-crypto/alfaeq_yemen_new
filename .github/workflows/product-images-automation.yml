@@ -15,7 +15,7 @@ on:
       providers:
         description: "Comma list: off,google,openverse"
         required: false
-        default: "off,google,openverse"
+        default: "off,google"
       dry_run:
         description: "true = report only, no writes"
         required: false
@@ -24,6 +24,10 @@ on:
         description: "true = replace existing product images"
         required: false
         default: "false"
+      workers:
+        description: "Parallel workers"
+        required: false
+        default: "12"
 
 permissions:
   contents: read
@@ -59,6 +63,7 @@ jobs:
         run: |
           python3 tools/auto_product_images.py \
             --limit "${{ inputs.limit || '200' }}" \
-            --providers "${{ inputs.providers || 'off,google,openverse' }}" \
+            --providers "${{ inputs.providers || 'off,google' }}" \
+            --workers "${{ inputs.workers || '12' }}" \
             ${{ inputs.dry_run == 'true' && '--dry-run' || '' }} \
             ${{ inputs.overwrite == 'true' && '--overwrite' || '' }}
