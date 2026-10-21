@@ -229,8 +229,12 @@ def main():
     parser.add_argument("--share-with", default=os.environ.get("GOOGLE_SHEETS_SHARE_WITH", ""))
     parser.add_argument("--folder-id", default=os.environ.get("GOOGLE_DRIVE_FOLDER_ID", ""))
     parser.add_argument("--create", action="store_true", help="create a new spreadsheet owned by the service account")
+    parser.add_argument("--write-back", action="store_true",
+                        help="write the resolved image back to Supabase (needs a service_role key)")
+    parser.add_argument("--service-key", default=os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--out", default="")
+    parser.add_argument("--csv", default="")
     args = parser.parse_args()
 
     providers = [p.strip() for p in args.providers.split(",") if p.strip()]
@@ -268,16 +272,28 @@ def main():
     values = [COLUMNS]
     for product in products:
         image_url, source = rows.get(product["id"], ("", ""))
+        if args.write_back and source and source != "supabase" and image_url:
+            try:
+                catalog.patch_product(args.url, args.service_key, product["id"], image_url)
+            except (urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
+                print(f"write-back failed {product['id']}: {error}", file=sys.stderr)
         values.append(product_row(product, image_url, source))
 
     if args.out:
         with open(args.out, "w", encoding="utf-8") as handle:
             json.dump(values, handle, ensure_ascii=False, indent=2)
 
+    if args.csv:
+        import csv
+        with open(args.csv, "w", encoding="utf-8-sig", newline="") as handle:
+            csv.writer(handle).writerows(values)
+
     if args.dry_run:
         print(f"DONE rows={len(values) - 1} with_image={state['resolved']} dry_run=True")
         return
 
+    if not (os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON") or args.service_account_file):
+        sys.exit("Set GOOGLE_SERVICE_ACCOUNT_JSON (or --service-account-file) to write to Google Sheets.")
     info = load_service_account(os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", ""), args.service_account_file)
     token = access_token(info)
 
