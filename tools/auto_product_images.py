@@ -263,17 +263,28 @@ def extension_for(content_type, image_url):
     return match.group(1).lower().replace("jpeg", "jpg") if match else "jpg"
 
 
+def service_headers(service_key, extra=None):
+    """Headers for privileged calls.
+
+    Legacy keys are JWTs and go in both `apikey` and `Authorization: Bearer`.
+    The newer `sb_secret_...` keys must NOT be sent as a Bearer JWT.
+    """
+    headers = {"apikey": service_key}
+    if str(service_key).startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {service_key}"
+    headers.update(extra or {})
+    return headers
+
+
 def upload_object(base, service_key, path, data, content_type):
     url = f"{base}/storage/v1/object/{BUCKET}/{urllib.parse.quote(path)}"
     try:
-        request(url, {
-            "apikey": service_key,
-            "Authorization": f"Bearer {service_key}",
+        request(url, service_headers(service_key, {
             "Content-Type": content_type,
             "x-upsert": "true",
-        }, method="POST", body=data, timeout=60).read()
+        }), method="POST", body=data, timeout=60).read()
     except (urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
-        print(f"upload failed {path}: {error.code} {error.read()[:160]!r}", file=sys.stderr)
+        print(f"upload failed {path}: {error}", file=sys.stderr)
         return False
     return True
 
@@ -282,14 +293,12 @@ def patch_product(base, service_key, product_id, image_url):
     url = f"{base}/rest/v1/products?id=eq.{urllib.parse.quote(str(product_id))}"
     body = json.dumps({"image_url": image_url}).encode()
     try:
-        request(url, {
-            "apikey": service_key,
-            "Authorization": f"Bearer {service_key}",
+        request(url, service_headers(service_key, {
             "Content-Type": "application/json",
             "Prefer": "return=minimal",
-        }, method="PATCH", body=body).read()
+        }), method="PATCH", body=body).read()
     except (urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
-        print(f"patch failed {product_id}: {error.code} {error.read()[:160]!r}", file=sys.stderr)
+        print(f"patch failed {product_id}: {error}", file=sys.stderr)
         return False
     return True
 
@@ -309,26 +318,22 @@ def register_media_asset(base, service_key, owner_id, product_id, public_url, ob
         "metadata": {"provider": source},
     }]).encode()
     try:
-        request(url, {
-            "apikey": service_key,
-            "Authorization": f"Bearer {service_key}",
+        request(url, service_headers(service_key, {
             "Content-Type": "application/json",
             "Prefer": "resolution=ignore-duplicates,return=minimal",
-        }, method="POST", body=body).read()
+        }), method="POST", body=body).read()
     except (urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
-        print(f"media_assets failed {product_id}: {error.code} {error.read()[:160]!r}", file=sys.stderr)
+        print(f"media_assets failed {product_id}: {error}", file=sys.stderr)
 
 
 def probe_storage_write(base, service_key):
     path = f".probe/{int(time.time())}.txt"
     url = f"{base}/storage/v1/object/{BUCKET}/{urllib.parse.quote(path)}"
     try:
-        request(url, {
-            "apikey": service_key,
-            "Authorization": f"Bearer {service_key}",
+        request(url, service_headers(service_key, {
             "Content-Type": "text/plain",
             "x-upsert": "true",
-        }, method="POST", body=b"probe", timeout=30)
+        }), method="POST", body=b"probe", timeout=30)
         return "ok"
     except urllib.error.HTTPError as error:
         body = error.read()[:200].decode("utf-8", "replace")
