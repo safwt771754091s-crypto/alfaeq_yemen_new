@@ -36,10 +36,12 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SUPABASE_DART = os.path.join(REPO_ROOT, "lib", "services", "supabase_service.dart")
@@ -58,11 +60,18 @@ DEFAULT_URL = dart_default(r"projectUrl[\s\S]*?defaultValue:\s*'(https://[^']+)'
 DEFAULT_PUBLISHABLE = dart_default(r"_defaultPublishableKey\s*=\s*'([^']+)'")
 
 
-def request(url, headers=None, method="GET", body=None, timeout=40):
+def request(url, headers=None, method="GET", body=None, timeout=40, retries=3):
     headers = dict(headers or {})
     headers.setdefault("User-Agent", USER_AGENT)
     req = urllib.request.Request(url, data=body, method=method, headers=headers)
-    return urllib.request.urlopen(req, timeout=timeout)
+    for attempt in range(retries):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout)
+        except urllib.error.HTTPError as error:
+            if error.code not in (429, 500, 502, 503, 504) or attempt == retries - 1:
+                raise
+            time.sleep(2 ** attempt)
+    raise urllib.error.URLError(url)
 
 
 def load_products(base, key, limit, pending_only=True):
@@ -116,32 +125,74 @@ def off_by_barcode(barcode):
     return product.get("image_front_url") or product.get("image_url")
 
 
+def off_by_name(name):
+    if not name:
+        return None
+    url = "https://world.openfoodfacts.org/cgi/search.pl?" + urllib.parse.urlencode(
+        {"search_terms": name, "search_simple": 1, "action": "process", "json": 1, "page_size": 1}
+    )
+    try:
+        data = json.loads(request(url, timeout=20).read())
+    except (urllib.error.URLError, ValueError, OSError):
+        return None
+    products = data.get("products") or []
+    if not products:
+        return None
+    first = products[0]
+    if not title_matches(name, first.get("product_name")):
+        return None
+    return first.get("image_front_url") or first.get("image_url")
+
+
 def google_images(query, api_key, cx):
     if not (api_key and cx and query):
-        return None
+        return None, None
     url = "https://customsearch.googleapis.com/customsearch/v1?" + urllib.parse.urlencode(
         {"key": api_key, "cx": cx, "q": query, "searchType": "image", "num": 1, "safe": "active"}
     )
     try:
         data = json.loads(request(url, timeout=20).read())
     except (urllib.error.URLError, ValueError, OSError):
-        return None
+        return None, None
     items = data.get("items") or []
-    return items[0]["link"] if items else None
+    if not items:
+        return None, None
+    return items[0].get("link"), items[0].get("title", "")
 
 
 def openverse_images(query):
     if not query:
-        return None
+        return None, None
     url = "https://api.openverse.org/v1/images/?" + urllib.parse.urlencode(
         {"q": query, "page_size": 1, "license_type": "commercial"}
     )
     try:
-        data = json.loads(request(url, timeout=20).read())
+        data = json.loads(request(url, timeout=12, retries=1).read())
     except (urllib.error.URLError, ValueError, OSError):
-        return None
+        return None, None
     results = data.get("results") or []
-    return results[0]["url"] if results else None
+    if not results:
+        return None, None
+    return results[0].get("url"), results[0].get("title", "")
+
+
+def name_tokens(text):
+    tokens = re.findall(r"[\u0600-\u06FF\w]{3,}", str(text or "").lower())
+    return {t for t in tokens if not t.isdigit()}
+
+
+def title_matches(name, title):
+    """Reject an obvious mismatch from a name-based provider.
+
+    Lenient by design: an empty title (provider gave none) is accepted, and
+    only a title with zero shared significant tokens is rejected.
+    """
+    if not title:
+        return True
+    wanted = name_tokens(name)
+    if not wanted:
+        return True
+    return bool(wanted & name_tokens(title))
 
 
 def find_image(product, providers, google_key, google_cx, sleep):
@@ -151,20 +202,22 @@ def find_image(product, providers, google_key, google_cx, sleep):
     for provider in providers:
         if provider == "off":
             found = off_by_barcode(barcode)
+            if not found:
+                found = off_by_name(name)
             if found:
                 return found, "off_barcode"
             time.sleep(sleep)
         elif provider == "google":
             for query in ([barcode] if barcode else []) + queries:
-                found = google_images(query, google_key, google_cx)
+                found, title = google_images(query, google_key, google_cx)
                 time.sleep(sleep)
-                if found:
+                if found and title_matches(name, title):
                     return found, "google_image"
         elif provider == "openverse":
             for query in queries:
-                found = openverse_images(query)
+                found, title = openverse_images(query)
                 time.sleep(sleep)
-                if found:
+                if found and title_matches(name, title):
                     return found, "openverse"
     return None, None
 
@@ -202,7 +255,7 @@ def upload_object(base, service_key, path, data, content_type):
             "Content-Type": content_type,
             "x-upsert": "true",
         }, method="POST", body=data, timeout=60).read()
-    except urllib.error.HTTPError as error:
+    except (urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
         print(f"upload failed {path}: {error.code} {error.read()[:160]!r}", file=sys.stderr)
         return False
     return True
@@ -218,7 +271,7 @@ def patch_product(base, service_key, product_id, image_url):
             "Content-Type": "application/json",
             "Prefer": "return=minimal",
         }, method="PATCH", body=body).read()
-    except urllib.error.HTTPError as error:
+    except (urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
         print(f"patch failed {product_id}: {error.code} {error.read()[:160]!r}", file=sys.stderr)
         return False
     return True
@@ -245,7 +298,7 @@ def register_media_asset(base, service_key, owner_id, product_id, public_url, ob
             "Content-Type": "application/json",
             "Prefer": "resolution=ignore-duplicates,return=minimal",
         }, method="POST", body=body).read()
-    except urllib.error.HTTPError as error:
+    except (urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
         print(f"media_assets failed {product_id}: {error.code} {error.read()[:160]!r}", file=sys.stderr)
 
 
@@ -254,11 +307,12 @@ def main():
     parser.add_argument("--url", default=os.environ.get("SUPABASE_URL", DEFAULT_URL))
     parser.add_argument("--publishable-key", default=os.environ.get("SUPABASE_PUBLISHABLE_KEY", DEFAULT_PUBLISHABLE))
     parser.add_argument("--service-key", default=os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""))
-    parser.add_argument("--providers", default="off,google,openverse")
+    parser.add_argument("--providers", default="off,google")
     parser.add_argument("--google-key", default=os.environ.get("GOOGLE_API_KEY", ""))
     parser.add_argument("--google-cx", default=os.environ.get("GOOGLE_CSE_CX", ""))
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--sleep", type=float, default=0.5)
+    parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--out", default="")
@@ -270,43 +324,63 @@ def main():
     providers = [p.strip() for p in args.providers.split(",") if p.strip()]
     products = load_products(args.url, args.publishable_key, args.limit, pending_only=not args.overwrite)
     pending = [p for p in products if args.overwrite or not str(p.get("image_url") or "").strip()]
-    print(f"products={len(products)} pending={len(pending)} providers={','.join(providers)}")
+    print(f"products={len(products)} pending={len(pending)} providers={','.join(providers)} workers={args.workers}")
 
-    resolved, applied, missed, failed = {}, 0, 0, 0
-    for index, product in enumerate(pending, 1):
-        image_url, source = find_image(product, providers, args.google_key, args.google_cx, args.sleep)
-        if not image_url:
-            missed += 1
-            continue
-        resolved[str(product["id"])] = image_url
-        if args.dry_run:
-            applied += 1
-            if index % 25 == 0 or index == len(pending):
-                print(f"[dry] {index}/{len(pending)} applied={applied} missed={missed}")
-            continue
-        downloaded = download_image(image_url)
-        if not downloaded:
-            missed += 1
-            continue
-        data, content_type = downloaded
-        digest = hashlib.sha256(data).hexdigest()[:12]
-        object_path = f"{product.get('owner_id') or 'catalog'}/{product['id']}-{digest}.{extension_for(content_type, image_url)}"
-        if not upload_object(args.url, args.service_key, object_path, data, content_type):
-            failed += 1
-            continue
-        public_url = f"{args.url}/storage/v1/object/public/{BUCKET}/{urllib.parse.quote(object_path)}"
-        if not patch_product(args.url, args.service_key, product["id"], public_url):
-            failed += 1
-            continue
-        register_media_asset(args.url, args.service_key, product.get("owner_id") or "", product["id"], public_url, object_path, content_type, source)
-        applied += 1
-        if index % 25 == 0 or index == len(pending):
-            print(f"{index}/{len(pending)} applied={applied} missed={missed} failed={failed}")
+    lock = threading.Lock()
+    state = {"done": 0, "applied": 0, "missed": 0, "failed": 0}
+    resolved = {}
+
+    def progress():
+        print(
+            f"[{state['done']}/{len(pending)}] applied={state['applied']} "
+            f"missed={state['missed']} failed={state['failed']}",
+            flush=True,
+        )
+
+    def process(product):
+        try:
+            image_url, source = find_image(product, providers, args.google_key, args.google_cx, args.sleep)
+            if not image_url:
+                return "missed", None, None
+            if args.dry_run:
+                return "applied", image_url, None
+            downloaded = download_image(image_url)
+            if not downloaded:
+                return "missed", None, None
+            data, content_type = downloaded
+            digest = hashlib.sha256(data).hexdigest()[:12]
+            object_path = f"{product.get('owner_id') or 'catalog'}/{product['id']}-{digest}.{extension_for(content_type, image_url)}"
+            if not upload_object(args.url, args.service_key, object_path, data, content_type):
+                return "failed", None, None
+            public_url = f"{args.url}/storage/v1/object/public/{BUCKET}/{urllib.parse.quote(object_path)}"
+            if not patch_product(args.url, args.service_key, product["id"], public_url):
+                return "failed", None, None
+            register_media_asset(
+                args.url, args.service_key, product.get("owner_id") or "",
+                product["id"], public_url, object_path, content_type, source,
+            )
+            return "applied", image_url, public_url
+        except Exception as error:  # noqa: BLE001 - one bad product must not stop the batch
+            print(f"error {product.get('id')}: {error!r}", file=sys.stderr)
+            return "failed", None, None
+
+    with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
+        futures = {pool.submit(process, product): product for product in pending}
+        for future in as_completed(futures):
+            product = futures[future]
+            status, image_url, public_url = future.result()
+            with lock:
+                state["done"] += 1
+                state[status] += 1
+                if status == "applied":
+                    resolved[str(product["id"])] = public_url or image_url
+                if state["done"] % 25 == 0 or state["done"] == len(pending):
+                    progress()
 
     if args.out:
         with open(args.out, "w", encoding="utf-8") as handle:
             json.dump(resolved, handle, ensure_ascii=False, indent=2)
-    print(f"DONE applied={applied} missed={missed} failed={failed} dry_run={args.dry_run}")
+    print(f"DONE applied={state['applied']} missed={state['missed']} failed={state['failed']} dry_run={args.dry_run}")
 
 
 if __name__ == "__main__":
