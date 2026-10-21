@@ -74,6 +74,23 @@ def request(url, headers=None, method="GET", body=None, timeout=40, retries=3):
     raise urllib.error.URLError(url)
 
 
+def key_diagnostics(key):
+    raw = key or ""
+    trimmed = raw.strip()
+    parts = trimmed.split(".")
+    if trimmed.startswith("eyJ") and len(parts) == 3:
+        kind = "jwt(service_role/anon)"
+    elif trimmed.startswith("sb_secret"):
+        kind = "sb_secret (new API key — not a JWT)"
+    elif trimmed.startswith("sb_publishable"):
+        kind = "sb_publishable (publishable key — wrong)"
+    elif not trimmed:
+        kind = "empty"
+    else:
+        kind = "unknown (not a JWT)"
+    return {"len": len(trimmed), "kind": kind, "whitespace": trimmed != raw}
+
+
 def load_products(base, key, limit, pending_only=True):
     out, offset, page = [], 0, 1000
     missing = "&image_url=eq." if pending_only else ""
@@ -302,6 +319,24 @@ def register_media_asset(base, service_key, owner_id, product_id, public_url, ob
         print(f"media_assets failed {product_id}: {error.code} {error.read()[:160]!r}", file=sys.stderr)
 
 
+def probe_storage_write(base, service_key):
+    path = f".probe/{int(time.time())}.txt"
+    url = f"{base}/storage/v1/object/{BUCKET}/{urllib.parse.quote(path)}"
+    try:
+        request(url, {
+            "apikey": service_key,
+            "Authorization": f"Bearer {service_key}",
+            "Content-Type": "text/plain",
+            "x-upsert": "true",
+        }, method="POST", body=b"probe", timeout=30)
+        return "ok"
+    except urllib.error.HTTPError as error:
+        body = error.read()[:200].decode("utf-8", "replace")
+        return f"http {error.code}: {body}"
+    except (urllib.error.URLError, OSError) as error:
+        return f"network: {error!r}"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Auto-attach product images.")
     parser.add_argument("--url", default=os.environ.get("SUPABASE_URL", DEFAULT_URL))
@@ -315,11 +350,17 @@ def main():
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--check-key", action="store_true")
     parser.add_argument("--out", default="")
     args = parser.parse_args()
 
     if not args.dry_run and not args.service_key:
         sys.exit("SUPABASE_SERVICE_ROLE_KEY is required to apply (or pass --dry-run)")
+
+    if args.check_key:
+        print("service-key", json.dumps(key_diagnostics(args.service_key)))
+        print("storage-write", probe_storage_write(args.url, args.service_key))
+        return
 
     providers = [p.strip() for p in args.providers.split(",") if p.strip()]
     products = load_products(args.url, args.publishable_key, args.limit, pending_only=not args.overwrite)
