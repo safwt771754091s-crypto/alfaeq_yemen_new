@@ -1,6 +1,16 @@
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// A gateway/provider failure whose [toString] is already the user-facing
+/// Arabic message. Using a plain [StateError] would prepend Dart's
+/// "Bad state:" debug prefix when the UI renders the exception.
+class AiGatewayException implements Exception {
+  final String message;
+  const AiGatewayException(this.message);
+  @override
+  String toString() => message;
+}
+
 class UnslothAiService {
   final SupabaseClient _client;
   UnslothAiService({SupabaseClient? client})
@@ -33,11 +43,11 @@ class UnslothAiService {
         final d = jsonDecode(r.data);
         if (d is Map) return Map<String, dynamic>.from(d);
       }
-      throw StateError('استجابة غير صالحة من بوابة الذكاء.');
+      throw const AiGatewayException('استجابة غير صالحة من بوابة الذكاء.');
     } on FunctionException catch (e) {
       // Covers FunctionsHttpException (non-2xx) and FunctionsFetchException
       // (network/transport failure, status 0).
-      throw StateError(describeError(e.details));
+      throw AiGatewayException(describeError(e.details));
     }
   }
 
