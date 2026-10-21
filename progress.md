@@ -58,6 +58,46 @@ Connect order, inventory, and merchant through the production Event Bus without 
   - `flutter build web --release` -> Built build/web.
 - Server action still required: set `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` in Supabase and redeploy `ai-gateway`; without them the gateway returns `ai_provider_not_configured` (shown to the user in Arabic).
 
+## Live AI verification + error-handling fixes — 2026-10-21
+- Scope: run the AI path end-to-end against production, then fix the defects found.
+- Server config is now complete: `ai-gateway` passes its configuration guards
+  (`AI_BASE_URL`/`AI_MODEL` present) and returns real completions. Provider is
+  Google Gemini (`gemini-flash-lite-latest`) via the OpenAI-compatible endpoint.
+  The free tier returns `429` under load; the gateway maps it to
+  `ai_provider_rate_limited`.
+- Evidence (live, real `AlfaeqAiService` against the production gateway, opt-in
+  `test/live_ai_e2e_test.dart`): name search, barcode search
+  (`6281020325937` -> «فول لونا»), wallet, orders, cart, account summary,
+  nearby stores, and the confirmation gate all worked. Catalog is priced in
+  `SAR`; `get_fx_rates` returns USD base 1 / SAR 3.75 / YER 1537.5, and the AI
+  reports the stored SAR price directly (no mislabelling).
+- Fixes:
+  1. `supabase_flutter.functions.invoke` throws `FunctionsHttpException` on any
+     non-2xx, so `UnslothAiService`'s returned-status check never ran and raw SDK
+     text (`FunctionsHttpException(status: 429, ...)`) leaked into the UI. Now
+     caught and routed through the Arabic mapper (`describeError`, made static).
+  2. A confirmation gate on one tool call left sibling calls in the same turn
+     unanswered, producing a dangling `tool_call` that the provider rejects on
+     the next request. Siblings are now answered
+     `not_executed_pending_confirmation`.
+  3. `StateError`'s `Bad state:` prefix no longer leaks — dedicated
+     `AiGatewayException` whose `toString()` is the Arabic message.
+- Tests: `test/unsloth_ai_service_test.dart` (mapper) and a new
+  `test/ai_service_test.dart` case for the sibling-call regression.
+- Verification (local, Flutter 3.47.6 / Dart 3.13.5):
+  - `flutter analyze` -> No issues found.
+  - `flutter test` -> All tests passed (80 + 1 opt-in live test skipped in CI).
+  - `flutter build web --release` -> Built build/web.
+  - Engineering gates re-checked locally: no Firebase runtime dep, no
+    service_role reference in the client tree, migration naming valid.
+- Remaining bug (not fixed): `lib/screens/developer_page.dart` still checks
+  `r.status` after `functions.invoke` (dead branch, same anti-pattern); failures
+  are caught and shown, so it is cosmetic.
+- Note: commits are on local branch `fix/ai-gateway-error-mapping` (HEAD
+  `0c0a5b0` + the `AiGatewayException` commit). The session's `GITHUB_TOKEN` is
+  empty and the embedded push token is rejected (401), so the branch could not
+  be pushed and no PR was opened.
+
 ## Web blank-page root cause: Google CDN dependency — 2026-10-09
 - Symptom (user report): the published app "looks deleted" — the page loads but
   shows nothing. Arabic: "الصفحة انحذفت".
