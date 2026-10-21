@@ -1,16 +1,59 @@
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
-class UnslothAiService{
- final SupabaseClient _client;
- UnslothAiService({SupabaseClient? client}):_client=client??Supabase.instance.client;
- Future<Map<String,dynamic>> chatCompletion({required List<Map<String,dynamic>> messages,required List<Map<String,dynamic>> tools,String? model,double temperature=.2,int maxTokens=1024,String toolChoice='auto'})async{
-  final r=await _client.functions.invoke('ai-gateway',body:{'messages':messages,'tools':tools,'tool_choice':toolChoice,if(model!=null&&model.trim().isNotEmpty)'model':model.trim(),'temperature':temperature,'max_tokens':maxTokens,'stream':false});
-  if(r.status<200||r.status>=300)throw StateError(_error(r.data));
-  if(r.data is Map)return Map<String,dynamic>.from(r.data);
-  if(r.data is String){final d=jsonDecode(r.data);if(d is Map)return Map<String,dynamic>.from(d);}
-  throw StateError('استجابة غير صالحة من بوابة الذكاء.');
- }
-   String _error(dynamic d){
+
+/// A gateway/provider failure whose [toString] is already the user-facing
+/// Arabic message. Using a plain [StateError] would prepend Dart's
+/// "Bad state:" debug prefix when the UI renders the exception.
+class AiGatewayException implements Exception {
+  final String message;
+  const AiGatewayException(this.message);
+  @override
+  String toString() => message;
+}
+
+class UnslothAiService {
+  final SupabaseClient _client;
+  UnslothAiService({SupabaseClient? client})
+      : _client = client ?? Supabase.instance.client;
+
+  Future<Map<String, dynamic>> chatCompletion({
+    required List<Map<String, dynamic>> messages,
+    required List<Map<String, dynamic>> tools,
+    String? model,
+    double temperature = .2,
+    int maxTokens = 1024,
+    String toolChoice = 'auto',
+  }) async {
+    // `functions.invoke` throws FunctionsHttpException for any non-2xx status
+    // instead of returning it, so a returned-status check is unreachable unless
+    // the exception is caught first. Without this, provider errors (429/503/401)
+    // leaked raw SDK text into the UI instead of the Arabic guidance below.
+    try {
+      final r = await _client.functions.invoke('ai-gateway', body: {
+        'messages': messages,
+        'tools': tools,
+        'tool_choice': toolChoice,
+        if (model != null && model.trim().isNotEmpty) 'model': model.trim(),
+        'temperature': temperature,
+        'max_tokens': maxTokens,
+        'stream': false,
+      });
+      if (r.data is Map) return Map<String, dynamic>.from(r.data);
+      if (r.data is String) {
+        final d = jsonDecode(r.data);
+        if (d is Map) return Map<String, dynamic>.from(d);
+      }
+      throw const AiGatewayException('استجابة غير صالحة من بوابة الذكاء.');
+    } on FunctionException catch (e) {
+      // Covers FunctionsHttpException (non-2xx) and FunctionsFetchException
+      // (network/transport failure, status 0).
+      throw AiGatewayException(describeError(e.details));
+    }
+  }
+
+  /// Maps a gateway/provider error payload to user-facing Arabic guidance.
+  /// Public and static so it can be unit tested without a network round-trip.
+  static String describeError(dynamic d) {
     final raw = d is Map && d['error'] is String
         ? d['error'] as String
         : d is Map && d['error'] is Map && d['error']['message'] is String
@@ -28,7 +71,7 @@ class UnslothAiService{
       case 'ai_provider_unreachable':
         return 'تعذر الوصول إلى مزود الذكاء من الخادم. تحقق من AI_BASE_URL واتصال الشبكة.';
       case 'ai_provider_rate_limited':
-        return 'مزود الذكاء المجاني مشغول الآن (تجاوز حد الطلبات). أعد المحاولة بعد قليل.';
+        return 'مزود الذكاء مشغول الآن (تجاوز حد الطلبات). انتظر قليلاً ثم أعد المحاولة، أو فعّل خطة أعلى لدى مزود الذكاء.';
       case 'ai_provider_unavailable':
         return 'مزود الذكاء غير متاح مؤقتاً بسبب الضغط. أعد المحاولة بعد قليل.';
       case 'ai_provider_auth_failed':
@@ -37,7 +80,30 @@ class UnslothAiService{
         return raw.isNotEmpty ? raw : 'فشل طلب بوابة الذكاء.';
     }
   }
- String extractContent(Map<String,dynamic> d){final c=d['choices'];if(c is List&&c.isNotEmpty&&c.first is Map){final m=c.first['message'];if(m is Map&&m['content'] is String)return m['content'].trim();}return '';}
- List<Map<String,dynamic>> extractToolCalls(Map<String,dynamic> d){final c=d['choices'];if(c is! List||c.isEmpty||c.first is! Map)return const [];final m=c.first['message'];final x=m is Map?m['tool_calls']:null;if(x is! List)return const [];return x.whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).toList();}
- Map<String,dynamic> extractAssistantMessage(Map<String,dynamic> d){final c=d['choices'];if(c is List&&c.isNotEmpty&&c.first is Map&&c.first['message'] is Map)return Map<String,dynamic>.from(c.first['message']);return {'role':'assistant','content':''};}
+
+  String extractContent(Map<String, dynamic> d) {
+    final c = d['choices'];
+    if (c is List && c.isNotEmpty && c.first is Map) {
+      final m = c.first['message'];
+      if (m is Map && m['content'] is String) return m['content'].trim();
+    }
+    return '';
+  }
+
+  List<Map<String, dynamic>> extractToolCalls(Map<String, dynamic> d) {
+    final c = d['choices'];
+    if (c is! List || c.isEmpty || c.first is! Map) return const [];
+    final m = c.first['message'];
+    final x = m is Map ? m['tool_calls'] : null;
+    if (x is! List) return const [];
+    return x.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  Map<String, dynamic> extractAssistantMessage(Map<String, dynamic> d) {
+    final c = d['choices'];
+    if (c is List && c.isNotEmpty && c.first is Map && c.first['message'] is Map) {
+      return Map<String, dynamic>.from(c.first['message']);
+    }
+    return {'role': 'assistant', 'content': ''};
+  }
 }

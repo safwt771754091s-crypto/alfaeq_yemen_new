@@ -30,7 +30,53 @@ class AlfaeqAiService {
     if(result['ok']==true)await _audit(action:'ai_tool_$name',result:'success',details:{'confirmed':confirmed});
     return result;
   }
-  Future<String> _run() async {for(var round=0;round<6;round++){final data=await _ai.chatCompletion(messages:List<Map<String,dynamic>>.from(_messages),tools:_schemas,maxTokens:1400);final assistant=_ai.extractAssistantMessage(data);final calls=_ai.extractToolCalls(data);_messages.add(assistant);if(calls.isEmpty){final text=_ai.extractContent(data);return text.isEmpty?'لم يصل رد نصي من خدمة الذكاء.':text;}for(final call in calls){final fn=call['function'];if(fn is! Map)continue;final name=(fn['name']??'').toString();Map<String,dynamic> args={};try{final raw=fn['arguments'];final decoded=raw is String?jsonDecode(raw):raw;if(decoded is Map)args=Map<String,dynamic>.from(decoded);}catch(_){}final result=await _execute(name,Map<String,Object?>.from(args));if(result['permission']=='confirmation_required'){_pending=_PendingAiAction(name:name,args:Map<String,Object?>.from(args),id:(call['id']??'').toString());return 'هذه العملية تحتاج تأكيدك. راجع التفاصيل ثم اضغط «تأكيد التنفيذ».';}_messages.add({'role':'tool','tool_call_id':call['id']??'','name':name,'content':jsonEncode(result)});}}return 'توقفت العملية بعد الحد الآمن للاستدعاءات.';}
+  Future<String> _run() async {
+    for (var round = 0; round < 6; round++) {
+      final data = await _ai.chatCompletion(messages: List<Map<String, dynamic>>.from(_messages), tools: _schemas, maxTokens: 1400);
+      final assistant = _ai.extractAssistantMessage(data);
+      final calls = _ai.extractToolCalls(data);
+      _messages.add(assistant);
+      if (calls.isEmpty) {
+        final text = _ai.extractContent(data);
+        return text.isEmpty ? 'لم يصل رد نصي من خدمة الذكاء.' : text;
+      }
+      for (var i = 0; i < calls.length; i++) {
+        final call = calls[i];
+        final fn = call['function'];
+        if (fn is! Map) continue;
+        final name = (fn['name'] ?? '').toString();
+        final callId = (call['id'] ?? '').toString();
+        Map<String, dynamic> args = {};
+        try {
+          final raw = fn['arguments'];
+          final decoded = raw is String ? jsonDecode(raw) : raw;
+          if (decoded is Map) args = Map<String, dynamic>.from(decoded);
+        } catch (_) {}
+        final result = await _execute(name, Map<String, Object?>.from(args));
+        if (result['permission'] == 'confirmation_required') {
+          _pending = _PendingAiAction(name: name, args: Map<String, Object?>.from(args), id: callId);
+          // Every tool_call in an assistant message needs a matching tool
+          // result. The gated call itself is answered when the user confirms or
+          // cancels, but any sibling calls in the same turn must be answered
+          // now, otherwise the next request carries a dangling tool_call and
+          // the provider rejects the whole history.
+          for (final other in calls.skip(i + 1)) {
+            final ofn = other['function'];
+            if (ofn is! Map) continue;
+            _messages.add({
+              'role': 'tool',
+              'tool_call_id': (other['id'] ?? '').toString(),
+              'name': (ofn['name'] ?? '').toString(),
+              'content': jsonEncode({'ok': false, 'error': 'not_executed_pending_confirmation'}),
+            });
+          }
+          return 'هذه العملية تحتاج تأكيدك. راجع التفاصيل ثم اضغط «تأكيد التنفيذ».';
+        }
+        _messages.add({'role': 'tool', 'tool_call_id': callId, 'name': name, 'content': jsonEncode(result)});
+      }
+    }
+    return 'توقفت العملية بعد الحد الآمن للاستدعاءات.';
+  }
   Future<String> sendMessage(String text) async {final t=text.trim();if(t.isEmpty)return '';if(_pending!=null)cancelPendingAction();_messages.add({'role':'user','content':t});try{return await _run();}catch(e){return 'تعذر الاتصال بخدمة ذكاء الفائق يمن حالياً. '+e.toString();}}
   Future<String> confirmPendingAction() async {final p=_pending;if(p==null)return 'لا توجد عملية معلقة.';_pending=null;final result=await _execute(p.name,p.args,confirmed:true);_messages.add({'role':'tool','tool_call_id':p.id,'name':p.name,'content':jsonEncode(result)});try{return await _run();}catch(_){return result['message']?.toString()??'تم التنفيذ لكن تعذر الحصول على الرد النهائي.';}}
   // A pending tool call must always receive a matching tool result, otherwise the
