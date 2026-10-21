@@ -17,8 +17,24 @@ on:
         description: "Sheet tab name"
         required: false
         default: "Products"
+      create:
+        description: "true = create a NEW spreadsheet (ignores spreadsheet id)"
+        required: false
+        default: "true"
+      title:
+        description: "Title for a newly created spreadsheet"
+        required: false
+        default: "Alfaeq Yemen - Catalog"
+      share_with:
+        description: "Google account email to share the sheet with (Editor)"
+        required: false
+        default: ""
+      write_back:
+        description: "true = also write the resolved images back to Supabase"
+        required: false
+        default: "false"
       dry_run:
-        description: "true = build rows only, do not write the sheet"
+        description: "true = build the local backup only, do not write the sheet"
         required: false
         default: "false"
 
@@ -39,30 +55,52 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Guard — Google service account must be present
+      - name: Check the Google service account
         env:
-          SA: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          SA: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON != '' && secrets.GOOGLE_SERVICE_ACCOUNT_JSON || secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
         run: |
           if [ -z "$SA" ]; then
-            echo "::error::Add repository secret GOOGLE_SERVICE_ACCOUNT_JSON (a Google service-account key with Sheets access)."
-            exit 1
-          fi
-          if [ -z "${{ secrets.GOOGLE_SHEETS_DOCUMENT_ID }}" ]; then
-            echo "::error::Add repository secret GOOGLE_SHEETS_DOCUMENT_ID (the target spreadsheet id)."
-            exit 1
+            echo "::warning::GOOGLE_SERVICE_ACCOUNT_JSON is not set - only the local backup will be produced."
           fi
 
-      - name: Export products with images to Google Sheets
+      - name: Resolve images, back up the catalog, and publish to Google Sheets
+        id: export
+        continue-on-error: true
         env:
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON != '' && secrets.GOOGLE_SERVICE_ACCOUNT_JSON || secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_SHEETS_DOCUMENT_ID: ${{ secrets.GOOGLE_SHEETS_DOCUMENT_ID }}
           GOOGLE_SHEETS_TAB: ${{ inputs.tab || 'Products' }}
+          GOOGLE_SHEETS_TITLE: ${{ inputs.title || 'Alfaeq Yemen - Catalog' }}
+          GOOGLE_SHEETS_SHARE_WITH: ${{ inputs.share_with }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
         run: |
+          mkdir -p backup
           python3 tools/export_catalog_to_sheets.py \
             --limit "${{ inputs.limit || '0' }}" \
             --providers "${{ inputs.providers || 'off,google' }}" \
             --tab "${{ inputs.tab || 'Products' }}" \
+            --title "${{ inputs.title || 'Alfaeq Yemen - Catalog' }}" \
+            --csv backup/catalog.csv \
+            --out backup/catalog.json \
+            ${{ inputs.share_with != '' && format('--share-with "{0}"', inputs.share_with) || '' }} \
+            ${{ inputs.create == 'true' && '--create' || '' }} \
+            ${{ inputs.write_back == 'true' && '--write-back' || '' }} \
             ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
+
+      - name: Upload the catalog backup
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: catalog-backup-${{ github.run_id }}
+          path: backup/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Report the Google export status
+        if: steps.export.outcome == 'failure'
+        run: |
+          echo "::warning::The Google Sheets publish step failed (often a disabled Sheets API). The catalog backup artifact was still uploaded."
