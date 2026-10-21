@@ -1,0 +1,56 @@
+name: Apply Product Images
+
+# Applies product images to Supabase from an explicit URL or the bundled map.
+# The service-role key is read from repository secrets and never printed.
+on:
+  workflow_dispatch:
+    inputs:
+      map_url:
+        description: "Optional raw URL of a {product_id: image_url} JSON map"
+        required: false
+        default: ""
+      limit:
+        description: "Max products to enrich live when no map is supplied (0 = all)"
+        required: false
+        default: "200"
+      dry_run:
+        description: "true = report only, no writes"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Guard — service-role key must be present
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SERVICE_KEY" ]; then
+            echo "::error::Add repository secret SUPABASE_SERVICE_ROLE_KEY (Supabase -> Project Settings -> API)."
+            exit 1
+          fi
+
+      - name: Apply saved image map
+        if: ${{ inputs.map_url != '' }}
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          curl -fsSL "${{ inputs.map_url }}" -o /tmp/product_images_map.json
+          python3 tools/apply_product_images.py --map /tmp/product_images_map.json ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
+
+      - name: Enrich live from Open Food Facts
+        if: ${{ inputs.map_url == '' }}
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python3 tools/enrich_product_images.py --limit "${{ inputs.limit }}" ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
