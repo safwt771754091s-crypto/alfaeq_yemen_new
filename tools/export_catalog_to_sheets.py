@@ -134,7 +134,11 @@ def sheets_call(token, url, method="GET", body=None):
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
     })
-    return urllib.request.urlopen(request, timeout=60)
+    try:
+        return urllib.request.urlopen(request, timeout=60)
+    except urllib.error.HTTPError as error:
+        detail = error.read()[:500].decode("utf-8", "replace")
+        sys.exit(f"Google API error {error.code} on {method} {url}\n{detail}")
 
 
 def create_spreadsheet(token, title, tab, folder_id=""):
