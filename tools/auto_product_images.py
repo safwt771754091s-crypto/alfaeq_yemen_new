@@ -91,12 +91,13 @@ def key_diagnostics(key):
     return {"len": len(trimmed), "kind": kind, "whitespace": trimmed != raw}
 
 
-def load_products(base, key, limit, pending_only=True):
+def load_products(base, key, limit, pending_only=True, select=None):
     out, offset, page = [], 0, 1000
+    fields = select or "id,name,owner_id,image_url,metadata,reference"
     missing = "&image_url=eq." if pending_only else ""
     while True:
         url = (
-            f"{base}/rest/v1/products?select=id,name,owner_id,image_url,metadata,reference"
+            f"{base}/rest/v1/products?select={fields}"
             f"{missing}&order=created_at.asc&offset={offset}&limit={page}"
         )
         rows = json.loads(request(url, {"apikey": key, "Authorization": f"Bearer {key}"}).read())
