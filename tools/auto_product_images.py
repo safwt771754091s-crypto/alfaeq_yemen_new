@@ -58,11 +58,18 @@ DEFAULT_URL = dart_default(r"projectUrl[\s\S]*?defaultValue:\s*'(https://[^']+)'
 DEFAULT_PUBLISHABLE = dart_default(r"_defaultPublishableKey\s*=\s*'([^']+)'")
 
 
-def request(url, headers=None, method="GET", body=None, timeout=40):
+def request(url, headers=None, method="GET", body=None, timeout=40, retries=3):
     headers = dict(headers or {})
     headers.setdefault("User-Agent", USER_AGENT)
     req = urllib.request.Request(url, data=body, method=method, headers=headers)
-    return urllib.request.urlopen(req, timeout=timeout)
+    for attempt in range(retries):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout)
+        except urllib.error.HTTPError as error:
+            if error.code not in (429, 500, 502, 503, 504) or attempt == retries - 1:
+                raise
+            time.sleep(2 ** attempt)
+    raise urllib.error.URLError(url)
 
 
 def load_products(base, key, limit, pending_only=True):
@@ -118,30 +125,53 @@ def off_by_barcode(barcode):
 
 def google_images(query, api_key, cx):
     if not (api_key and cx and query):
-        return None
+        return None, None
     url = "https://customsearch.googleapis.com/customsearch/v1?" + urllib.parse.urlencode(
         {"key": api_key, "cx": cx, "q": query, "searchType": "image", "num": 1, "safe": "active"}
     )
     try:
         data = json.loads(request(url, timeout=20).read())
     except (urllib.error.URLError, ValueError, OSError):
-        return None
+        return None, None
     items = data.get("items") or []
-    return items[0]["link"] if items else None
+    if not items:
+        return None, None
+    return items[0].get("link"), items[0].get("title", "")
 
 
 def openverse_images(query):
     if not query:
-        return None
+        return None, None
     url = "https://api.openverse.org/v1/images/?" + urllib.parse.urlencode(
         {"q": query, "page_size": 1, "license_type": "commercial"}
     )
     try:
         data = json.loads(request(url, timeout=20).read())
     except (urllib.error.URLError, ValueError, OSError):
-        return None
+        return None, None
     results = data.get("results") or []
-    return results[0]["url"] if results else None
+    if not results:
+        return None, None
+    return results[0].get("url"), results[0].get("title", "")
+
+
+def name_tokens(text):
+    tokens = re.findall(r"[\u0600-\u06FF\w]{3,}", str(text or "").lower())
+    return {t for t in tokens if not t.isdigit()}
+
+
+def title_matches(name, title):
+    """Reject an obvious mismatch from a name-based provider.
+
+    Lenient by design: an empty title (provider gave none) is accepted, and
+    only a title with zero shared significant tokens is rejected.
+    """
+    if not title:
+        return True
+    wanted = name_tokens(name)
+    if not wanted:
+        return True
+    return bool(wanted & name_tokens(title))
 
 
 def find_image(product, providers, google_key, google_cx, sleep):
@@ -156,15 +186,15 @@ def find_image(product, providers, google_key, google_cx, sleep):
             time.sleep(sleep)
         elif provider == "google":
             for query in ([barcode] if barcode else []) + queries:
-                found = google_images(query, google_key, google_cx)
+                found, title = google_images(query, google_key, google_cx)
                 time.sleep(sleep)
-                if found:
+                if found and title_matches(name, title):
                     return found, "google_image"
         elif provider == "openverse":
             for query in queries:
-                found = openverse_images(query)
+                found, title = openverse_images(query)
                 time.sleep(sleep)
-                if found:
+                if found and title_matches(name, title):
                     return found, "openverse"
     return None, None
 
