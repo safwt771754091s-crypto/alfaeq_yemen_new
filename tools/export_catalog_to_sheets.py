@@ -41,13 +41,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import auto_product_images as catalog  # noqa: E402
 
 SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets"
+DRIVE_API = "https://www.googleapis.com/drive/v3/files"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
-SCOPE = "https://www.googleapis.com/auth/spreadsheets"
+SCOPE = "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive"
 
 COLUMNS = [
-    "id", "name", "description", "price", "currency", "stock", "status",
-    "section_id", "store_id", "reference", "barcode", "image_url", "image",
-    "image_source", "updated_at",
+    "id", "name", "description", "price", "currency",
+    "sale_unit", "unit_label", "base_unit", "unit_scale", "min_order_base",
+    "stock", "status", "section_id", "store_id", "reference", "barcode",
+    "image_url", "image", "image_source", "updated_at",
 ]
 
 
@@ -127,6 +129,23 @@ def sheets_call(token, url, method="GET", body=None):
     return urllib.request.urlopen(request, timeout=60)
 
 
+def create_spreadsheet(token, title, tab, folder_id=""):
+    body = {"properties": {"title": title}, "sheets": [{"properties": {"title": tab}}]}
+    data = json.loads(sheets_call(token, SHEETS_API, "POST", body).read())
+    spreadsheet_id = data["spreadsheetId"]
+    if folder_id:
+        url = (f"{DRIVE_API}/{spreadsheet_id}?addParents={urllib.parse.quote(folder_id)}"
+               "&supportsAllDrives=true&fields=id,parents")
+        sheets_call(token, url, "PATCH", {})
+    return spreadsheet_id
+
+
+def share_file(token, file_id, email, role="writer"):
+    body = {"type": "user", "role": role, "emailAddress": email}
+    url = f"{DRIVE_API}/{file_id}/permissions?sendNotificationEmail=false&supportsAllDrives=true"
+    sheets_call(token, url, "POST", body)
+
+
 def ensure_tab(token, spreadsheet_id, tab):
     meta = json.loads(sheets_call(token, f"{SHEETS_API}/{spreadsheet_id}?fields=sheets.properties").read())
     titles = {s["properties"]["title"] for s in meta.get("sheets", [])}
@@ -154,13 +173,21 @@ def product_row(product, image_url, source):
             meta = json.loads(meta)
         except ValueError:
             meta = {}
+    def cell(key, default=""):
+        value = product.get(key)
+        return default if value is None else value
     return [
         str(product.get("id") or ""),
         str(product.get("name") or ""),
         str(product.get("description") or ""),
-        product.get("price") if product.get("price") is not None else "",
+        cell("price"),
         str(product.get("currency") or ""),
-        product.get("stock") if product.get("stock") is not None else "",
+        str(product.get("sale_unit") or ""),
+        str(product.get("unit_label") or ""),
+        str(product.get("base_unit") or ""),
+        cell("unit_scale"),
+        cell("min_order_base"),
+        cell("stock"),
         str(product.get("status") or ""),
         str(product.get("section_id") or ""),
         str(product.get("store_id") or ""),
@@ -186,6 +213,10 @@ def main():
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--workers", type=int, default=10)
     parser.add_argument("--sleep", type=float, default=0.1)
+    parser.add_argument("--title", default=os.environ.get("GOOGLE_SHEETS_TITLE", "Alfaeq Yemen — Catalog"))
+    parser.add_argument("--share-with", default=os.environ.get("GOOGLE_SHEETS_SHARE_WITH", ""))
+    parser.add_argument("--folder-id", default=os.environ.get("GOOGLE_DRIVE_FOLDER_ID", ""))
+    parser.add_argument("--create", action="store_true", help="create a new spreadsheet owned by the service account")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--out", default="")
     args = parser.parse_args()
@@ -194,7 +225,8 @@ def main():
     products = catalog.load_products(
         args.url, args.publishable_key, args.limit, pending_only=False,
         select="id,name,description,price,currency,stock,status,section_id,store_id,"
-               "reference,image_url,metadata,updated_at",
+               "reference,image_url,metadata,updated_at,sale_unit,unit_label,base_unit,"
+               "unit_scale,min_order_base",
     )
     print(f"products={len(products)} providers={','.join(providers)} tab={args.tab}", flush=True)
 
@@ -234,15 +266,25 @@ def main():
         print(f"DONE rows={len(values) - 1} with_image={state['resolved']} dry_run=True")
         return
 
-    if not args.spreadsheet_id:
-        sys.exit("GOOGLE_SHEETS_DOCUMENT_ID (or --spreadsheet-id) is required to write")
-
     info = load_service_account(os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", ""), args.service_account_file)
     token = access_token(info)
-    ensure_tab(token, args.spreadsheet_id, args.tab)
-    write_values(token, args.spreadsheet_id, args.tab, values)
+
+    spreadsheet_id = args.spreadsheet_id
+    if not spreadsheet_id:
+        if not args.create:
+            sys.exit("Provide --spreadsheet-id (or GOOGLE_SHEETS_DOCUMENT_ID), or pass --create")
+        spreadsheet_id = create_spreadsheet(token, args.title, args.tab, args.folder_id)
+        print(f"created spreadsheet {spreadsheet_id}")
+        print(f"created https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit")
+
+    if args.share_with:
+        share_file(token, spreadsheet_id, args.share_with)
+        print(f"shared with {args.share_with}")
+
+    ensure_tab(token, spreadsheet_id, args.tab)
+    write_values(token, spreadsheet_id, args.tab, values)
     print(f"DONE rows={len(values) - 1} with_image={state['resolved']} dry_run=False")
-    print(f"sheet https://docs.google.com/spreadsheets/d/{args.spreadsheet_id}/edit#gid=0")
+    print(f"sheet https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit#gid=0")
 
 
 if __name__ == "__main__":

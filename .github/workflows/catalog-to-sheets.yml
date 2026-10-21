@@ -17,6 +17,18 @@ on:
         description: "Sheet tab name"
         required: false
         default: "Products"
+      create:
+        description: "true = create a NEW spreadsheet (ignores spreadsheet id)"
+        required: false
+        default: "true"
+      title:
+        description: "Title for a newly created spreadsheet"
+        required: false
+        default: "Alfaeq Yemen — Catalog"
+      share_with:
+        description: "Google account email to share the sheet with (Editor)"
+        required: false
+        default: ""
       dry_run:
         description: "true = build rows only, do not write the sheet"
         required: false
@@ -44,11 +56,11 @@ jobs:
           SA: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: |
           if [ -z "$SA" ]; then
-            echo "::error::Add repository secret GOOGLE_SERVICE_ACCOUNT_JSON (a Google service-account key with Sheets access)."
+            echo "::error::Add repository secret GOOGLE_SERVICE_ACCOUNT_JSON (a Google service-account key with Sheets + Drive access)."
             exit 1
           fi
-          if [ -z "${{ secrets.GOOGLE_SHEETS_DOCUMENT_ID }}" ]; then
-            echo "::error::Add repository secret GOOGLE_SHEETS_DOCUMENT_ID (the target spreadsheet id)."
+          if [ "${{ inputs.create }}" != "true" ] && [ -z "${{ secrets.GOOGLE_SHEETS_DOCUMENT_ID }}" ]; then
+            echo "::error::Either set create=true (new sheet) or add secret GOOGLE_SHEETS_DOCUMENT_ID (existing sheet id)."
             exit 1
           fi
 
@@ -57,6 +69,9 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_SHEETS_DOCUMENT_ID: ${{ secrets.GOOGLE_SHEETS_DOCUMENT_ID }}
           GOOGLE_SHEETS_TAB: ${{ inputs.tab || 'Products' }}
+          GOOGLE_SHEETS_TITLE: ${{ inputs.title || 'Alfaeq Yemen — Catalog' }}
+          GOOGLE_SHEETS_SHARE_WITH: ${{ inputs.share_with }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
@@ -65,4 +80,7 @@ jobs:
             --limit "${{ inputs.limit || '0' }}" \
             --providers "${{ inputs.providers || 'off,google' }}" \
             --tab "${{ inputs.tab || 'Products' }}" \
+            --title "${{ inputs.title || 'Alfaeq Yemen — Catalog' }}" \
+            ${{ inputs.share_with != '' && format('--share-with "{0}"', inputs.share_with) || '' }} \
+            ${{ inputs.create == 'true' && '--create' || '' }} \
             ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
