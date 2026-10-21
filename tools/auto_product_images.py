@@ -345,8 +345,8 @@ def probe_storage_write(base, service_key):
 
 def main():
     parser = argparse.ArgumentParser(description="Auto-attach product images.")
-    parser.add_argument("--url", default=os.environ.get("SUPABASE_URL", DEFAULT_URL))
-    parser.add_argument("--publishable-key", default=os.environ.get("SUPABASE_PUBLISHABLE_KEY", DEFAULT_PUBLISHABLE))
+    parser.add_argument("--url", default=os.environ.get("SUPABASE_URL") or DEFAULT_URL)
+    parser.add_argument("--publishable-key", default=os.environ.get("SUPABASE_PUBLISHABLE_KEY") or DEFAULT_PUBLISHABLE)
     parser.add_argument("--service-key", default=os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""))
     parser.add_argument("--providers", default="off,google")
     parser.add_argument("--google-key", default=os.environ.get("GOOGLE_API_KEY", ""))

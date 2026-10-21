@@ -116,8 +116,16 @@ def access_token(info):
         info.get("token_uri", TOKEN_URL), data=body, method="POST",
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
-    with urllib.request.urlopen(request, timeout=40) as response:
-        return json.loads(response.read())["access_token"]
+    try:
+        with urllib.request.urlopen(request, timeout=40) as response:
+            return json.loads(response.read())["access_token"]
+    except urllib.error.HTTPError as error:
+        detail = error.read()[:300].decode("utf-8", "replace")
+        sys.exit(
+            f"Google rejected the service-account token ({error.code}): {detail}\n"
+            "Check that the key is a real service-account JSON and that the "
+            "Google Sheets API + Google Drive API are enabled for its project."
+        )
 
 
 def sheets_call(token, url, method="GET", body=None):
@@ -202,8 +210,8 @@ def product_row(product, image_url, source):
 
 def main():
     parser = argparse.ArgumentParser(description="Export products + images to Google Sheets.")
-    parser.add_argument("--url", default=os.environ.get("SUPABASE_URL", catalog.DEFAULT_URL))
-    parser.add_argument("--publishable-key", default=os.environ.get("SUPABASE_PUBLISHABLE_KEY", catalog.DEFAULT_PUBLISHABLE))
+    parser.add_argument("--url", default=os.environ.get("SUPABASE_URL") or catalog.DEFAULT_URL)
+    parser.add_argument("--publishable-key", default=os.environ.get("SUPABASE_PUBLISHABLE_KEY") or catalog.DEFAULT_PUBLISHABLE)
     parser.add_argument("--spreadsheet-id", default=os.environ.get("GOOGLE_SHEETS_DOCUMENT_ID", os.environ.get("ALFAEQ_GOOGLE_SHEETS_DOCUMENT_ID", "")))
     parser.add_argument("--tab", default=os.environ.get("GOOGLE_SHEETS_TAB", "Products"))
     parser.add_argument("--service-account-file", default="")
