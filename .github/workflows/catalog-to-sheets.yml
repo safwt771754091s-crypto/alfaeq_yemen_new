@@ -1,0 +1,68 @@
+name: Catalog → Google Sheets (with images)
+
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max products to export this run (0 = all)"
+        required: false
+        default: "0"
+      providers:
+        description: "Image providers: off,google,openverse"
+        required: false
+        default: "off,google"
+      tab:
+        description: "Sheet tab name"
+        required: false
+        default: "Products"
+      dry_run:
+        description: "true = build rows only, do not write the sheet"
+        required: false
+        default: "false"
+
+concurrency:
+  group: catalog-sheets-export
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Guard — Google service account must be present
+        env:
+          SA: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error::Add repository secret GOOGLE_SERVICE_ACCOUNT_JSON (a Google service-account key with Sheets access)."
+            exit 1
+          fi
+          if [ -z "${{ secrets.GOOGLE_SHEETS_DOCUMENT_ID }}" ]; then
+            echo "::error::Add repository secret GOOGLE_SHEETS_DOCUMENT_ID (the target spreadsheet id)."
+            exit 1
+          fi
+
+      - name: Export products with images to Google Sheets
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SHEETS_DOCUMENT_ID: ${{ secrets.GOOGLE_SHEETS_DOCUMENT_ID }}
+          GOOGLE_SHEETS_TAB: ${{ inputs.tab || 'Products' }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
+        run: |
+          python3 tools/export_catalog_to_sheets.py \
+            --limit "${{ inputs.limit || '0' }}" \
+            --providers "${{ inputs.providers || 'off,google' }}" \
+            --tab "${{ inputs.tab || 'Products' }}" \
+            ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}

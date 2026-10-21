@@ -74,12 +74,30 @@ def request(url, headers=None, method="GET", body=None, timeout=40, retries=3):
     raise urllib.error.URLError(url)
 
 
-def load_products(base, key, limit, pending_only=True):
+def key_diagnostics(key):
+    raw = key or ""
+    trimmed = raw.strip()
+    parts = trimmed.split(".")
+    if trimmed.startswith("eyJ") and len(parts) == 3:
+        kind = "jwt(service_role/anon)"
+    elif trimmed.startswith("sb_secret"):
+        kind = "sb_secret (new API key — not a JWT)"
+    elif trimmed.startswith("sb_publishable"):
+        kind = "sb_publishable (publishable key — wrong)"
+    elif not trimmed:
+        kind = "empty"
+    else:
+        kind = "unknown (not a JWT)"
+    return {"len": len(trimmed), "kind": kind, "whitespace": trimmed != raw}
+
+
+def load_products(base, key, limit, pending_only=True, select=None):
     out, offset, page = [], 0, 1000
+    fields = select or "id,name,owner_id,image_url,metadata,reference"
     missing = "&image_url=eq." if pending_only else ""
     while True:
         url = (
-            f"{base}/rest/v1/products?select=id,name,owner_id,image_url,metadata,reference"
+            f"{base}/rest/v1/products?select={fields}"
             f"{missing}&order=created_at.asc&offset={offset}&limit={page}"
         )
         rows = json.loads(request(url, {"apikey": key, "Authorization": f"Bearer {key}"}).read())
@@ -246,17 +264,28 @@ def extension_for(content_type, image_url):
     return match.group(1).lower().replace("jpeg", "jpg") if match else "jpg"
 
 
+def service_headers(service_key, extra=None):
+    """Headers for privileged calls.
+
+    Legacy keys are JWTs and go in both `apikey` and `Authorization: Bearer`.
+    The newer `sb_secret_...` keys must NOT be sent as a Bearer JWT.
+    """
+    headers = {"apikey": service_key}
+    if str(service_key).startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {service_key}"
+    headers.update(extra or {})
+    return headers
+
+
 def upload_object(base, service_key, path, data, content_type):
     url = f"{base}/storage/v1/object/{BUCKET}/{urllib.parse.quote(path)}"
     try:
-        request(url, {
-            "apikey": service_key,
-            "Authorization": f"Bearer {service_key}",
+        request(url, service_headers(service_key, {
             "Content-Type": content_type,
             "x-upsert": "true",
-        }, method="POST", body=data, timeout=60).read()
+        }), method="POST", body=data, timeout=60).read()
     except (urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
-        print(f"upload failed {path}: {error.code} {error.read()[:160]!r}", file=sys.stderr)
+        print(f"upload failed {path}: {error}", file=sys.stderr)
         return False
     return True
 
@@ -265,14 +294,12 @@ def patch_product(base, service_key, product_id, image_url):
     url = f"{base}/rest/v1/products?id=eq.{urllib.parse.quote(str(product_id))}"
     body = json.dumps({"image_url": image_url}).encode()
     try:
-        request(url, {
-            "apikey": service_key,
-            "Authorization": f"Bearer {service_key}",
+        request(url, service_headers(service_key, {
             "Content-Type": "application/json",
             "Prefer": "return=minimal",
-        }, method="PATCH", body=body).read()
+        }), method="PATCH", body=body).read()
     except (urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
-        print(f"patch failed {product_id}: {error.code} {error.read()[:160]!r}", file=sys.stderr)
+        print(f"patch failed {product_id}: {error}", file=sys.stderr)
         return False
     return True
 
@@ -292,14 +319,28 @@ def register_media_asset(base, service_key, owner_id, product_id, public_url, ob
         "metadata": {"provider": source},
     }]).encode()
     try:
-        request(url, {
-            "apikey": service_key,
-            "Authorization": f"Bearer {service_key}",
+        request(url, service_headers(service_key, {
             "Content-Type": "application/json",
             "Prefer": "resolution=ignore-duplicates,return=minimal",
-        }, method="POST", body=body).read()
+        }), method="POST", body=body).read()
     except (urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
-        print(f"media_assets failed {product_id}: {error.code} {error.read()[:160]!r}", file=sys.stderr)
+        print(f"media_assets failed {product_id}: {error}", file=sys.stderr)
+
+
+def probe_storage_write(base, service_key):
+    path = f".probe/{int(time.time())}.txt"
+    url = f"{base}/storage/v1/object/{BUCKET}/{urllib.parse.quote(path)}"
+    try:
+        request(url, service_headers(service_key, {
+            "Content-Type": "text/plain",
+            "x-upsert": "true",
+        }), method="POST", body=b"probe", timeout=30)
+        return "ok"
+    except urllib.error.HTTPError as error:
+        body = error.read()[:200].decode("utf-8", "replace")
+        return f"http {error.code}: {body}"
+    except (urllib.error.URLError, OSError) as error:
+        return f"network: {error!r}"
 
 
 def main():
@@ -315,11 +356,17 @@ def main():
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--check-key", action="store_true")
     parser.add_argument("--out", default="")
     args = parser.parse_args()
 
     if not args.dry_run and not args.service_key:
         sys.exit("SUPABASE_SERVICE_ROLE_KEY is required to apply (or pass --dry-run)")
+
+    if args.check_key:
+        print("service-key", json.dumps(key_diagnostics(args.service_key)))
+        print("storage-write", probe_storage_write(args.url, args.service_key))
+        return
 
     providers = [p.strip() for p in args.providers.split(",") if p.strip()]
     products = load_products(args.url, args.publishable_key, args.limit, pending_only=not args.overwrite)

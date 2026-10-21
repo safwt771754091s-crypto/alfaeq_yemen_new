@@ -55,6 +55,11 @@ jobs:
             exit 1
           fi
 
+      - name: Verify service-role key can write to Storage
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python3 tools/auto_product_images.py --check-key
+
       - name: Find, download and link product images
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
