@@ -1,30 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
+import '../core/geo_util.dart';
 import '../core/money.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
+import '../widgets/delivery_timeline.dart';
 
 class MerchantOrdersPage extends StatefulWidget {
   const MerchantOrdersPage({super.key});
   @override State<MerchantOrdersPage> createState()=>_MerchantOrdersPageState();
 }
+
+class _MerchantOrderData {
+  final List<Map<String,dynamic>> stores;
+  final List<Map<String,dynamic>> orders;
+  final Map<String,List<Map<String,dynamic>>> events;
+  const _MerchantOrderData(this.stores,this.orders,this.events);
+}
+
 class _MerchantOrdersPageState extends State<MerchantOrdersPage>{
   final _auth=AuthService(); bool _busy=false;
   Future<bool> _allowed() async { final r=await _auth.role(); return r=='merchant'||r=='admin'||r=='owner'||r=='developer'; }
-  Future<List<Map<String,dynamic>>> _orders(String uid) async {
-    final stores=await SupabaseService.client.from('stores').select('id').eq('owner_id',uid);
-    final ids=List<Map<String,dynamic>>.from(stores).map((x)=>'${x['id']}').toList();
-    if(ids.isEmpty)return [];
+
+  Future<_MerchantOrderData> _data(String uid) async {
+    final storeRows=await SupabaseService.client.from('stores').select('id,name,latitude,longitude').eq('owner_id',uid);
+    final stores=List<Map<String,dynamic>>.from(storeRows);
+    final ids=stores.map((x)=>'${x['id']}').toList();
+    if(ids.isEmpty)return const _MerchantOrderData(<Map<String,dynamic>>[],<Map<String,dynamic>>[],<String,List<Map<String,dynamic>>>{});
     final rows=await SupabaseService.client.from('orders').select().overlaps('merchant_ids',ids).order('created_at',ascending:false).limit(100);
-    return List<Map<String,dynamic>>.from(rows);
+    final orders=List<Map<String,dynamic>>.from(rows);
+    final orderIds=orders.map((o)=>'${o['id']}').toList();
+    final events=<String,List<Map<String,dynamic>>>{};
+    if(orderIds.isNotEmpty){
+      try{
+        final ev=await SupabaseService.client.from('delivery_events').select().inFilter('order_id',orderIds).order('created_at',ascending:true);
+        for(final raw in List<Map<String,dynamic>>.from(ev)){
+          events.putIfAbsent('${raw['order_id']}',()=><Map<String,dynamic>>[]).add(raw);
+        }
+      }catch(_){}
+    }
+    return _MerchantOrderData(stores,orders,events);
   }
+
+  LatLng? _pickupPoint(List<Map<String,dynamic>> stores){
+    for(final s in stores){
+      final lat=(s['latitude'] as num?)?.toDouble();
+      final lng=(s['longitude'] as num?)?.toDouble();
+      if(lat!=null&&lng!=null)return LatLng(lat,lng);
+    }
+    return null;
+  }
+
   Future<void> _setStatus(Map<String,dynamic> o,String status) async {
     if(SupabaseService.client.auth.currentUser==null||!await _allowed())return;
     setState(()=>_busy=true);
     try{
       await SupabaseService.client.rpc('transition_order',params:{'p_order_id':'${o['id']}','p_status':status,'p_delivery_status':status=='ready_for_pickup'?'awaiting_assignment':null});
-      _message('تم تحديث حالة الطلب.'); if(mounted)setState((){});
-    }catch(e){_message('تعذر تحديث الطلب: ${e}');}finally{if(mounted)setState(()=>_busy=false);}
+      _message(status=='ready_for_pickup'?'تم تجهيز الطلب وتسليمه لقائمة المندوبين.':'تم تحديث حالة الطلب.');
+      if(mounted)setState((){});
+    }catch(e){_message('تعذر تحديث الطلب: $e');}finally{if(mounted)setState(()=>_busy=false);}
   }
+
   Future<void> _sendInvoice(Map<String,dynamic> o) async {
     if(SupabaseService.client.auth.currentUser==null||!await _allowed())return;
     setState(()=>_busy=true);
@@ -35,43 +71,77 @@ class _MerchantOrdersPageState extends State<MerchantOrdersPage>{
       _message(configured?'تم إرسال الفاتورة عبر واتساب (عدد المستلمين: $queued).':'تم تجهيز الفاتورة؛ يلزم ضبط واتساب لإرسالها.');
     }catch(e){_message('تعذر إرسال الفاتورة: $e');}finally{if(mounted)setState(()=>_busy=false);}
   }
+
   @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:FutureBuilder<bool>(
     future:_allowed(),builder:(context,a){
       if(a.connectionState==ConnectionState.waiting)return const Scaffold(body:Center(child:CircularProgressIndicator()));
       if(a.data!=true)return const Scaffold(body:Center(child:Text('مركز الطلبات مخصص للحسابات التجارية المعتمدة.')));
       final u=SupabaseService.client.auth.currentUser;if(u==null)return const Scaffold(body:Center(child:Text('يجب تسجيل الدخول.')));
-      return Scaffold(appBar:AppBar(title:const Text('طلبات التاجر')),body:FutureBuilder<List<Map<String,dynamic>>>(
-        future:_orders(u.id),builder:(context,s){
+      return Scaffold(appBar:AppBar(title:const Text('طلبات التاجر')),body:FutureBuilder<_MerchantOrderData>(
+        future:_data(u.id),builder:(context,s){
           if(s.hasError)return Center(child:Text('تعذر تحميل الطلبات.\n${s.error}'));
           if(s.connectionState==ConnectionState.waiting)return const Center(child:CircularProgressIndicator());
-          final os=s.data??const <Map<String,dynamic>>[];if(os.isEmpty)return const Center(child:Text('لا توجد طلبات مرتبطة بمتجرك حالياً.'));
+          final data=s.data;final os=data?.orders??const <Map<String,dynamic>>[];
+          if(os.isEmpty)return const Center(child:Text('لا توجد طلبات مرتبطة بمتجرك حالياً.'));
+          final pickup=_pickupPoint(data?.stores??const <Map<String,dynamic>>[]);
           return RefreshIndicator(
             onRefresh: () async { if (mounted) setState(() {}); },
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: os.length,
-                              itemBuilder: (c, i) => _OrderCard(order: os[i], busy: _busy, onStatus: _setStatus, onInvoice: _sendInvoice),
+              itemBuilder: (c, i) => _OrderCard(
+                order: os[i],
+                events: data?.events['${os[i]['id']}'] ?? const <Map<String,dynamic>>[],
+                pickupPoint: pickup,
+                busy: _busy,
+                onStatus: _setStatus,
+                onInvoice: _sendInvoice,
+              ),
             ),
           );
         }),);
     }));
   void _message(String t){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(t)));}
 }
+
 class _OrderCard extends StatelessWidget{
- final Map<String,dynamic> order;final bool busy;final Future<void> Function(Map<String,dynamic>,String) onStatus;final Future<void> Function(Map<String,dynamic>) onInvoice;
- const _OrderCard({required this.order,required this.busy,required this.onStatus,required this.onInvoice});
+ final Map<String,dynamic> order;
+ final List<Map<String,dynamic>> events;
+ final LatLng? pickupPoint;
+ final bool busy;
+ final Future<void> Function(Map<String,dynamic>,String) onStatus;
+ final Future<void> Function(Map<String,dynamic>) onInvoice;
+ const _OrderCard({required this.order,this.events=const <Map<String,dynamic>>[],this.pickupPoint,required this.busy,required this.onStatus,required this.onInvoice});
+
+ String? _tripSummary(){
+  if(pickupPoint==null)return null;
+  final dest=GeoUtil.pointOf(order['delivery_location']);
+  if(dest==null)return null;
+  final km=GeoUtil.distanceKm(pickupPoint!,dest);
+  return 'المسافة إلى العميل ${GeoUtil.formatDistance(km)} • الزمن المتوقع ${GeoUtil.formatDuration(GeoUtil.eta(km))}';
+ }
+
  @override Widget build(BuildContext context){
   final id='${order['id']??''}',status='${order['status']??'pending'}',delivery='${order['delivery_status']??'awaiting_assignment'}',items=order['items'] is List?List<dynamic>.from(order['items'] as List):const <dynamic>[];
+  final trip=_tripSummary();
+  final readyAt=GeoUtil.formatClock(GeoUtil.parseTime(order['merchant_ready_at']));
   return Card(elevation:0,margin:const EdgeInsets.only(bottom:12),child:ExpansionTile(
    leading:CircleAvatar(child:Icon(_icon(status))),title:Text('طلب #${id.length>8?id.substring(0,8):id}',style:const TextStyle(fontWeight:FontWeight.w900)),subtitle:Text('$status • $delivery'),
    children:[Padding(padding:const EdgeInsets.fromLTRB(16,0,16,16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
     Text(formatMoney(num.tryParse('${order['total']??0}'), order['currency']?.toString(), fallback: '0'),style:const TextStyle(fontSize:17,fontWeight:FontWeight.w900)),
-    Text('عدد الأصناف: ${items.length}'),Text('العنوان: ${order['address']??'—'}'),Text('الدفع: ${order['payment_method']??'—'}'),const SizedBox(height:8),
+    Text('عدد الأصناف: ${items.length}'),Text('العنوان: ${order['address']??'—'}'),Text('الدفع: ${order['payment_method']??'—'}'),
+    if(trip!=null)Padding(padding:const EdgeInsets.only(top:4),child:Row(children:[const Icon(Icons.route_outlined,size:16),const SizedBox(width:6),Expanded(child:Text(trip,style:const TextStyle(color:Colors.black54)))])),
+    if(readyAt!=null)Padding(padding:const EdgeInsets.only(top:4),child:Text('سُلّم للمندوب الساعة $readyAt',style:const TextStyle(color:Colors.black54))),
+    const SizedBox(height:8),
     ...items.whereType<Map>().map((x)=>ListTile(dense:true,contentPadding:EdgeInsets.zero,title:Text('${x['name']??'صنف'}'),subtitle:Text('الكمية: ${x['quantity']??0}'),trailing:Text('${x['line_total']??x['unit_price']??0}'))),
-    Wrap(spacing:8,children:[
-      if(status=='pending')FilledButton.icon(onPressed:busy?null:()=>onStatus(order,'accepted'),icon:const Icon(Icons.check),label:const Text('قبول')),
+    const Divider(height:20),
+    const Text('مسار الطلب',style:TextStyle(fontWeight:FontWeight.w900)),
+    const SizedBox(height:8),
+    DeliveryTimeline(order:order,events:events,dense:true),
+    Wrap(spacing:8,runSpacing:8,children:[
+      if(status=='pending')FilledButton.icon(onPressed:busy?null:()=>onStatus(order,'accepted'),icon:const Icon(Icons.check),label:const Text('قبول الطلب')),
       if(status=='accepted')FilledButton.icon(onPressed:busy?null:()=>onStatus(order,'preparing'),icon:const Icon(Icons.inventory_2_outlined),label:const Text('بدء التجهيز')),
-      if(status=='preparing')FilledButton.icon(onPressed:busy?null:()=>onStatus(order,'ready_for_pickup'),icon:const Icon(Icons.local_shipping_outlined),label:const Text('جاهز للاستلام')),
+      if(status=='preparing')FilledButton.icon(onPressed:busy?null:()=>onStatus(order,'ready_for_pickup'),icon:const Icon(Icons.local_shipping_outlined),label:const Text('تسليم للسائق')),
       OutlinedButton.icon(onPressed:busy?null:()=>onInvoice(order),icon:const Icon(Icons.receipt_long_outlined),label:const Text('إرسال الفاتورة واتساب')),
       if(status=='pending'||status=='accepted')OutlinedButton.icon(onPressed:busy?null:()=>onStatus(order,'cancelled'),icon:const Icon(Icons.close),label:const Text('إلغاء'))
     ])

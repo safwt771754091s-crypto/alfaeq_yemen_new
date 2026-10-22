@@ -17,7 +17,7 @@ void main() {
     test('merchant orders use Supabase ownership and server-side transitions', () {
       final orders = File('lib/screens/merchant_orders_page.dart').readAsStringSync();
       final migration = File('supabase/migrations/20260923160000_stage4_merchant_order_transitions.sql').readAsStringSync();
-      expect(orders, contains("from('stores').select('id').eq('owner_id',uid)"));
+      expect(orders, contains("from('stores').select('id,name,latitude,longitude').eq('owner_id',uid)"));
       expect(orders, contains("rpc('transition_order'"));
       expect(migration, contains('security definer'));
       expect(migration, contains('s.owner_id = uid'));
