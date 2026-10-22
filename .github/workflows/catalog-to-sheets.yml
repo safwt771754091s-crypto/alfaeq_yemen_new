@@ -71,7 +71,7 @@ jobs:
           GOOGLE_SHEETS_DOCUMENT_ID: ${{ secrets.GOOGLE_SHEETS_DOCUMENT_ID }}
           GOOGLE_SHEETS_TAB: ${{ inputs.tab || 'Products' }}
           GOOGLE_SHEETS_TITLE: ${{ inputs.title || 'Alfaeq Yemen - Catalog' }}
-          GOOGLE_SHEETS_SHARE_WITH: ${{ inputs.share_with }}
+          GOOGLE_SHEETS_SHARE_WITH: ${{ inputs.share_with || secrets.GOOGLE_SHEETS_SHARE_WITH }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
