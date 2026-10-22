@@ -39,11 +39,11 @@ class _SmartDispatchPageState extends State<SmartDispatchPage> {
         'assigned_by': user.id,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', order['id']);
-      await SupabaseService.client.from('delivery_events').insert({
+      await SupabaseService.client.from('order_delivery_events').insert({
         'order_id': order['id'],
-        'driver_id': driverId,
-        'status': 'assigned',
-        'assigned_by': user.id,
+        'event': 'assigned',
+        'actor_uid': user.id,
+        'actor_role': 'staff',
       });
       await SupabaseService.client.from('audit_logs').insert({
         'actor_uid': user.id,

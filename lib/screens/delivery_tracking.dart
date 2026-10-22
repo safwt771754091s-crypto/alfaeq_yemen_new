@@ -171,7 +171,7 @@ class _OrderJourney extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: SupabaseService.client.from('delivery_events').select().eq('order_id', orderId).order('created_at', ascending: true),
+      future: SupabaseService.client.from('order_delivery_events').select().eq('order_id', orderId).order('created_at', ascending: true),
       builder: (context, snapshot) {
         final events = snapshot.hasData ? List<Map<String, dynamic>>.from(snapshot.data!) : const <Map<String, dynamic>>[];
         return DeliveryTimeline(order: order, events: events);
