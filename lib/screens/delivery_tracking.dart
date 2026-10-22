@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/supabase_service.dart';
+import '../widgets/delivery_timeline.dart';
 import 'live_tracking_map_page.dart';
 
 class DeliveryTracking extends StatelessWidget {
@@ -81,8 +82,6 @@ class _OrderTrackingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = (data['status'] ?? 'pending').toString();
-    final deliveryStatus = (data['delivery_status'] ?? 'awaiting_assignment').toString();
-    final stages = _deliveryStages(deliveryStatus);
     final total = data['total'] ?? 0;
     final currency = (data['currency'] ?? 'YER').toString();
     final payment = _paymentLabel((data['payment_method'] ?? '').toString());
@@ -115,21 +114,11 @@ class _OrderTrackingView extends StatelessWidget {
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LiveTrackingMapPage(orderId: orderId))),
         )),
         const SizedBox(height: 12),
-        const Text('حالة التوصيل', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+        const Text('مسار الطلب والأوقات', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
         const SizedBox(height: 8),
         Card(elevation: 0, child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-          child: Column(children: List.generate(stages.length, (i) {
-            final stage = stages[i];
-            final active = stage['active'] as bool;
-            final current = stage['current'] as bool;
-            return ListTile(
-              dense: true,
-              leading: CircleAvatar(radius: 17, child: Icon(current ? Icons.local_shipping : Icons.check, size: 18)),
-              title: Text(stage['label'] as String, style: TextStyle(fontWeight: active ? FontWeight.w800 : FontWeight.w500)),
-              trailing: Icon(active ? Icons.check_circle : Icons.radio_button_unchecked, color: active ? Colors.green : Colors.grey),
-            );
-          })),
+          child: _OrderJourney(orderId: orderId, order: data),
         )),
         if (address.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -147,28 +136,6 @@ class _OrderTrackingView extends StatelessWidget {
         const Card(elevation: 0, child: ListTile(leading: Icon(Icons.sync), title: Text('تحديث فوري'), subtitle: Text('تستقبل الشاشة تحديثات الطلب وموقع المندوب مباشرة من Supabase.'))),
       ],
     );
-  }
-
-  static List<Map<String, dynamic>> _deliveryStages(String status) {
-    const names = <String, String>{
-      'awaiting_assignment': 'بانتظار تعيين مندوب',
-      'assigned': 'تم تعيين المندوب',
-      'picked_up': 'استلم المندوب الطلب',
-      'on_the_way': 'الطلب في الطريق',
-      'in_transit': 'الطلب قيد التوصيل',
-      'delivered': 'تم التسليم',
-    };
-    const order = ['awaiting_assignment', 'assigned', 'picked_up', 'on_the_way', 'in_transit', 'delivered'];
-    var currentIndex = order.indexOf(status);
-    if (currentIndex < 0) currentIndex = 0;
-    return [
-      for (var i = 0; i < order.length; i++)
-        {
-          'label': names[order[i]]!,
-          'active': i <= currentIndex && status != 'cancelled',
-          'current': order[i] == status,
-        },
-    ];
   }
 
   static String _orderStatusLabel(String value) => switch (value) {
@@ -194,6 +161,23 @@ class _OrderTrackingView extends StatelessWidget {
         'jeeb_wallet' => 'محفظة جيب',
         _ => value.isEmpty ? 'غير محددة' : value,
       };
+}
+
+class _OrderJourney extends StatelessWidget {
+  final String orderId;
+  final Map<String, dynamic> order;
+  const _OrderJourney({required this.orderId, required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseService.client.from('delivery_events').select().eq('order_id', orderId).order('created_at', ascending: true),
+      builder: (context, snapshot) {
+        final events = snapshot.hasData ? List<Map<String, dynamic>>.from(snapshot.data!) : const <Map<String, dynamic>>[];
+        return DeliveryTimeline(order: order, events: events);
+      },
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {
