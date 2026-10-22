@@ -4,7 +4,7 @@
 -- assigned -> picked_up -> out_for_delivery -> delivered, but nobody could
 -- answer "when?" or "who did what?". This migration adds:
 --   * explicit hand-over/transit timestamps on public.orders,
---   * a public.delivery_events audit trail written by the same trusted RPCs
+--   * a public.order_delivery_events audit trail written by the same trusted RPCs
 --     (so the platform, the customer, the merchant and the courier all see the
 --     same history), and
 --   * the timestamp + event writes inside the existing definer functions.
@@ -16,13 +16,18 @@
 alter table public.orders
   add column if not exists merchant_ready_at timestamptz,
   add column if not exists assigned_at timestamptz,
+  add column if not exists assigned_by text,
   add column if not exists picked_up_at timestamptz,
   add column if not exists out_for_delivery_at timestamptz,
   add column if not exists delivered_at timestamptz,
   add column if not exists cancelled_at timestamptz;
 
 -- 2) Delivery event trail ---------------------------------------------------
-create table if not exists public.delivery_events (
+-- A dedicated table owned by this migration. public.delivery_events already
+-- exists from the automation event bus with a different shape (id text pk,
+-- event_type, driver_id, location, metadata) and a row trigger, so reusing it
+-- would collide. Keeping the order journey separate is safer and additive.
+create table if not exists public.order_delivery_events (
   id bigserial primary key,
   order_id text not null,
   event text not null,
@@ -34,13 +39,13 @@ create table if not exists public.delivery_events (
   created_at timestamptz not null default now()
 );
 
-create index if not exists delivery_events_order_idx
-  on public.delivery_events (order_id, created_at);
+create index if not exists order_delivery_events_order_idx
+  on public.order_delivery_events (order_id, created_at);
 
-alter table public.delivery_events enable row level security;
+alter table public.order_delivery_events enable row level security;
 
-drop policy if exists delivery_events_select on public.delivery_events;
-create policy delivery_events_select on public.delivery_events
+drop policy if exists order_delivery_events_select on public.order_delivery_events;
+create policy order_delivery_events_select on public.order_delivery_events
 for select using (
   (select private.is_platform_staff())
   or actor_uid = auth.uid()::text
@@ -61,10 +66,10 @@ for select using (
 );
 
 -- Events are only ever written by the definer RPCs below.
-revoke all on public.delivery_events from public, anon, authenticated;
-grant select on public.delivery_events to authenticated;
-grant all on public.delivery_events to service_role;
-grant usage, select on sequence public.delivery_events_id_seq to service_role;
+revoke all on public.order_delivery_events from public, anon, authenticated;
+grant select on public.order_delivery_events to authenticated;
+grant all on public.order_delivery_events to service_role;
+grant usage, select on sequence public.order_delivery_events_id_seq to service_role;
 
 do $$
 begin
@@ -72,9 +77,9 @@ begin
     select 1 from pg_publication_tables
     where pubname = 'supabase_realtime'
       and schemaname = 'public'
-      and tablename = 'delivery_events'
+      and tablename = 'order_delivery_events'
   ) then
-    alter publication supabase_realtime add table public.delivery_events;
+    alter publication supabase_realtime add table public.order_delivery_events;
   end if;
 exception when others then null;
 end $$;
@@ -169,7 +174,7 @@ begin
       updated_at = v_now
   where id = p_order_id;
 
-  insert into public.delivery_events (order_id, event, actor_uid, actor_role)
+  insert into public.order_delivery_events (order_id, event, actor_uid, actor_role)
   values (
     p_order_id,
     case
@@ -272,7 +277,7 @@ begin
   get diagnostics v_updated = row_count;
 
   if v_updated > 0 then
-    insert into public.delivery_events
+    insert into public.order_delivery_events
       (order_id, event, actor_uid, actor_role, latitude, longitude)
     values
       (p_order_id, p_status, v_uid, 'driver', p_latitude, p_longitude);
@@ -363,7 +368,7 @@ begin
     set active_order_count = active_order_count + 1, updated_at = v_now
     where uid = p_driver_id;
 
-    insert into public.delivery_events (order_id, event, actor_uid, actor_role)
+    insert into public.order_delivery_events (order_id, event, actor_uid, actor_role)
     values (p_order_id, 'assigned', auth.uid()::text,
             case when private.is_platform_staff() then 'staff' else 'driver' end);
   end if;

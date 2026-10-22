@@ -56,16 +56,16 @@ void main() {
       }
     });
 
-    test('creates a locked-down delivery_events trail', () {
-      expect(sql, contains('create table if not exists public.delivery_events'));
+    test('creates a locked-down order_delivery_events trail', () {
+      expect(sql, contains('create table if not exists public.order_delivery_events'));
       expect(sql, contains('enable row level security'));
-      expect(sql, contains('revoke all on public.delivery_events from public, anon, authenticated'));
+      expect(sql, contains('revoke all on public.order_delivery_events from public, anon, authenticated'));
     });
 
     test('stamps hand-over moments inside the definer RPCs', () {
       expect(sql, contains('merchant_ready_at = case'));
       expect(sql, contains('picked_up_at = case'));
-      expect(sql, contains('insert into public.delivery_events'));
+      expect(sql, contains('insert into public.order_delivery_events'));
       expect(sql, contains('security definer'));
     });
   });

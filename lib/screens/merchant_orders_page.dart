@@ -33,7 +33,7 @@ class _MerchantOrdersPageState extends State<MerchantOrdersPage>{
     final events=<String,List<Map<String,dynamic>>>{};
     if(orderIds.isNotEmpty){
       try{
-        final ev=await SupabaseService.client.from('delivery_events').select().inFilter('order_id',orderIds).order('created_at',ascending:true);
+        final ev=await SupabaseService.client.from('order_delivery_events').select().inFilter('order_id',orderIds).order('created_at',ascending:true);
         for(final raw in List<Map<String,dynamic>>.from(ev)){
           events.putIfAbsent('${raw['order_id']}',()=><Map<String,dynamic>>[]).add(raw);
         }
