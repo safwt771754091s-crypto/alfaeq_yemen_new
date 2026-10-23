@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -46,13 +48,11 @@ class _WorldHomePageState extends State<WorldHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // WeChat-style four primary tabs; everything else lives under Discover.
     final pages = <Widget>[
       _HomeTab(onOpen: _open),
-      const _StoresTab(),
       const ConversationsPage(),
-      const MomentsPage(),
-      const CartPage(),
-      const MyOrdersPage(),
+      const DiscoverPage(),
       const AccountCenterPage(),
     ];
     return Directionality(
@@ -75,11 +75,8 @@ class _MainBottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     const items = [
       (Icons.home_outlined, Icons.home, 'الرئيسية'),
-      (Icons.storefront_outlined, Icons.storefront, 'المتاجر'),
       (Icons.chat_bubble_outline, Icons.chat_bubble, 'المحادثات'),
-      (Icons.auto_awesome_outlined, Icons.auto_awesome, 'اللحظات'),
-      (Icons.shopping_cart_outlined, Icons.shopping_cart, 'السلة'),
-      (Icons.receipt_long_outlined, Icons.receipt_long, 'طلباتي'),
+      (Icons.explore_outlined, Icons.explore, 'اكتشف'),
       (Icons.person_outline, Icons.person, 'حسابي'),
     ];
     return Container(
@@ -89,8 +86,8 @@ class _MainBottomBar extends StatelessWidget {
         child: Row(children: List.generate(items.length, (i) {
           final selected = selectedIndex == i;
           final item = items[i];
-          final icon = i == 4
-              ? _LiveCartBadge(icon: selected ? item.$2 : item.$1, color: selected ? _blue : _navy)
+          final icon = i == 1
+              ? _UnreadChatsBadge(icon: selected ? item.$2 : item.$1, color: selected ? _blue : _navy)
               : Icon(selected ? item.$2 : item.$1, color: selected ? _blue : _navy, size: 24);
           return Expanded(child: InkWell(
             onTap: () => onSelected(i),
@@ -107,6 +104,51 @@ class _MainBottomBar extends StatelessWidget {
       ),
     );
   }
+}
+class _UnreadChatsBadge extends StatefulWidget {
+  final IconData icon;
+  final Color color;
+  const _UnreadChatsBadge({required this.icon, required this.color});
+
+  @override
+  State<_UnreadChatsBadge> createState() => _UnreadChatsBadgeState();
+}
+
+class _UnreadChatsBadgeState extends State<_UnreadChatsBadge> {
+  Timer? _timer;
+  int _count = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    // The unread aggregate comes from a server RPC; a short poll keeps the
+    // badge fresh without a second realtime subscription.
+    _timer = Timer.periodic(const Duration(seconds: 20), (_) => _refresh());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    final user = SupabaseService.client.auth.currentUser;
+    if (user == null || !SupabaseService.isInitialized) return;
+    try {
+      final res = await SupabaseService.client.rpc('my_thread_unread_counts');
+      var total = 0;
+      for (final row in (res as List)) {
+        final value = (row as Map)['unread'];
+        if (value is num && value > 0) total += value.toInt();
+      }
+      if (mounted) setState(() => _count = total);
+    } catch (_) {/* the badge is best-effort */}
+  }
+
+  @override
+  Widget build(BuildContext context) => _CartBadgeIcon(icon: widget.icon, count: _count, color: widget.color);
 }
 class _LiveCartBadge extends StatelessWidget {
   final IconData icon;
@@ -854,15 +896,18 @@ class _BenefitsBar extends StatelessWidget {
 }
 
 class _StoresTab extends StatelessWidget {
-  const _StoresTab();
+  final bool showTitle;
+  const _StoresTab({this.showTitle = true});
   @override
   Widget build(BuildContext context) => ListView(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
         children: [
-          const Text('المتاجر', style: TextStyle(color: _navy, fontSize: 28, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
-          const Text('متاجر الفائق المعتمدة ومنتجاتها الحقيقية.', style: TextStyle(color: Colors.black54)),
-          const SizedBox(height: 16),
+          if (showTitle) ...[
+            const Text('المتاجر', style: TextStyle(color: _navy, fontSize: 28, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            const Text('متاجر الفائق المعتمدة ومنتجاتها الحقيقية.', style: TextStyle(color: Colors.black54)),
+            const SizedBox(height: 16),
+          ],
           const Text('كل المتاجر المعتمدة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
           const SizedBox(height: 9),
           FutureBuilder<List<CatalogDocument>>(
@@ -1148,9 +1193,90 @@ class _StoreCard extends StatelessWidget {
     );
   }
 }
+
+/// WeChat-style "Discover" tab: a hub of grouped rows that opens every
+/// super-app surface (Moments, mini-programs, stores, wallet, orders, ...).
+class DiscoverPage extends StatelessWidget {
+  const DiscoverPage({super.key});
+
+  void _open(BuildContext context, Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+  @override
+  Widget build(BuildContext context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: _surface,
+          body: ListView(
+            padding: const EdgeInsets.only(bottom: 28),
+            children: [
+              Container(
+                padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 18, 20, 18),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_navy, _blue]),
+                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+                ),
+                child: Row(children: const [
+                  Icon(Icons.explore, color: Colors.white, size: 26),
+                  SizedBox(width: 10),
+                  Text('اكتشف', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+                ]),
+              ),
+              const SizedBox(height: 14),
+              _card([
+                _row(context, Icons.auto_awesome_outlined, 'اللحظات', 'شاهد لحظات المتاجر والمستخدمين', () => const MomentsPage()),
+                _row(context, Icons.widgets_outlined, 'البرامج المصغّرة', 'خدمات الفائق كتطبيقات مستقلة', () => const MiniProgramsPage()),
+                _row(context, Icons.storefront_outlined, 'المتاجر والأقسام', 'كل المتاجر المعتمدة والأقسام', () => const _DiscoverStoresPage()),
+                _row(context, Icons.grid_view_outlined, 'كل الخدمات', 'كل ما تريده من مكان واحد', () => const ServicesHubPage()),
+              ]),
+              const SizedBox(height: 12),
+              _card([
+                _row(context, Icons.shopping_cart_outlined, 'السلة', 'منتجاتك المضافة', () => const CartPage()),
+                _row(context, Icons.receipt_long_outlined, 'طلباتي', 'تابع طلباتك وتوصيلها', () => const MyOrdersPage()),
+                _row(context, Icons.account_balance_wallet_outlined, 'المحفظة', 'الرصيد والعمليات المالية', () => const WalletCenterPage()),
+                _row(context, Icons.local_offer_outlined, 'العروض', 'عروض وخصومات المتاجر', () => const _OffersPage()),
+              ]),
+              const SizedBox(height: 12),
+              _card([
+                _row(context, Icons.auto_awesome, 'ذكاء الفائق', 'مساعدك الذكي لكل شيء', () => const AiAssistantPage()),
+                _row(context, Icons.support_agent_outlined, 'دعم الفائق', 'تواصل مع فريق الدعم', () => const SupportChatPage()),
+                _row(context, Icons.qr_code_scanner, 'مسح الباركود', 'ابحث عن منتج بالكاميرا', () => const BarcodeScannerPage()),
+                _row(context, Icons.inventory_2_outlined, 'المنتجات', 'تصفح كل المنتجات', () => const ProductsPage()),
+              ]),
+            ],
+          ),
+        ),
+      );
+
+  Widget _card(List<Widget> rows) => Card(
+        elevation: 0,
+        margin: const EdgeInsets.symmetric(horizontal: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE3E8EF))),
+        child: Column(children: rows),
+      );
+
+  Widget _row(BuildContext context, IconData icon, String title, String subtitle, Widget Function() page) => ListTile(
+        leading: Container(width: 42, height: 42, decoration: BoxDecoration(color: const Color(0xFFF1F6FF), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _blue)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+        subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: const Icon(Icons.chevron_left),
+        onTap: () => _open(context, page()),
+      );
+}
+
+/// Standalone page wrapper around the stores list so it can be opened from
+/// Discover with a normal back button and header.
+class _DiscoverStoresPage extends StatelessWidget {
+  const _DiscoverStoresPage();
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: _surface,
+        appBar: AppBar(title: const Text('المتاجر والأقسام', style: TextStyle(fontWeight: FontWeight.w900))),
+        body: const _StoresTab(showTitle: false),
+      );
+}
+
 class ServicesHubPage extends StatelessWidget {
   const ServicesHubPage({super.key});
-
   // WeChat-style "discover" hub: one grid grouping every super-app service.
   List<(String, List<(IconData, String, Widget Function())>)> _groups() => [
         ('الطلب والشراء', [
