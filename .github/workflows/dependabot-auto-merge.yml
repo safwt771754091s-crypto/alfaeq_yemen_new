@@ -37,10 +37,16 @@ jobs:
           deadline=$(( $(date +%s) + 2100 ))
           while true; do
             runs="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/check-runs?per_page=100")"
-            total="$(jq '.total_count' <<<"$runs")"
-            # Exclude this workflow's own check run, otherwise it waits on itself.
-            pending="$(jq '[.check_runs[] | select(.name != "Dependabot auto-merge") | select(.status != "completed")] | length' <<<"$runs")"
-            failed="$(jq '[.check_runs[] | select(.name != "Dependabot auto-merge") | select(.status == "completed" and (.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral"))] | length' <<<"$runs")"
+            # Keep only the newest check run per name and drop this workflow's own
+            # checks (current and legacy job names); otherwise the loop waits on
+            # itself and can never observe zero pending checks.
+            others="$(jq -c '[.check_runs[]
+              | select(.name != "Dependabot auto-merge" and .name != "auto-merge")
+              | select(.status == "completed" or .status == "in_progress" or .status == "queued")]
+              | group_by(.name) | map(max_by(.id))' <<<"$runs")"
+            total="$(jq 'length' <<<"$others")"
+            pending="$(jq '[.[] | select(.status != "completed")] | length' <<<"$others")"
+            failed="$(jq '[.[] | select(.status == "completed" and (.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral"))] | length' <<<"$others")"
             echo "total=$total pending=$pending failed=$failed"
             if [ "$failed" -gt 0 ]; then
               echo "::error::Checks failed for Dependabot PR #$PR; leaving it open."
