@@ -175,9 +175,10 @@ class _CartPageState extends State<CartPage> {
               const SizedBox(height: 10),
               OutlinedButton.icon(
                 onPressed: () async {
-                  final picked = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
-                  if (picked == null || picked.files.isEmpty) return;
-                  setDialogState(() { bytes = picked.files.first.bytes; fileName = picked.files.first.name; });
+                  final picked = await FilePicker.pickFile(type: FileType.image);
+                  if (picked == null) return;
+                  final data = await picked.readAsBytes();
+                  setDialogState(() { bytes = data; fileName = picked.name; });
                 },
                 icon: Icon(bytes == null ? Icons.upload_file_outlined : Icons.check_circle_outline),
                 label: Text(bytes == null ? 'اختر صورة إشعار التحويل' : 'تم اختيار: ${fileName ?? "الإشعار"}'),

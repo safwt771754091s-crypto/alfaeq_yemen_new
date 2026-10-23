@@ -80,14 +80,14 @@ class _ProductEditPageState extends State<ProductEditPage> {
   }
 
   Future<void> _pickImage() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
-    final file = result?.files.single;
-    if (file == null || file.bytes == null || !mounted) return;
+    final file = await FilePicker.pickFile(type: FileType.image);
+    if (file == null || !mounted) return;
     setState(() => _uploading = true);
     try {
+      final bytes = await file.readAsBytes();
       final url = await MediaService.uploadProductImage(
         ownerId: widget.ownerId,
-        bytes: file.bytes!,
+        bytes: bytes,
         extension: file.extension ?? 'jpg',
         productId: '${widget.product['id']}',
         overwrite: true,

@@ -432,17 +432,11 @@ class _MomentsComposerPageState extends State<MomentsComposerPage> {
   }
 
   Future<void> _pickImages() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: true,
-      withData: true,
-    );
-    if (result == null) return;
-    for (final file in result.files) {
-      final bytes = file.bytes;
-      if (bytes == null) continue;
+    final files = await FilePicker.pickFiles(type: FileType.image);
+    if (files.isEmpty) return;
+    for (final file in files) {
       final ext = (file.extension ?? 'jpg');
-      _images.add(_PickedImage(bytes: bytes, extension: ext));
+      _images.add(_PickedImage(bytes: await file.readAsBytes(), extension: ext));
     }
     setState(() {});
   }

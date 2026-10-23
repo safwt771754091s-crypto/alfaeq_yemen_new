@@ -27,13 +27,11 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
   int _duplicateCount = 0;
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['xlsx', 'xls', 'csv'],
-      withData: true,
     );
-    if (result == null || result.files.single.bytes == null) return;
-    final file = result.files.single;
+    if (file == null) return;
     setState(() {
       _fileName = file.name;
       _preview = [];
@@ -41,7 +39,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
       _validCount = 0;
       _duplicateCount = 0;
     });
-    await _parseFile(file.bytes!, file.name.toLowerCase());
+    await _parseFile(await file.readAsBytes(), file.name.toLowerCase());
   }
 
   Future<void> _parseFile(Uint8List bytes, String name) async {
