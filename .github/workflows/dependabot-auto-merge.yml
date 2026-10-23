@@ -67,10 +67,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           gh pr review --approve "$PR_URL" || true
-          if ! gh pr merge --squash --delete-branch "$PR_URL"; then
-            echo "Direct merge blocked; enabling auto-merge instead."
-            gh pr merge --squash --delete-branch --auto "$PR_URL"
-          fi
+          # Several Dependabot PRs often become green at once; the first merge
+          # makes the others' base stale, so retry briefly before giving up.
+          for attempt in 1 2 3 4 5; do
+            if gh pr merge --squash --delete-branch "$PR_URL"; then
+              echo "Merged on attempt $attempt."
+              exit 0
+            fi
+            echo "Merge attempt $attempt blocked; refreshing state and retrying."
+            sleep 20
+          done
+          echo "Direct merge blocked; enabling auto-merge instead."
+          gh pr merge --squash --delete-branch --auto "$PR_URL"
