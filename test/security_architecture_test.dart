@@ -252,6 +252,25 @@ void main() {
       expect(fn, isNot(contains('/v1/v1/chat/completions')));
     });
 
+    test('customer shell mirrors the WeChat four-tab layout with a Discover hub', () {
+      // WeChat ships four primary tabs (Chats, Contacts, Discover, Me). The
+      // Alfaeq shell keeps the same shape: Home, Chats, Discover, Account, with
+      // every other super-app surface reachable from Discover.
+      final home = File('lib/screens/world_home_page.dart').readAsStringSync();
+      expect(home, contains("'الرئيسية'"));
+      expect(home, contains("'المحادثات'"));
+      expect(home, contains("'اكتشف'"));
+      expect(home, contains("'حسابي'"));
+      expect(home, contains('class DiscoverPage'));
+      expect(home, contains('const DiscoverPage()'));
+      expect(home, contains('const ConversationsPage()'));
+      expect(home, contains('const AccountCenterPage()'));
+      // Discover must expose the WeChat-style entries.
+      expect(home, contains('MiniProgramsPage()'));
+      expect(home, contains('MomentsPage()'));
+      expect(home, contains('ServicesHubPage()'));
+    });
+
     test('realtime publication covers every table the app streams', () {
       // A `.stream()` call on a table missing from supabase_realtime never
       // delivers rows (the admin login log showed "تعذر قراءة سجل الدخول").
