@@ -33,6 +33,8 @@ fi
 # Collect any provider secrets that are present (names only are reported).
 SECRETS=()
 for name in AI_BASE_URL AI_API_KEY AI_MODEL \
+            AI_FALLBACK_BASE_URL AI_FALLBACK_API_KEY AI_FALLBACK_MODEL \
+            AI_ENABLE_FREE_FALLBACK \
             UNSLOTH_BASE_URL UNSLOTH_API_KEY UNSLOTH_MODEL \
             OPENAI_BASE_URL OPENAI_API_KEY OPENAI_MODEL \
             OPENHANDS_API_KEY OPENHANDS_BASE_URL \
