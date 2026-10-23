@@ -1,0 +1,67 @@
+name: Dependabot Auto-Merge
+
+# Dependabot PRs get a read-only GITHUB_TOKEN on `pull_request`, so we use
+# `pull_request_target` to obtain write access. This workflow never checks out
+# or executes the pull request's code; it only queries check runs and merges.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    if: >
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Wait for all checks to pass
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          sha="$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json headRefOid -q .headRefOid)"
+          echo "Watching checks for PR #$PR at $sha"
+          deadline=$(( $(date +%s) + 2100 ))
+          while true; do
+            runs="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/check-runs?per_page=100")"
+            total="$(jq '.total_count' <<<"$runs")"
+            pending="$(jq '[.check_runs[] | select(.status != "completed")] | length' <<<"$runs")"
+            failed="$(jq '[.check_runs[] | select(.status == "completed" and (.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral"))] | length' <<<"$runs")"
+            echo "total=$total pending=$pending failed=$failed"
+            if [ "$failed" -gt 0 ]; then
+              echo "::error::Checks failed for Dependabot PR #$PR; leaving it open."
+              exit 1
+            fi
+            if [ "$total" -gt 0 ] && [ "$pending" -eq 0 ]; then
+              echo "All checks passed."
+              break
+            fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for checks on Dependabot PR #$PR."
+              exit 1
+            fi
+            sleep 30
+          done
+
+      - name: Approve and merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          gh pr review --approve "$PR_URL" || true
+          if ! gh pr merge --squash --delete-branch "$PR_URL"; then
+            echo "Direct merge blocked; enabling auto-merge instead."
+            gh pr merge --squash --delete-branch --auto "$PR_URL"
+          fi
