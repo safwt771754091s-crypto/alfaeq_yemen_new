@@ -73,7 +73,7 @@ jobs:
           done
           echo "APK build failed after 3 attempts"
           exit 1
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: alfaeq-yemen-fresh-apk
           path: build/app/outputs/flutter-apk/app-debug.apk

@@ -75,7 +75,7 @@ jobs:
           NODE
       - name: Upload browser QA evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: alfaeq-browser-qa
           path: browser-qa-results.json

@@ -81,14 +81,14 @@ jobs:
         run: flutter build appbundle --release --dart-define=SUPABASE_URL="https://esvljorjykzgrpnrxnma.supabase.co" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: alfaeq-yemen-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
 
       - name: Upload AAB
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: alfaeq-yemen-release-aab
           path: build/app/outputs/bundle/release/app-release.aab

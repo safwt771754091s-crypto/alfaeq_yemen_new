@@ -74,7 +74,7 @@ jobs:
             echo "status=static-security-gate-passed"
           } > audit-artifacts/security-audit-manifest.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: alfaeq-security-audit-manifest
           path: audit-artifacts/security-audit-manifest.txt

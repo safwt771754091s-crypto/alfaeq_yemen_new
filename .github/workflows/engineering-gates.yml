@@ -86,7 +86,7 @@ jobs:
             "checks": ["engineering-contract","legacy-firebase-block","privileged-client-credential-block","migration-safety"]
           }
           EOF
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: alfaeq-engineering-gate-evidence
           path: gate-artifacts/engineering-gate.json
