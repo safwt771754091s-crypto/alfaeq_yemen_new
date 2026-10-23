@@ -245,6 +245,10 @@ void main() {
       expect(fn, contains('FREE_FALLBACKS'));
       expect(fn, contains('https://text.pollinations.ai/openai'));
       expect(fn, contains('AI_ENABLE_FREE_FALLBACK'));
+      // A dead model (404) or any non-2xx from one provider must advance the
+      // chain instead of being returned as-is to the app.
+      expect(fn, contains('result.status >= 200 && result.status < 300'));
+      expect(fn, contains('ai_provider_unavailable'));
       expect(fn, isNot(contains('/v1/v1/chat/completions')));
     });
 

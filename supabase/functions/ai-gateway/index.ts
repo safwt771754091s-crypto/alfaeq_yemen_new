@@ -137,28 +137,42 @@ Deno.serve(async (req) => {
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Try each configured provider in order. Free/community providers frequently
-// answer 429/5xx under load, so on a transient failure we move to the next
-// provider (and retry each one a few times with backoff).
+// Try each configured provider in order. A dead model, a bad key or a 429 on
+// one provider must never stop the chain: only a 2xx answer ends it. Every
+// other outcome moves on to the next provider.
 async function callProviders(providers: AiProvider[], payload: Record<string, unknown>) {
   let lastStatus = 502;
-  let lastBody = JSON.stringify({ error: "ai_provider_unreachable" });
-  let lastContentType = "application/json";
+  let lastBody = "";
 
   for (const provider of providers) {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
     const result = await callUpstream(provider.chatUrl, { ...payload, model: provider.model }, headers);
 
-    // A successful or client-visible (non-transient) response ends the chain.
-    if (result.status < 500 && result.status !== 429) return result;
+    if (result.status >= 200 && result.status < 300) return result;
 
     lastStatus = result.status;
     lastBody = result.body;
-    lastContentType = result.contentType;
   }
 
-  return { status: lastStatus, body: lastBody, contentType: lastContentType };
+  // Every provider failed: surface one stable, client-friendly code instead of
+  // leaking an empty 404 from an upstream that no longer serves the model.
+  if (lastStatus === 429) {
+    return {
+      status: 429,
+      body: JSON.stringify({ error: "ai_provider_rate_limited", upstream_status: 429 }),
+      contentType: "application/json",
+    };
+  }
+  let detail: unknown = lastBody.slice(0, 500);
+  try {
+    detail = JSON.parse(lastBody);
+  } catch { /* keep the raw slice */ }
+  return {
+    status: 503,
+    body: JSON.stringify({ error: "ai_provider_unavailable", upstream_status: lastStatus, detail }),
+    contentType: "application/json",
+  };
 }
 
 async function callUpstream(
