@@ -94,15 +94,11 @@ class _AccountCenterPageState extends State<AccountCenterPage> {
   }
 
   Future<void> _pickAvatar() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      withData: true,
-    );
-    final file = result?.files.single;
-    if (file == null || file.bytes == null) return;
+    final file = await FilePicker.pickFile(type: FileType.image);
+    if (file == null) return;
     setState(() => _uploadingAvatar = true);
     try {
-      final url = await _profile.uploadAvatar(file.bytes!, file.extension ?? 'jpg');
+      final url = await _profile.uploadAvatar(await file.readAsBytes(), file.extension ?? 'jpg');
       await _profile.updateProfile(avatarUrl: url);
       await _reload();
       _toast('تم تحديث الصورة الشخصية.');

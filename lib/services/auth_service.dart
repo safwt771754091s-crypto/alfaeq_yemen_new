@@ -15,6 +15,16 @@ class AuthService {
   static const bool googleAuthEnabled =
       bool.fromEnvironment('GOOGLE_AUTH_ENABLED');
 
+  static bool _googleInitialized = false;
+
+  /// google_sign_in 7.x requires a one-time initialization before any other
+  /// call. Repeated calls are cheap; the platform init runs only once.
+  static Future<void> _ensureGoogleInitialized() async {
+    if (_googleInitialized) return;
+    await GoogleSignIn.instance.initialize();
+    _googleInitialized = true;
+  }
+
   User? get currentUser => auth.currentUser;
 
   Stream<User?> get authStateChanges =>
@@ -47,12 +57,17 @@ class AuthService {
       return null;
     }
 
-    final google = GoogleSignIn();
-    final account = await google.signIn();
-    if (account == null) return null;
+    await _ensureGoogleInitialized();
+    final GoogleSignInAccount account;
+    try {
+      account = await GoogleSignIn.instance.authenticate();
+    } on GoogleSignInException catch (error) {
+      // Cancelling the account picker is a normal, non-fatal outcome.
+      if (error.code == GoogleSignInExceptionCode.canceled) return null;
+      rethrow;
+    }
 
-    final googleAuth = await account.authentication;
-    final idToken = googleAuth.idToken;
+    final idToken = account.authentication.idToken;
     if (idToken == null || idToken.isEmpty) {
       throw StateError('لم يتم استلام رمز Google المطلوب لتسجيل الدخول.');
     }
@@ -60,7 +75,6 @@ class AuthService {
     final response = await auth.signInWithIdToken(
       provider: OAuthProvider.google,
       idToken: idToken,
-      accessToken: googleAuth.accessToken,
     );
     final user = response.user;
     if (user == null) return response;
@@ -234,7 +248,8 @@ class AuthService {
     } finally {
       if (!kIsWeb) {
         try {
-          await GoogleSignIn().signOut().timeout(const Duration(seconds: 3));
+          await _ensureGoogleInitialized();
+          await GoogleSignIn.instance.signOut().timeout(const Duration(seconds: 3));
         } catch (_) {}
       }
     }

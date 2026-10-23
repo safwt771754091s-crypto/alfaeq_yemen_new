@@ -51,12 +51,8 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
   }
 
   Future<void> _pickProductImage() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      withData: true,
-    );
-    if (result == null || result.files.single.bytes == null || !mounted) return;
-    final file = result.files.single;
+    final file = await FilePicker.pickFile(type: FileType.image);
+    if (file == null || !mounted) return;
     final user = SupabaseService.client.auth.currentUser;
     if (user == null) {
       _message('يجب تسجيل الدخول أولاً.');
@@ -67,7 +63,7 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
       final ext = file.extension ?? 'jpg';
       final url = await MediaService.uploadProductImage(
         ownerId: user.id,
-        bytes: file.bytes!,
+        bytes: await file.readAsBytes(),
         extension: ext,
       );
       if (!mounted) return;

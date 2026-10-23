@@ -39,8 +39,7 @@ class _DeveloperPageState extends State<DeveloperPage>{
     if(title.isEmpty||description.isEmpty){setState(()=>_status='اكتب عنوان المهمة ووصفها.');return;}
     setState((){_busy=true;_status='جارٍ بدء التنفيذ الآمن...';});
     try{
-      final r=await SupabaseService.client.functions.invoke('developer-control',body:{'action':'execute_task','title':title,'description':description,'branch':'main'});
-      if(r.status<200||r.status>=300)throw StateError(r.data.toString());
+      await SupabaseService.client.functions.invoke('developer-control',body:{'action':'execute_task','title':title,'description':description,'branch':'main'});
       await _audit('developer_execute_task','accepted',details:{'title':title});
       _title.clear();_description.clear();setState(()=>_status='تم قبول المهمة وبدء الوكيل الهندسي.');
       await _loadRuns();
@@ -50,7 +49,7 @@ class _DeveloperPageState extends State<DeveloperPage>{
   Future<void> _loadRuns()async{
     try{
       final r=await SupabaseService.client.functions.invoke('developer-control',body:{'action':'status'});
-      if(r.status>=200&&r.status<300&&r.data is Map){
+      if(r.data is Map){
         final raw=(r.data as Map)['runs'];
         if(raw is List)setState(()=>_runs=List<Map<String,dynamic>>.from(raw.whereType<Map>().map((e)=>Map<String,dynamic>.from(e))));
       }
@@ -59,8 +58,7 @@ class _DeveloperPageState extends State<DeveloperPage>{
   Future<void> _runAutomation() async {
     setState(()=>_status='جارٍ تشغيل عامل أتمتة الفائق...');
     try {
-      final r=await SupabaseService.client.functions.invoke('developer-control',body:{'action':'run_automation_worker'});
-      if(r.status<200||r.status>=300)throw StateError(r.data.toString());
+      await SupabaseService.client.functions.invoke('developer-control',body:{'action':'run_automation_worker'});
       setState(()=>_status='تم تشغيل عامل الأتمتة واستلام النتيجة من Supabase.');
       await _audit('automation_worker_run','accepted');
     } catch(e) {
