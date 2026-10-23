@@ -107,12 +107,15 @@ void main() {
 
     test('store and section listings filter server-side instead of truncating', () {
       final store = File('lib/screens/store_detail_page.dart').readAsStringSync();
-      // Live stock view filters by store on the server, not by truncating a page.
-      expect(store, contains(".eq('store_id', widget.store.id)"));
-      expect(store, isNot(contains('activeProducts(limit: 5000)')));
+      // The store page filters by store server-side and pages past the 1000-row
+      // PostgREST cap instead of truncating a single page.
+      expect(store, contains('activeProductsPaged('));
+      expect(store, contains('storeId: widget.store.id'));
+      expect(store, isNot(contains('limit: 5000')));
       final program = File('lib/screens/mini_programs_page.dart').readAsStringSync();
-      expect(program, contains('activeProducts(sectionId: widget.section.id'));
-      expect(program, isNot(contains('activeProducts(limit: 500)')));
+      expect(program, contains('activeProductsPaged('));
+      expect(program, contains('sectionId: widget.section.id'));
+      expect(program, isNot(contains('limit: 5000')));
     });
 
     test('public update CTA opens its real link', () {
@@ -252,23 +255,63 @@ void main() {
       expect(fn, isNot(contains('/v1/v1/chat/completions')));
     });
 
-    test('customer shell mirrors the WeChat four-tab layout with a Discover hub', () {
-      // WeChat ships four primary tabs (Chats, Contacts, Discover, Me). The
-      // Alfaeq shell keeps the same shape: Home, Chats, Discover, Account, with
+    test('catalog pages past the PostgREST 1000-row cap', () {
+      // Supabase/PostgREST caps every response at 1000 rows regardless of the
+      // requested limit, so the UI must page through the catalog or it silently
+      // shows only the first 1000 of 3892 products.
+      final catalog = File('lib/services/catalog_service.dart').readAsStringSync();
+      expect(catalog, contains('activeProductsPaged'));
+      expect(catalog, contains('CountOption.exact'));
+      expect(catalog, contains('.range('));
+      expect(catalog, contains('maxRowsPerRequest = 1000'));
+
+      for (final page in [
+        'lib/screens/products_page.dart',
+        'lib/screens/store_detail_page.dart',
+        'lib/screens/mini_programs_page.dart',
+        'lib/screens/world_home_page.dart',
+      ]) {
+        final src = File(page).readAsStringSync();
+        expect(src, isNot(contains('limit: 5000')), reason: '$page must page instead of a 5000 limit');
+      }
+      expect(File('lib/screens/products_page.dart').readAsStringSync(), contains('activeProductsPaged'));
+      expect(File('lib/screens/store_detail_page.dart').readAsStringSync(), contains('activeProductsPaged'));
+      expect(File('lib/screens/mini_programs_page.dart').readAsStringSync(), contains('activeProductsPaged'));
+    });
+
+    test('customer shell mirrors the WeChat tab layout with a Discover hub', () {
+      // WeChat's primary tabs are Chats, Contacts, Discover, Me. The Alfaeq
+      // shell keeps that shape (Home, Chats, Contacts, Discover, Account) with
       // every other super-app surface reachable from Discover.
       final home = File('lib/screens/world_home_page.dart').readAsStringSync();
       expect(home, contains("'الرئيسية'"));
       expect(home, contains("'المحادثات'"));
+      expect(home, contains("'الجهات'"));
       expect(home, contains("'اكتشف'"));
       expect(home, contains("'حسابي'"));
       expect(home, contains('class DiscoverPage'));
       expect(home, contains('const DiscoverPage()'));
       expect(home, contains('const ConversationsPage()'));
+      expect(home, contains('const ContactsPage()'));
       expect(home, contains('const AccountCenterPage()'));
       // Discover must expose the WeChat-style entries.
       expect(home, contains('MiniProgramsPage()'));
       expect(home, contains('MomentsPage()'));
       expect(home, contains('ServicesHubPage()'));
+    });
+
+    test('contacts directory mirrors WeChat Contacts', () {
+      final page = File('lib/screens/contacts_page.dart').readAsStringSync();
+      expect(page, contains('class ContactsPage'));
+      expect(page, contains('class DirectChatPage'));
+      expect(page, contains("rpc('start_direct_thread'"));
+      expect(page, contains("_rpcList('my_saved_contacts')"));
+      expect(page, contains("_rpcList('list_my_contacts')"));
+      expect(page, contains("from('user_contacts')"));
+      final migration = File('supabase/migrations/20261006010000_wechat_contacts_v1.sql').readAsStringSync();
+      expect(migration, contains('create table if not exists public.user_contacts'));
+      expect(migration, contains('function public.start_direct_thread'));
+      expect(migration, contains('function public.my_saved_contacts'));
     });
 
     test('realtime publication covers every table the app streams', () {
@@ -505,15 +548,19 @@ void main() {
 
     test('product lists reflect live stock after a purchase', () {
       // A purchase decrements products.stock_base; the lists must observe the
-      // change, so they subscribe to a realtime stream instead of a one-shot future.
+      // change. A realtime stream would truncate at 1000 rows, so the pages
+      // page through the catalog and re-page on product change events.
       final store = File('lib/screens/store_detail_page.dart').readAsStringSync();
       final all = File('lib/screens/products_page.dart').readAsStringSync();
       final home = File('lib/main.dart').readAsStringSync();
-      for (final src in [store, all, home]) {
-        expect(src, contains('StreamBuilder<List<Map<String, dynamic>>>'));
-        expect(src, contains(".stream(primaryKey: ['id'])"));
+      for (final src in [store, all]) {
+        expect(src, contains('activeProductsPaged('));
+        expect(src, contains('onPostgresChanges('));
         expect(src, contains('ProductUnit.stockBase(p)'));
       }
+      // The home store card still streams a small preview.
+      expect(home, contains(".stream(primaryKey: ['id'])"));
+      expect(home, contains('ProductUnit.stockBase(p)'));
       // Out-of-stock products cannot be added.
       expect(store, contains('stockBase > 0 ? onAdd : null'));
       expect(all, contains('stockBase > 0 ? onAdd : null'));

@@ -110,12 +110,20 @@ class MiniProgramPage extends StatefulWidget {
 class _MiniProgramPageState extends State<MiniProgramPage> {
   final _search = TextEditingController();
   String _query = '';
-  late final Future<List<CatalogDocument>> _productsFuture;
+  int _loaded = 0;
+  int _total = 0;
+  late final Future<CatalogPage> _productsFuture;
 
   @override
   void initState() {
     super.initState();
-    _productsFuture = CatalogService().activeProducts(sectionId: widget.section.id, limit: 5000);
+    // PostgREST caps each response at 1000 rows; page through the section.
+    _productsFuture = CatalogService().activeProductsPaged(
+      sectionId: widget.section.id,
+      onProgress: (loaded, total) {
+        if (mounted) setState(() { _loaded = loaded; _total = total; });
+      },
+    );
   }
 
   @override
@@ -223,14 +231,19 @@ class _MiniProgramPageState extends State<MiniProgramPage> {
             const SizedBox(height: 18),
             const Text('الأصناف المتاحة', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
             const SizedBox(height: 9),
-            FutureBuilder<List<CatalogDocument>>(
+            FutureBuilder<CatalogPage>(
               future: _productsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()));
+                  return Column(children: [
+                    const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator())),
+                    if (_total > 0) Text('جارٍ تحميل الأصناف… $_loaded من $_total', style: const TextStyle(color: Colors.black54)),
+                  ]);
                 }
                 if (snapshot.hasError) return const Text('تعذر تحميل الأصناف.');
-                var products = snapshot.data ?? const <CatalogDocument>[];
+                final page = snapshot.data;
+                var products = page?.items ?? const <CatalogDocument>[];
+                final total = page?.total ?? products.length;
                 if (_query.isNotEmpty) {
                   final q = _query.trim().toLowerCase();
                   products = products.where((p) {
@@ -246,6 +259,8 @@ class _MiniProgramPageState extends State<MiniProgramPage> {
                 const maxCards = 300;
                 final visible = products.take(maxCards).toList();
                 return Column(children: [
+                  Text('إجمالي الأصناف: $total', style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),

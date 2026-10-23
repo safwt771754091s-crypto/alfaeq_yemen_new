@@ -256,14 +256,22 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
           final isOwner = ownerSnapshot.data == true;
           return StreamBuilder<List<Map<String, dynamic>>>(
             stream: isOwner
-                ? SupabaseService.client.from('products').stream(primaryKey: ['id']).limit(1000)
-                : SupabaseService.client.from('products').stream(primaryKey: ['id']).eq('owner_id', uid).limit(100),
+                ? SupabaseService.client.from('products').stream(primaryKey: ['id']).limit(200)
+                : SupabaseService.client.from('products').stream(primaryKey: ['id']).eq('owner_id', uid).limit(200),
             builder: (context, snapshot) {
     if (snapshot.hasError) return _error(snapshot.error.toString());
     if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
     final docs = snapshot.data ?? const <Map<String, dynamic>>[]; final filtered = _selectedStoreId == null ? docs : docs.where((doc) => doc['store_id'] == _selectedStoreId).toList();
     if (filtered.isEmpty) return const _EmptyCard(text: 'لا توجد أصناف لهذا المتجر بعد.');
-    return Column(children: filtered.map((doc) { final data = doc; return Card(elevation: 0, child: ListTile(leading: const Icon(Icons.inventory_2_outlined), title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('مخزون: ${data['stock'] ?? 0} • حالة: ${data['status'] ?? 'active'}'), trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [Text(CurrencyService.instance.formatProduct(data), style: const TextStyle(fontWeight: FontWeight.w900)), TextButton(onPressed: () => _updateProduct(doc), child: const Text('تعديل'))]), onTap: () => _updateProduct(doc))); }).toList());
+    const maxRows = 150;
+    final visible = filtered.take(maxRows).toList();
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text('عرض ${visible.length} من ${filtered.length} صنفًا${isOwner ? ' (كل الأصناف)' : ''} — استخدم البحث/التصفية للوصول إلى الباقي.', style: const TextStyle(color: Colors.black54, fontSize: 12), textAlign: TextAlign.center),
+      ),
+      ...visible.map((doc) { final data = doc; return Card(elevation: 0, child: ListTile(leading: const Icon(Icons.inventory_2_outlined), title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('مخزون: ${data['stock'] ?? 0} • حالة: ${data['status'] ?? 'active'}'), trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [Text(CurrencyService.instance.formatProduct(data), style: const TextStyle(fontWeight: FontWeight.w900)), TextButton(onPressed: () => _updateProduct(doc), child: const Text('تعديل'))]), onTap: () => _updateProduct(doc))); }),
+    ]);
           });
         },
       );

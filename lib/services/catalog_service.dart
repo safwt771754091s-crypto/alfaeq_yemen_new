@@ -1,3 +1,5 @@
+import 'package:postgrest/postgrest.dart';
+
 import 'supabase_service.dart';
 import '../core/product_units.dart';
 
@@ -18,10 +20,21 @@ class CatalogDocument {
 
 }
 
+class CatalogPage {
+  final List<CatalogDocument> items;
+  final int total;
+  const CatalogPage({required this.items, required this.total});
+}
+
 class CatalogService {
   final bool useSupabase;
 
   const CatalogService({this.useSupabase = true});
+
+  /// PostgREST (Supabase) caps every response at 1000 rows regardless of the
+  /// requested `limit`, so a single `.limit(5000)` silently truncates the
+  /// catalog. Callers that need the whole list must page through it.
+  static const int maxRowsPerRequest = 1000;
 
   Future<List<CatalogDocument>> activeProducts({String? storeId, String? sectionId, int limit = 100}) async {
     if (!useSupabase || !SupabaseService.isInitialized) {
@@ -32,6 +45,47 @@ class CatalogService {
     if (sectionId != null && sectionId.isNotEmpty) query = query.eq('section_id', sectionId);
     final rows = await query.order('name').limit(limit);
     return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
+  }
+
+  /// Fetches every matching active product by walking 1000-row pages, and
+  /// reports the true server-side total so the UI can show progress.
+  /// [onProgress] receives (loaded, total) after each page.
+  Future<CatalogPage> activeProductsPaged({
+    String? storeId,
+    String? sectionId,
+    void Function(int loaded, int total)? onProgress,
+    int pageSize = maxRowsPerRequest,
+  }) async {
+    if (!useSupabase || !SupabaseService.isInitialized) {
+      throw StateError('خدمة الكتالوج الجديدة غير مفعلة.');
+    }
+    final client = SupabaseService.client;
+    final size = pageSize.clamp(1, maxRowsPerRequest);
+
+    PostgrestFilterBuilder<List<Map<String, dynamic>>> build() {
+      var query = client.from('products').select().eq('status', 'active');
+      if (storeId != null && storeId.isNotEmpty) query = query.eq('store_id', storeId);
+      if (sectionId != null && sectionId.isNotEmpty) query = query.eq('section_id', sectionId);
+      return query;
+    }
+
+    final first = await build().order('name').range(0, size - 1).count(CountOption.exact);
+    final items = first.data
+        .map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row)))
+        .toList();
+    final total = first.count;
+    onProgress?.call(items.length, total);
+
+    var offset = size;
+    while (items.length < total) {
+      final page = await build().order('name').range(offset, offset + size - 1);
+      if (page.isEmpty) break;
+      items.addAll(page.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))));
+      onProgress?.call(items.length, total);
+      offset += size;
+    }
+
+    return CatalogPage(items: items, total: total);
   }
 
   Future<List<CatalogDocument>> approvedStores(String sectionId, {int limit = 30}) async {
