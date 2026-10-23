@@ -17,6 +17,7 @@ import 'merchant_approval_page.dart';
 import 'merchant_invites_page.dart';
 import 'merchant_portal_page.dart';
 import 'platform_control_page.dart';
+import 'site_updates_page.dart';
 import 'wallet_vouchers_page.dart';
 import 'whatsapp_automation_page.dart';
 
@@ -88,6 +89,7 @@ class AdminDashboard extends StatelessWidget {
                 _ActionCard(icon: Icons.card_giftcard, title: 'رموز شحن المحفظة', subtitle: 'إصدار رموز شحن مدفوعة وتتبّع استخدامها', onTap: () => _open(context, const WalletVouchersPage())),
                 _ActionCard(icon: Icons.message_outlined, title: 'أتمتة واتساب', subtitle: 'استقبال منتجات التجار عبر WhatsApp Business وربطها بالمتجر', onTap: () => _open(context, WhatsAppAutomationPage())),
                 _ActionCard(icon: Icons.fact_check_outlined, title: 'اعتماد المتاجر', subtitle: 'مراجعة واعتماد طلبات التجار', onTap: () => _open(context, MerchantApprovalPage())),
+                _ActionCard(icon: Icons.campaign_outlined, title: 'تحديثات الصفحة الرئيسية', subtitle: 'نشر أخبار وعروض تظهر فوراً في قسم «آخر تحديثات الفائق»', onTap: () => _open(context, const SiteUpdatesPage())),
                 _ActionCard(icon: Icons.receipt_long_outlined, title: 'مراجعة الحوالات المحلية', subtitle: 'تأكيد أو رفض إشعارات التحويل البنكي ودفع الطلبات', onTap: () => _open(context, const LocalPaymentReviewPage())),
                 _ActionCard(icon: Icons.add_link, title: 'التجار والروابط', subtitle: 'إنشاء وإدارة دعوات التجار', onTap: () => _open(context, MerchantInvitesPage())),
                 _ActionCard(icon: Icons.storefront_outlined, title: 'مركز التاجر', subtitle: 'الكتالوج والمنتجات والطلبات', onTap: () => _open(context, MerchantPortalPage())),

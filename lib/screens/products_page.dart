@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/app_sections.dart';
 import '../core/product_units.dart';
@@ -26,15 +29,54 @@ class _ProductsPageState extends State<ProductsPage> {
   String _query = '';
   String _sectionId = 'all';
   Map<String, ({double average, int count})> _ratings = const {};
+  int _loaded = 0;
+  int _total = 0;
+  late Future<CatalogPage> _productsFuture;
+  RealtimeChannel? _stockChannel;
+  Timer? _reloadDebounce;
 
   @override
   void initState() {
     super.initState();
+    _loadProducts();
+    _subscribeToStock();
     _loadRatings();
+  }
+
+  void _loadProducts() {
+    _productsFuture = CatalogService().activeProductsPaged(
+      onProgress: (loaded, total) {
+        if (mounted) setState(() { _loaded = loaded; _total = total; });
+      },
+    );
+  }
+
+  /// PostgREST caps a realtime stream at 1000 rows, so instead of streaming the
+  /// catalog (which would truncate it) we subscribe for change signals and
+  /// re-page on stock/price updates — keeping the full list live.
+  void _subscribeToStock() {
+    try {
+      _stockChannel = SupabaseService.client
+          .channel('products-page-stock')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'products',
+            callback: (_) {
+              _reloadDebounce?.cancel();
+              _reloadDebounce = Timer(const Duration(milliseconds: 700), () {
+                if (mounted) setState(_loadProducts);
+              });
+            },
+          )
+          .subscribe();
+    } catch (_) {/* realtime is best-effort; the page still loads on demand */}
   }
 
   @override
   void dispose() {
+    _reloadDebounce?.cancel();
+    _stockChannel?.unsubscribe();
     _search.dispose();
     super.dispose();
   }
@@ -47,12 +89,6 @@ class _ProductsPageState extends State<ProductsPage> {
       if (mounted) setState(() => _ratings = ratings);
     } catch (_) {/* rating badges are best-effort */}
   }
-
-  Stream<List<Map<String, dynamic>>> get _productsStream => SupabaseService.client
-      .from('products')
-      .stream(primaryKey: ['id'])
-      .order('name')
-      .limit(5000);
 
   Future<void> _addToCart(CatalogDocument product) async {
     final user = SupabaseService.client.auth.currentUser;
@@ -118,18 +154,18 @@ class _ProductsPageState extends State<ProductsPage> {
                 ),
               ),
               const SizedBox(height: 18),
-              StreamBuilder<List<Map<String, dynamic>>>(
-                stream: _productsStream,
+              FutureBuilder<CatalogPage>(
+                future: _productsFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()));
+                    return Column(children: [
+                      const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator())),
+                      if (_total > 0) Text('جارٍ تحميل الأصناف… $_loaded من $_total', style: const TextStyle(color: Colors.black54)),
+                    ]);
                   }
                   if (snapshot.hasError) return const Text('تعذر تحميل المنتجات.');
                   final ratings = _ratings;
-                  var products = (snapshot.data ?? const <Map<String, dynamic>>[])
-                      .where((row) => (row['status'] ?? 'active') == 'active')
-                      .map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row)))
-                      .toList();
+                  var products = (snapshot.data?.items ?? const <CatalogDocument>[]);
                   if (_sectionId != 'all') {
                     products = products.where((p) => (p.data['section_id'] ?? '').toString() == _sectionId).toList();
                   }
@@ -149,6 +185,8 @@ class _ProductsPageState extends State<ProductsPage> {
                   const maxCards = 300;
                   final visible = products.take(maxCards).toList();
                   return Column(children: [
+                    Text('إجمالي الأصناف: ${products.length}', style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),

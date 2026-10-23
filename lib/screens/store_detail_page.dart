@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/product_units.dart';
 import '../services/currency_service.dart';
@@ -26,6 +29,11 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   bool _reviewsLoading = true;
   final _searchController = TextEditingController();
   String _query = '';
+  int _loaded = 0;
+  int _total = 0;
+  late Future<CatalogPage> _productsFuture;
+  RealtimeChannel? _stockChannel;
+  Timer? _reloadDebounce;
 
   Map<String, dynamic> get _data => widget.store.data;
   String get _name => (_data['name'] ?? 'متجر').toString();
@@ -33,11 +41,48 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   @override
   void initState() {
     super.initState();
+    _loadProducts();
+    _subscribeToStock();
     _loadReviews();
+  }
+
+  // PostgREST caps each response at 1000 rows; page through the store.
+  void _loadProducts() {
+    _productsFuture = CatalogService().activeProductsPaged(
+      storeId: widget.store.id,
+      onProgress: (loaded, total) {
+        if (mounted) setState(() { _loaded = loaded; _total = total; });
+      },
+    );
+  }
+
+  /// A realtime stream would also truncate at 1000 rows, so we subscribe for
+  /// change signals and re-page instead, keeping stock/price live for the
+  /// whole catalog.
+  void _subscribeToStock() {
+    try {
+      _stockChannel = SupabaseService.client
+          .channel('store-${widget.store.id}-stock')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'products',
+            filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'store_id', value: widget.store.id),
+            callback: (_) {
+              _reloadDebounce?.cancel();
+              _reloadDebounce = Timer(const Duration(milliseconds: 700), () {
+                if (mounted) setState(_loadProducts);
+              });
+            },
+          )
+          .subscribe();
+    } catch (_) {/* realtime is best-effort; the page still loads on demand */}
   }
 
   @override
   void dispose() {
+    _reloadDebounce?.cancel();
+    _stockChannel?.unsubscribe();
     _searchController.dispose();
     super.dispose();
   }
@@ -167,20 +212,17 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                 ),
               ),
             ),
-            StreamBuilder<List<Map<String, dynamic>>>(
-              stream: SupabaseService.client
-                  .from('products')
-                  .stream(primaryKey: ['id'])
-                  .eq('store_id', widget.store.id)
-                  .order('name')
-                  .limit(5000),
+            FutureBuilder<CatalogPage>(
+              future: _productsFuture,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()));
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Column(children: [
+                    const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator())),
+                    if (_total > 0) Text('جارٍ تحميل الأصناف… $_loaded من $_total', style: const TextStyle(color: Colors.black54)),
+                  ]);
+                }
                 if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(16), child: Text('تعذر تحميل المنتجات.'));
-                final all = (snapshot.data ?? const <Map<String, dynamic>>[])
-                    .map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row)))
-                    .where((doc) => (doc.data['status'] ?? 'active') == 'active')
-                    .toList();
+                final all = snapshot.data?.items ?? const <CatalogDocument>[];
                 if (all.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد منتجات نشطة في هذا المتجر.', style: TextStyle(color: Colors.black54)));
                 final q = _query.toLowerCase();
                 final products = q.isEmpty
@@ -200,6 +242,10 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                 const maxCards = 300;
                 final visible = products.take(maxCards).toList();
                 return Column(children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Text('إجمالي أصناف المتجر: ${snapshot.data?.total ?? all.length}', style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700)),
+                  ),
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),

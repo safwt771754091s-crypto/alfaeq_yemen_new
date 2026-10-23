@@ -19,6 +19,7 @@ import 'my_orders_page.dart';
 import 'notifications_page.dart';
 import 'ai_assistant_page.dart';
 import 'conversations_page.dart';
+import 'contacts_page.dart';
 import 'mini_programs_page.dart';
 import 'moments_page.dart';
 import 'products_page.dart';
@@ -48,10 +49,12 @@ class _WorldHomePageState extends State<WorldHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // WeChat-style four primary tabs; everything else lives under Discover.
+    // WeChat-style five primary tabs (Home / Chats / Contacts / Discover / Me);
+    // everything else lives under Discover.
     final pages = <Widget>[
       _HomeTab(onOpen: _open),
       const ConversationsPage(),
+      const ContactsPage(),
       const DiscoverPage(),
       const AccountCenterPage(),
     ];
@@ -76,6 +79,7 @@ class _MainBottomBar extends StatelessWidget {
     const items = [
       (Icons.home_outlined, Icons.home, 'الرئيسية'),
       (Icons.chat_bubble_outline, Icons.chat_bubble, 'المحادثات'),
+      (Icons.contacts_outlined, Icons.contacts, 'الجهات'),
       (Icons.explore_outlined, Icons.explore, 'اكتشف'),
       (Icons.person_outline, Icons.person, 'حسابي'),
     ];
@@ -977,13 +981,22 @@ class WorldSectionPage extends StatefulWidget {
 class _WorldSectionPageState extends State<WorldSectionPage> {
   final _searchController = TextEditingController();
   String _query = '';
-  late final Future<List<CatalogDocument>> _productsFuture;
+  int _loaded = 0;
+  int _total = 0;
+  late final Future<CatalogPage> _productsFuture;
   late final Future<List<CatalogDocument>> _storesFuture;
 
   @override
   void initState() {
     super.initState();
-    _productsFuture = CatalogService().activeProducts(sectionId: widget.section.id, limit: 5000);
+    // Page through the whole section: PostgREST caps each response at 1000
+    // rows, so a single request would silently hide most of the catalog.
+    _productsFuture = CatalogService().activeProductsPaged(
+      sectionId: widget.section.id,
+      onProgress: (loaded, total) {
+        if (mounted) setState(() { _loaded = loaded; _total = total; });
+      },
+    );
     _storesFuture = CatalogService().approvedStores(widget.section.id, limit: 30);
   }
 
@@ -1042,18 +1055,27 @@ class _WorldSectionPageState extends State<WorldSectionPage> {
               const SizedBox(height: 18),
               const Text('منتجات القسم', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 9),
-              FutureBuilder<List<CatalogDocument>>(
+              FutureBuilder<CatalogPage>(
                 future: _productsFuture,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Column(children: [
+                      const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())),
+                      if (_total > 0) Text('جارٍ تحميل الأصناف… $_loaded من $_total', style: const TextStyle(color: Colors.black54)),
+                    ]);
+                  }
                   if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المنتجات', text: 'تحقق من اتصال قاعدة البيانات.');
-                  final products = _filter(snapshot.data ?? const <CatalogDocument>[]);
+                  final page = snapshot.data;
+                  final products = _filter(page?.items ?? const <CatalogDocument>[]);
+                  final total = page?.total ?? products.length;
                   if (products.isEmpty) return const _Info(title: 'لا توجد منتجات مطابقة', text: 'جرّب كلمة أخرى أو تحقق من الاسم أو الباركود.');
                   // The section list is inside a Column: never build thousands of
                   // tiles. Cap the render and let search narrow the catalog.
                   const maxTiles = 300;
                   final visible = products.take(maxTiles).toList();
                   return Column(children: [
+                    Text('إجمالي أصناف القسم: $total', style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
                     ...visible.map((product) => _SectionProductTile(product: product)),
                     if (products.length > visible.length)
                       Padding(
@@ -1146,7 +1168,9 @@ class _StoreCard extends StatelessWidget {
           ),
           Container(height: 1, color: const Color(0xFFE8ECEA)),
           FutureBuilder<List<CatalogDocument>>(
-            future: CatalogService().activeProducts(storeId: store.id, limit: 5000),
+            // Only the first few products are previewed here; the full catalog
+            // lives on the store page (which pages past the 1000-row cap).
+            future: CatalogService().activeProducts(storeId: store.id, limit: 24),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) return const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator());
               if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(16), child: Text('تعذر تحميل الأصناف.'));

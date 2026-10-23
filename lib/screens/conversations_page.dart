@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
 import 'ai_assistant_page.dart';
+import 'contacts_page.dart';
 import 'group_chat_page.dart';
 import 'support_chat_page.dart';
 
@@ -21,11 +22,13 @@ class _ConversationsPageState extends State<ConversationsPage> {
 
   Timer? _unreadTimer;
   Map<String, int> _unread = {};
+  Map<String, String> _contactNames = {};
 
   @override
   void initState() {
     super.initState();
     _refreshUnread();
+    _loadContactNames();
     // Realtime pushes message rows, but the unread aggregate is cheap to poll;
     // a short interval keeps the badge fresh without a second subscription.
     _unreadTimer = Timer.periodic(const Duration(seconds: 15), (_) => _refreshUnread());
@@ -35,6 +38,21 @@ class _ConversationsPageState extends State<ConversationsPage> {
   void dispose() {
     _unreadTimer?.cancel();
     super.dispose();
+  }
+
+  /// Direct threads have an empty title; resolve the peer's display name.
+  Future<void> _loadContactNames() async {
+    if (_uid == null || !SupabaseService.isInitialized) return;
+    try {
+      final res = await SupabaseService.client.rpc('my_direct_thread_peers');
+      final names = <String, String>{};
+      for (final row in (res as List)) {
+        final map = Map<String, dynamic>.from(row as Map);
+        final id = map['thread_id']?.toString();
+        if (id != null) names[id] = (map['peer_name'] ?? 'مستخدم الفائق').toString();
+      }
+      if (mounted) setState(() => _contactNames = names);
+    } catch (_) {/* peer names are best-effort */}
   }
 
   Future<void> _refreshUnread() async {
@@ -125,7 +143,12 @@ class _ConversationsPageState extends State<ConversationsPage> {
                 return Column(
                   children: [
                     for (final row in rows)
-                      _ThreadTile(row: row, lastMessage: _lastMessage, unread: _unread[row['id'].toString()] ?? 0),
+                      _ThreadTile(
+                        row: row,
+                        lastMessage: _lastMessage,
+                        unread: _unread[row['id'].toString()] ?? 0,
+                        displayTitle: _contactNames[row['id'].toString()],
+                      ),
                   ],
                 );
               },
@@ -162,14 +185,18 @@ class _ThreadTile extends StatelessWidget {
   final Map<String, dynamic> row;
   final Stream<List<Map<String, dynamic>>> Function(String) lastMessage;
   final int unread;
-  const _ThreadTile({required this.row, required this.lastMessage, this.unread = 0});
+  final String? displayTitle;
+  const _ThreadTile({required this.row, required this.lastMessage, this.unread = 0, this.displayTitle});
 
   @override
   Widget build(BuildContext context) {
     final id = row['id'].toString();
-    final title = (row['title'] ?? 'محادثة').toString();
     final type = (row['thread_type'] ?? '').toString();
     final isGroup = type == 'group';
+    final isDirect = type == 'direct';
+    final rawTitle = (row['title'] ?? '').toString();
+    // Direct threads carry no title; fall back to the peer's name.
+    final title = rawTitle.isNotEmpty ? rawTitle : (displayTitle ?? (isDirect ? 'محادثة' : 'محادثة'));
     final isSupport = type == 'support' || title.contains('دعم');
     return Column(
       children: [
@@ -182,14 +209,16 @@ class _ThreadTile extends StatelessWidget {
               MaterialPageRoute(
                 builder: (_) => isGroup
                     ? GroupChatPage(threadId: id, title: title)
-                    : SupportChatPage(initialThreadId: id),
+                    : isDirect
+                        ? DirectChatPage(threadId: id, title: title.isEmpty ? 'محادثة' : title)
+                        : SupportChatPage(initialThreadId: id),
               ),
             );
           },
           leading: CircleAvatar(
             radius: 26,
             backgroundColor: const Color(0xFFF1F6FF),
-            child: Icon(isGroup ? Icons.groups_outlined : isSupport ? Icons.support_agent_outlined : Icons.forum_outlined, color: const Color(0xFF0B63CE)),
+            child: Icon(isGroup ? Icons.groups_outlined : isDirect ? Icons.person_outline : isSupport ? Icons.support_agent_outlined : Icons.forum_outlined, color: const Color(0xFF0B63CE)),
           ),
           title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900), maxLines: 1, overflow: TextOverflow.ellipsis),
           subtitle: StreamBuilder<List<Map<String, dynamic>>>(
