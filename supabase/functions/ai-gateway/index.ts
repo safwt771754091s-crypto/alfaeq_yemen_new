@@ -6,28 +6,52 @@ const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 // Provider-neutral server configuration.
 // Backward-compatible with the existing UNSLOTH_* variables.
-const aiBaseUrl = (
-  Deno.env.get("AI_BASE_URL") ??
-  Deno.env.get("UNSLOTH_BASE_URL") ??
-  Deno.env.get("OPENAI_BASE_URL") ??
-  ""
-).replace(/\/$/, "");
-const aiApiKey =
-  Deno.env.get("AI_API_KEY") ??
-  Deno.env.get("UNSLOTH_API_KEY") ??
-  Deno.env.get("OPENAI_API_KEY") ??
-  "";
-const defaultModel =
-  Deno.env.get("AI_MODEL") ??
-  Deno.env.get("UNSLOTH_MODEL") ??
-  Deno.env.get("OPENAI_MODEL") ??
-  "";
+type AiProvider = { name: string; chatUrl: string; apiKey: string; model: string };
 
-// Accept both `https://host` and `https://host/v1` so the OpenAI-compatible
-// endpoint is never requested as `/v1/v1/chat/completions`.
-const chatCompletionsUrl = aiBaseUrl.endsWith("/v1")
-  ? `${aiBaseUrl}/chat/completions`
-  : `${aiBaseUrl}/v1/chat/completions`;
+// Accept `https://host`, `https://host/v1` and pre-resolved chat endpoints
+// (e.g. Pollinations `https://text.pollinations.ai/openai`) so the
+// OpenAI-compatible path is never double-suffixed with `/v1`.
+function normalizeChatUrl(base: string): string {
+  const trimmed = base.replace(/\/$/, "");
+  if (!trimmed) return "";
+  if (trimmed.endsWith("/chat/completions")) return trimmed;
+  if (trimmed.endsWith("/v1")) return `${trimmed}/chat/completions`;
+  if (trimmed.endsWith("/openai")) return trimmed;
+  return `${trimmed}/v1/chat/completions`;
+}
+
+const env = (name: string) => (Deno.env.get(name) ?? "").trim();
+
+const primaryBase = env("AI_BASE_URL") || env("UNSLOTH_BASE_URL") || env("OPENAI_BASE_URL");
+const primaryKey = env("AI_API_KEY") || env("UNSLOTH_API_KEY") || env("OPENAI_API_KEY");
+const primaryModel = env("AI_MODEL") || env("UNSLOTH_MODEL") || env("OPENAI_MODEL");
+
+// Optional explicit fallback provider with the same OpenAI-compatible shape.
+const fallbackBase = env("AI_FALLBACK_BASE_URL");
+const fallbackKey = env("AI_FALLBACK_API_KEY");
+const fallbackModel = env("AI_FALLBACK_MODEL");
+
+// Built-in free providers keep the assistant answering when the primary
+// provider is rate-limited or out of quota. They need no secret. Set
+// AI_ENABLE_FREE_FALLBACK=false to disable them.
+const freeFallbackEnabled = env("AI_ENABLE_FREE_FALLBACK") !== "false";
+const FREE_FALLBACKS: AiProvider[] = freeFallbackEnabled
+  ? [
+    { name: "llm7", chatUrl: "https://api.llm7.io/v1/chat/completions", apiKey: "unused", model: "default" },
+    { name: "pollinations", chatUrl: "https://text.pollinations.ai/openai", apiKey: "", model: "openai" },
+  ]
+  : [];
+
+const providers: AiProvider[] = [];
+if (primaryBase && primaryModel) {
+  providers.push({ name: "primary", chatUrl: normalizeChatUrl(primaryBase), apiKey: primaryKey, model: primaryModel });
+}
+if (fallbackBase && fallbackModel) {
+  providers.push({ name: "fallback", chatUrl: normalizeChatUrl(fallbackBase), apiKey: fallbackKey, model: fallbackModel });
+}
+for (const candidate of FREE_FALLBACKS) {
+  if (!providers.some((p) => p.chatUrl === candidate.chatUrl)) providers.push(candidate);
+}
 
 const MAX_MESSAGES = 80;
 const MAX_MESSAGE_CHARS = 120_000;
@@ -45,9 +69,9 @@ Deno.serve(async (req) => {
   if (!supabaseUrl || !serviceRoleKey) {
     return json({ error: "server_configuration_missing" }, 503);
   }
-  if (!aiBaseUrl || !defaultModel) {
-    // The AI provider must be configured with server-side secrets:
-    // AI_BASE_URL, AI_MODEL and AI_API_KEY.
+  if (providers.length === 0) {
+    // No provider configured (no secrets and free fallback disabled).
+    // Server-side secrets: AI_BASE_URL, AI_MODEL and AI_API_KEY.
     return json({ error: "ai_provider_not_configured" }, 503);
   }
 
@@ -95,7 +119,6 @@ Deno.serve(async (req) => {
   const temperature = Math.min(Math.max(requestedTemperature, 0), 2);
 
   const payload = {
-    model: defaultModel,
     messages,
     temperature,
     max_tokens: maxTokens,
@@ -105,10 +128,7 @@ Deno.serve(async (req) => {
     ...(typeof body.top_p === "number" ? { top_p: body.top_p } : {}),
   };
 
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (aiApiKey) headers.Authorization = `Bearer ${aiApiKey}`;
-
-  const result = await callUpstream(payload, headers);
+  const result = await callProviders(providers, payload);
   return new Response(result.body, {
     status: result.status,
     headers: { ...corsHeaders, "Content-Type": result.contentType },
@@ -117,9 +137,35 @@ Deno.serve(async (req) => {
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Free/community providers (e.g. the Gemini free tier) frequently answer 429
-// or 503 under load. Retry a few times with backoff before surfacing an error.
-async function callUpstream(payload: unknown, headers: Record<string, string>) {
+// Try each configured provider in order. Free/community providers frequently
+// answer 429/5xx under load, so on a transient failure we move to the next
+// provider (and retry each one a few times with backoff).
+async function callProviders(providers: AiProvider[], payload: Record<string, unknown>) {
+  let lastStatus = 502;
+  let lastBody = JSON.stringify({ error: "ai_provider_unreachable" });
+  let lastContentType = "application/json";
+
+  for (const provider of providers) {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
+    const result = await callUpstream(provider.chatUrl, { ...payload, model: provider.model }, headers);
+
+    // A successful or client-visible (non-transient) response ends the chain.
+    if (result.status < 500 && result.status !== 429) return result;
+
+    lastStatus = result.status;
+    lastBody = result.body;
+    lastContentType = result.contentType;
+  }
+
+  return { status: lastStatus, body: lastBody, contentType: lastContentType };
+}
+
+async function callUpstream(
+  chatCompletionsUrl: string,
+  payload: unknown,
+  headers: Record<string, string>,
+) {
   const attempts = 3;
   let lastStatus = 502;
   let lastBody = JSON.stringify({ error: "ai_provider_unreachable" });

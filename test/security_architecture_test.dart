@@ -235,6 +235,19 @@ void main() {
       }
     });
 
+    test('ai-gateway falls back to free providers when the primary is exhausted', () {
+      // The Gemini free tier returns 429 under load. The gateway must keep the
+      // assistant answering by trying a key-free OpenAI-compatible provider
+      // instead of surfacing a raw provider error to the app.
+      final fn = File('supabase/functions/ai-gateway/index.ts').readAsStringSync();
+      expect(fn, contains('normalizeChatUrl'));
+      expect(fn, contains('callProviders'));
+      expect(fn, contains('FREE_FALLBACKS'));
+      expect(fn, contains('https://text.pollinations.ai/openai'));
+      expect(fn, contains('AI_ENABLE_FREE_FALLBACK'));
+      expect(fn, isNot(contains('/v1/v1/chat/completions')));
+    });
+
     test('realtime publication covers every table the app streams', () {
       // A `.stream()` call on a table missing from supabase_realtime never
       // delivers rows (the admin login log showed "تعذر قراءة سجل الدخول").
