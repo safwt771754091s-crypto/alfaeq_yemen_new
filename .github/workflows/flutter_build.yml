@@ -47,7 +47,7 @@ jobs:
           python3 tools/build_product_gallery.py --out catalog || echo "::warning::gallery refresh failed, shipping the committed copy"
           mkdir -p build/web/catalog
           cp -f catalog/index.html catalog/products.json catalog/missing-images.json build/web/catalog/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: alfaeq-yemen-web
           path: build/web
@@ -176,7 +176,7 @@ jobs:
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: flutter build apk --debug --dart-define=SUPABASE_URL="https://esvljorjykzgrpnrxnma.supabase.co" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: alfaeq-yemen-android-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
