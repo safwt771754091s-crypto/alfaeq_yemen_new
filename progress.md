@@ -129,3 +129,50 @@ Connect order, inventory, and merchant through the production Event Bus without 
   contract-and-supply-chain, Security Audit Gate static-security. deploy-web /
   web-smoke are main-only and skipped on the PR, so the CDN-blocked smoke
   assertion runs on the next push to main.
+
+## Full-platform production readiness audit — 2026-10-23
+Scope: inspect the whole platform and prepare it for the final release. Branch
+`release/v1.0.9-production-readiness` (2 commits on top of `origin/main` 449f175f).
+
+### Local verification (Flutter 3.47.6 / Dart 3.13.5)
+- `flutter analyze` -> No issues found.
+- `flutter test` -> 93 pass, 1 skipped (opt-in live AI e2e).
+- `flutter build web --release --no-web-resources-cdn --base-href /alfaeq_yemen_new/`
+  -> Built build/web; local `build/web/canvaskit/` present (no gstatic dependency).
+- Engineering/security gates (run locally): no Firebase client dep, no
+  `service_role` in client tree, all 96 migration filenames valid, 0
+  SECURITY DEFINER functions without `search_path`.
+- Android: not buildable in this sandbox (no Android SDK); covered by CI
+  (`android-release.yml`, `build_apk.yml`).
+
+### Live backend verification
+- REST with the publishable key works; RLS verified: `stores` -> 1 (سوبر الفائق),
+  `products` -> 3892, `orders`/`moments`/`notifications` -> 0.
+- Sensitive tables (`users`, `wallets`, `wallet_ledger`, `payments`, `orders`,
+  `audit_logs`, `ai_tool_audit_logs`, `security_reports`, `chat_messages`,
+  `drivers`) return `[]` to the anon key — no anonymous data leak.
+- All edge functions are deployed and reachable (correct 401/503/200 config
+  guards): ai-gateway, ai-event-worker, automation-event-gateway,
+  automation-worker, developer-control, payment-gateway, push-dispatch,
+  sheets-catalog-sync, whatsapp-webhook, create-merchant-invite,
+  request-password-reset, plus `admin-users` (deployed, 401 invalid_auth).
+- Live web (GitHub Pages): index 200, `version.json` = 1.0.8+8, public gallery
+  200 (~2.9 MB, 3892 products), local canvaskit + Arabic font 200.
+
+### Fix applied
+- `lib/screens/developer_page.dart`: removed three unreachable `r.status` checks
+  after `functions.invoke` (the SDK throws `FunctionsHttpException` on non-2xx,
+  so the branches never ran and the real error text was lost). Commit 740b655c.
+
+### Remaining blockers / risks (need owner action)
+1. **Push blocked**: sandbox `$GITHUB_TOKEN` is empty (len=0); `git push` cannot
+   authenticate. Branch is committed locally only. Fix = reprovision the sandbox
+   so the GitHub secret re-injects, or supply a PAT.
+2. **AI provider quota**: `ai-gateway` is configured (Google Gemini
+   `gemini-flash-lite-latest`) but the free tier returns 429 under load; the app
+   maps it to Arabic guidance. Consider a paid key / higher quota before launch.
+3. **Android signing**: release APK/AAB require `ANDROID_KEYSTORE_BASE64` and the
+   keystore secrets in GitHub. Verify they are set before the store release.
+4. **Dead code (non-blocking)**: `location_required_page.dart` and
+   `smart_dispatch_page.dart` are implemented but unreachable;
+   `supabase_data_service.dart` is unreferenced. Left untouched (out of scope).
