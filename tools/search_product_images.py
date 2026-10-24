@@ -91,20 +91,20 @@ def request(url, headers, method="GET", body=None, timeout=40, retries=1):
     raise last
 
 
-def load_products(base, key, limit=0, pending_only=True):
-    products, offset, page = [], 0, 1000
+def load_products(base, key, limit=0, pending_only=True, offset=0):
+    products, start, page = [], offset, 1000
     headers = {"apikey": key, "Authorization": f"Bearer {key}"}
     while True:
         flt = "&image_url=eq." if pending_only else ""
         url = (
             f"{base}/rest/v1/products?select=id,name,image_url,metadata"
-            f"&status=eq.active{flt}&order=id&limit={page}&offset={offset}"
+            f"&status=eq.active{flt}&order=id&limit={page}&offset={start}"
         )
         rows = json.loads(request(url, headers).read().decode())
         if not rows:
             break
         products.extend(rows)
-        offset += len(rows)
+        start += len(rows)
         if len(rows) < page or (limit and len(products) >= limit):
             break
     return products[:limit] if limit else products
@@ -320,6 +320,8 @@ def main():
     parser.add_argument("--google-key", default=os.environ.get("GOOGLE_API_KEY", ""))
     parser.add_argument("--google-cx", default=os.environ.get("GOOGLE_CSE_CX", ""))
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument("--offset", type=int, default=0,
+                        help="skip this many pending products (advance a large sweep)")
     parser.add_argument("--min-score", type=float, default=1.0,
                         help="accept threshold; 1.0 = every core name token must appear")
     parser.add_argument("--sleep", type=float, default=0.4)
@@ -339,7 +341,7 @@ def main():
 
     providers = [p.strip() for p in args.providers.split(",") if p.strip()]
     products = load_products(args.url, args.publishable_key, args.limit,
-                             pending_only=not args.overwrite)
+                             pending_only=not args.overwrite, offset=args.offset)
     pending = [p for p in products if args.overwrite or not str(p.get("image_url") or "").strip()]
     print(f"products={len(products)} pending={len(pending)} "
           f"providers={','.join(providers)} min_score={args.min_score} workers={args.workers}")
@@ -408,9 +410,17 @@ def main():
                           f"failed={state['failed']}", flush=True)
 
     if args.out:
+        merged = {"applied": {}, "ready": {}, "review": {}}
+        if os.path.exists(args.out):
+            try:
+                with open(args.out, encoding="utf-8") as handle:
+                    merged.update(json.load(handle))
+            except (OSError, ValueError):
+                pass
+        for key, fresh in (("applied", resolved), ("ready", ready), ("review", review)):
+            merged.setdefault(key, {}).update(fresh)
         with open(args.out, "w", encoding="utf-8") as handle:
-            json.dump({"applied": resolved, "ready": ready, "review": review}, handle,
-                      ensure_ascii=False, indent=2)
+            json.dump(merged, handle, ensure_ascii=False, indent=2)
     print(f"DONE applied={state['applied']} review={state['review']} ready={len(ready)} "
           f"missed={state['missed']} failed={state['failed']} dry_run={args.dry_run}")
 
