@@ -101,6 +101,7 @@ jobs:
             ${{ inputs.overwrite == 'true' && '--overwrite' || '' }}
 
       - name: Publish the image map and review report
+        continue-on-error: true
         run: |
           mkdir -p catalog
           python3 - <<'PY'
@@ -136,7 +137,19 @@ jobs:
           git add catalog/product-images-map.json catalog/image-search-review.json catalog/image-search-missed.json
           if git diff --cached --quiet; then
             echo "reports unchanged"
-          else
-            git commit -m "chore(catalog): refresh the product image map and review report"
-            git push
+            exit 0
           fi
+          git commit -m "chore(catalog): refresh the product image map and review report"
+          # Concurrent sweeps can race on this branch; rebase onto the latest
+          # remote and retry instead of losing a whole batch of matches.
+          for attempt in 1 2 3 4 5; do
+            if git push; then
+              echo "reports pushed"
+              exit 0
+            fi
+            echo "push rejected (attempt $attempt), rebasing on origin/main"
+            git pull --rebase origin main || git rebase --abort || true
+            sleep 5
+          done
+          echo "::warning::could not publish the reports after 5 attempts"
+          exit 0
