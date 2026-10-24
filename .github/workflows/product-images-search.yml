@@ -85,9 +85,14 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
         run: |
+          # Skip products already examined in earlier sweeps so each scheduled
+          # run advances through the catalog instead of re-scanning the head.
           python3 tools/search_product_images.py \
             --limit "${{ inputs.limit || '300' }}" \
             --offset "${{ inputs.offset || '0' }}" \
+            --known-file catalog/image-search-review.json \
+            --known-file catalog/product-images-map.json \
+            --known-file catalog/image-search-missed.json \
             --providers "${{ inputs.providers || 'google,ddg' }}" \
             --min-score "${{ inputs.min_score || '1.0' }}" \
             --workers "${{ inputs.workers || '6' }}" \
@@ -111,21 +116,24 @@ jobs:
           data = load('/tmp/image-search.json')
           fresh_ready = {pid: meta['source'] for pid, meta in data.get('ready', {}).items()}
           fresh_review = data.get('review', {})
+          fresh_missed = data.get('missed', {})
 
           # Merge with what earlier sweeps already published so a run that
-          # covers a different slice never drops previous matches.
-          old_ready = load('catalog/product-images-map.json')
-          old_review = load('catalog/image-search-review.json')
-          old_ready.update(fresh_ready)
-          old_review.update(fresh_review)
-          with open('catalog/product-images-map.json', 'w', encoding='utf-8') as fh:
-              json.dump(old_ready, fh, ensure_ascii=False, indent=2)
-          with open('catalog/image-search-review.json', 'w', encoding='utf-8') as fh:
-              json.dump(old_review, fh, ensure_ascii=False, indent=2)
+          # covers a different slice never drops previous results.
+          files = {
+              'catalog/product-images-map.json': fresh_ready,
+              'catalog/image-search-review.json': fresh_review,
+              'catalog/image-search-missed.json': fresh_missed,
+          }
+          for path, fresh in files.items():
+              merged = load(path)
+              merged.update(fresh)
+              with open(path, 'w', encoding='utf-8') as fh:
+                  json.dump(merged, fh, ensure_ascii=False, indent=2)
           PY
           git config user.name "alfaeq-image-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add catalog/product-images-map.json catalog/image-search-review.json
+          git add catalog/product-images-map.json catalog/image-search-review.json catalog/image-search-missed.json
           if git diff --cached --quiet; then
             echo "reports unchanged"
           else

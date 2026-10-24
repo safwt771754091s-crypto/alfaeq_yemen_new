@@ -322,6 +322,8 @@ def main():
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--offset", type=int, default=0,
                         help="skip this many pending products (advance a large sweep)")
+    parser.add_argument("--known-file", action="append", default=[],
+                        help="JSON map of product ids already examined; skip them")
     parser.add_argument("--min-score", type=float, default=1.0,
                         help="accept threshold; 1.0 = every core name token must appear")
     parser.add_argument("--sleep", type=float, default=0.4)
@@ -340,15 +342,24 @@ def main():
         sys.exit("SUPABASE_SERVICE_ROLE_KEY is required to apply (or pass --dry-run)")
 
     providers = [p.strip() for p in args.providers.split(",") if p.strip()]
+    known = set()
+    for path in args.known_file:
+        try:
+            with open(path, encoding="utf-8") as handle:
+                known.update(json.load(handle).keys())
+        except (OSError, ValueError):
+            pass
     products = load_products(args.url, args.publishable_key, args.limit,
                              pending_only=not args.overwrite, offset=args.offset)
-    pending = [p for p in products if args.overwrite or not str(p.get("image_url") or "").strip()]
-    print(f"products={len(products)} pending={len(pending)} "
+    pending = [p for p in products
+               if (args.overwrite or not str(p.get("image_url") or "").strip())
+               and str(p["id"]) not in known]
+    print(f"products={len(products)} pending={len(pending)} known={len(known)} "
           f"providers={','.join(providers)} min_score={args.min_score} workers={args.workers}")
 
     lock = threading.Lock()
     state = {"done": 0, "applied": 0, "review": 0, "missed": 0, "failed": 0}
-    resolved, review, ready = {}, {}, {}
+    resolved, review, ready, missed = {}, {}, {}, {}
 
     def process(product):
         try:
@@ -402,6 +413,8 @@ def main():
                     resolved[str(product["id"])] = value
                 elif status == "review":
                     review[str(product["id"])] = {"name": product["name"], **(meta or {})}
+                elif status in ("missed", "failed"):
+                    missed[str(product["id"])] = {"name": product["name"]}
                 if meta and "source" in meta:
                     ready[str(product["id"])] = {"name": product["name"], **meta}
                 if state["done"] % 25 == 0 or state["done"] == len(pending):
@@ -410,14 +423,15 @@ def main():
                           f"failed={state['failed']}", flush=True)
 
     if args.out:
-        merged = {"applied": {}, "ready": {}, "review": {}}
+        merged = {"applied": {}, "ready": {}, "review": {}, "missed": {}}
         if os.path.exists(args.out):
             try:
                 with open(args.out, encoding="utf-8") as handle:
                     merged.update(json.load(handle))
             except (OSError, ValueError):
                 pass
-        for key, fresh in (("applied", resolved), ("ready", ready), ("review", review)):
+        for key, fresh in (("applied", resolved), ("ready", ready),
+                           ("review", review), ("missed", missed)):
             merged.setdefault(key, {}).update(fresh)
         with open(args.out, "w", encoding="utf-8") as handle:
             json.dump(merged, handle, ensure_ascii=False, indent=2)
