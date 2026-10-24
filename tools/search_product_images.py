@@ -73,11 +73,16 @@ DEFAULT_URL = dart_default(r"projectUrl[\s\S]*?defaultValue:\s*'(https://[^']+)'
 DEFAULT_PUBLISHABLE = dart_default(r"_defaultPublishableKey\s*=\s*'([^']+)'")
 
 
+def safe_url(url):
+    """Percent-encode non-ASCII (e.g. Arabic file names) without touching structure."""
+    return urllib.parse.quote(str(url), safe=":/?&=#%[]@!$&'()*+,;~")
+
+
 def request(url, headers, method="GET", body=None, timeout=40, retries=1):
     last = None
     for attempt in range(retries + 1):
         try:
-            req = urllib.request.Request(url, data=body, headers=headers, method=method)
+            req = urllib.request.Request(safe_url(url), data=body, headers=headers, method=method)
             return urllib.request.urlopen(req, timeout=timeout)
         except (urllib.error.URLError, OSError) as error:
             last = error
@@ -240,12 +245,32 @@ def upload_object(base, service_key, path, data, content_type):
     url = f"{base}/storage/v1/object/{BUCKET}/{urllib.parse.quote(path)}"
     try:
         request(url, service_headers(service_key, {
-            "Content-Type": content_type, "x-upsert": "true",
+            "Content-Type": content_type,
+            "Cache-Control": "max-age=31536000",
+            "x-upsert": "true",
         }), method="POST", body=data, timeout=60).read()
-    except (urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
+    except urllib.error.HTTPError as error:
+        detail = error.read()[:300].decode("utf-8", "replace")
+        print(f"upload failed {path}: HTTP {error.code} {detail}", file=sys.stderr)
+        return False
+    except (urllib.error.URLError, OSError) as error:
         print(f"upload failed {path}: {error}", file=sys.stderr)
         return False
     return True
+
+
+def probe_storage_write(base, service_key):
+    path = f".probe/{int(time.time())}.txt"
+    url = f"{base}/storage/v1/object/{BUCKET}/{urllib.parse.quote(path)}"
+    try:
+        request(url, service_headers(service_key, {
+            "Content-Type": "text/plain", "x-upsert": "true",
+        }), method="POST", body=b"probe", timeout=30)
+        return "ok"
+    except urllib.error.HTTPError as error:
+        return f"http {error.code}: {error.read()[:200].decode('utf-8', 'replace')}"
+    except (urllib.error.URLError, OSError) as error:
+        return f"network: {error!r}"
 
 
 def patch_product(base, service_key, product_id, image_url):
@@ -301,8 +326,13 @@ def main():
     parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--check-key", action="store_true")
     parser.add_argument("--out", default="")
     args = parser.parse_args()
+
+    if args.check_key:
+        print("storage-write:", probe_storage_write(args.url, args.service_key))
+        return
 
     if not args.dry_run and not args.service_key:
         sys.exit("SUPABASE_SERVICE_ROLE_KEY is required to apply (or pass --dry-run)")
@@ -316,7 +346,7 @@ def main():
 
     lock = threading.Lock()
     state = {"done": 0, "applied": 0, "review": 0, "missed": 0, "failed": 0}
-    resolved, review = {}, {}
+    resolved, review, ready = {}, {}, {}
 
     def process(product):
         try:
@@ -332,24 +362,28 @@ def main():
             if best_score < args.min_score:
                 return "review", image_url, {"reason": reason, "score": round(best_score, 3),
                                              "title": title}
+            # A confident match is recorded as "ready" even if the upload fails
+            # (e.g. an invalid service key), so it can be applied later without
+            # repeating the search.
+            meta = {"reason": reason, "score": best_score, "title": title, "source": image_url}
             if args.dry_run:
-                return "applied", image_url, {"reason": reason, "score": best_score, "title": title}
+                return "applied", image_url, meta
             downloaded = download_image(image_url)
             if not downloaded:
-                return "missed", None, None
+                return "missed", None, meta
             data, content_type = downloaded
             digest = hashlib.sha256(data).hexdigest()[:12]
             object_path = (f"{product.get('owner_id') or 'catalog'}/{product['id']}-"
                            f"{digest}.{extension_for(content_type, image_url)}")
             if not upload_object(args.url, args.service_key, object_path, data, content_type):
-                return "failed", None, None
+                return "failed", None, meta
             public_url = (f"{args.url}/storage/v1/object/public/{BUCKET}/"
                           f"{urllib.parse.quote(object_path)}")
             if not patch_product(args.url, args.service_key, product["id"], public_url):
-                return "failed", None, None
+                return "failed", None, meta
             register_media_asset(args.url, args.service_key, product.get("owner_id") or "",
                                  product["id"], public_url, object_path, content_type, reason)
-            return "applied", public_url, {"reason": reason, "score": best_score, "title": title}
+            return "applied", public_url, meta
         except Exception as error:  # noqa: BLE001 - one bad product must not stop the batch
             print(f"error {product.get('id')}: {error!r}", file=sys.stderr)
             return "failed", None, None
@@ -366,6 +400,8 @@ def main():
                     resolved[str(product["id"])] = value
                 elif status == "review":
                     review[str(product["id"])] = {"name": product["name"], **(meta or {})}
+                if meta and "source" in meta:
+                    ready[str(product["id"])] = {"name": product["name"], **meta}
                 if state["done"] % 25 == 0 or state["done"] == len(pending):
                     print(f"[{state['done']}/{len(pending)}] applied={state['applied']} "
                           f"review={state['review']} missed={state['missed']} "
@@ -373,9 +409,9 @@ def main():
 
     if args.out:
         with open(args.out, "w", encoding="utf-8") as handle:
-            json.dump({"applied": resolved, "review": review}, handle,
+            json.dump({"applied": resolved, "ready": ready, "review": review}, handle,
                       ensure_ascii=False, indent=2)
-    print(f"DONE applied={state['applied']} review={state['review']} "
+    print(f"DONE applied={state['applied']} review={state['review']} ready={len(ready)} "
           f"missed={state['missed']} failed={state['failed']} dry_run={args.dry_run}")
 
 
