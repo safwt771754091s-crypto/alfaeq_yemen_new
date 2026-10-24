@@ -13,6 +13,10 @@ on:
         description: "Max products to process this run (0 = all)"
         required: false
         default: "300"
+      offset:
+        description: "Skip this many pending products (advance a sweep)"
+        required: false
+        default: "0"
       providers:
         description: "Comma list: google,ddg"
         required: false
@@ -83,6 +87,7 @@ jobs:
         run: |
           python3 tools/search_product_images.py \
             --limit "${{ inputs.limit || '300' }}" \
+            --offset "${{ inputs.offset || '0' }}" \
             --providers "${{ inputs.providers || 'google,ddg' }}" \
             --min-score "${{ inputs.min_score || '1.0' }}" \
             --workers "${{ inputs.workers || '6' }}" \
@@ -94,13 +99,29 @@ jobs:
         run: |
           mkdir -p catalog
           python3 - <<'PY'
-          import json
-          data = json.load(open('/tmp/image-search.json', encoding='utf-8'))
-          ready = {pid: meta['source'] for pid, meta in data.get('ready', {}).items()}
+          import json, os
+
+          def load(path):
+              try:
+                  with open(path, encoding='utf-8') as fh:
+                      return json.load(fh)
+              except (OSError, ValueError):
+                  return {}
+
+          data = load('/tmp/image-search.json')
+          fresh_ready = {pid: meta['source'] for pid, meta in data.get('ready', {}).items()}
+          fresh_review = data.get('review', {})
+
+          # Merge with what earlier sweeps already published so a run that
+          # covers a different slice never drops previous matches.
+          old_ready = load('catalog/product-images-map.json')
+          old_review = load('catalog/image-search-review.json')
+          old_ready.update(fresh_ready)
+          old_review.update(fresh_review)
           with open('catalog/product-images-map.json', 'w', encoding='utf-8') as fh:
-              json.dump(ready, fh, ensure_ascii=False, indent=2)
+              json.dump(old_ready, fh, ensure_ascii=False, indent=2)
           with open('catalog/image-search-review.json', 'w', encoding='utf-8') as fh:
-              json.dump(data.get('review', {}), fh, ensure_ascii=False, indent=2)
+              json.dump(old_review, fh, ensure_ascii=False, indent=2)
           PY
           git config user.name "alfaeq-image-bot"
           git config user.email "actions@users.noreply.github.com"
