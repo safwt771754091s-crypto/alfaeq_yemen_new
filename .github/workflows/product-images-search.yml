@@ -1,0 +1,99 @@
+name: Product Image Search
+
+# Finds product images by name on the web, matches them strictly, uploads them
+# to Supabase Storage and links them to the product. Only images whose title
+# contains every significant word of the product name are applied; everything
+# else is written to catalog/image-search-review.json for a human to check.
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max products to process this run (0 = all)"
+        required: false
+        default: "300"
+      providers:
+        description: "Comma list: google,ddg"
+        required: false
+        default: "google,ddg"
+      min_score:
+        description: "Accept threshold (1.0 = every name word must match)"
+        required: false
+        default: "1.0"
+      dry_run:
+        description: "true = report only, no writes"
+        required: false
+        default: "false"
+      overwrite:
+        description: "true = replace existing product images"
+        required: false
+        default: "false"
+      workers:
+        description: "Parallel workers"
+        required: false
+        default: "6"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: product-image-search
+  cancel-in-progress: false
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install the free image-search provider
+        run: python3 -m pip install --quiet ddgs
+
+      - name: Guard — service-role key must be present
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SERVICE_KEY" ]; then
+            echo "::error::Add repository secret SUPABASE_SERVICE_ROLE_KEY (Supabase -> Project Settings -> API)."
+            exit 1
+          fi
+
+      - name: Find, match and link product images
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
+        run: |
+          python3 tools/search_product_images.py \
+            --limit "${{ inputs.limit || '300' }}" \
+            --providers "${{ inputs.providers || 'google,ddg' }}" \
+            --min-score "${{ inputs.min_score || '1.0' }}" \
+            --workers "${{ inputs.workers || '6' }}" \
+            --out /tmp/image-search.json \
+            ${{ inputs.dry_run == 'true' && '--dry-run' || '' }} \
+            ${{ inputs.overwrite == 'true' && '--overwrite' || '' }}
+
+      - name: Publish the review report
+        run: |
+          mkdir -p catalog
+          python3 - <<'PY'
+          import json
+          data = json.load(open('/tmp/image-search.json', encoding='utf-8'))
+          with open('catalog/image-search-review.json', 'w', encoding='utf-8') as fh:
+              json.dump(data.get('review', {}), fh, ensure_ascii=False, indent=2)
+          PY
+          git config user.name "alfaeq-image-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add catalog/image-search-review.json
+          if git diff --cached --quiet; then
+            echo "review report unchanged"
+          else
+            git commit -m "chore(catalog): refresh the product image review report"
+            git push
+          fi
