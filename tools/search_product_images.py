@@ -73,11 +73,16 @@ DEFAULT_URL = dart_default(r"projectUrl[\s\S]*?defaultValue:\s*'(https://[^']+)'
 DEFAULT_PUBLISHABLE = dart_default(r"_defaultPublishableKey\s*=\s*'([^']+)'")
 
 
+def safe_url(url):
+    """Percent-encode non-ASCII (e.g. Arabic file names) without touching structure."""
+    return urllib.parse.quote(str(url), safe=":/?&=#%[]@!$&'()*+,;~")
+
+
 def request(url, headers, method="GET", body=None, timeout=40, retries=1):
     last = None
     for attempt in range(retries + 1):
         try:
-            req = urllib.request.Request(url, data=body, headers=headers, method=method)
+            req = urllib.request.Request(safe_url(url), data=body, headers=headers, method=method)
             return urllib.request.urlopen(req, timeout=timeout)
         except (urllib.error.URLError, OSError) as error:
             last = error
@@ -240,12 +245,32 @@ def upload_object(base, service_key, path, data, content_type):
     url = f"{base}/storage/v1/object/{BUCKET}/{urllib.parse.quote(path)}"
     try:
         request(url, service_headers(service_key, {
-            "Content-Type": content_type, "x-upsert": "true",
+            "Content-Type": content_type,
+            "Cache-Control": "max-age=31536000",
+            "x-upsert": "true",
         }), method="POST", body=data, timeout=60).read()
-    except (urllib.error.HTTPError, urllib.error.URLError, OSError) as error:
+    except urllib.error.HTTPError as error:
+        detail = error.read()[:300].decode("utf-8", "replace")
+        print(f"upload failed {path}: HTTP {error.code} {detail}", file=sys.stderr)
+        return False
+    except (urllib.error.URLError, OSError) as error:
         print(f"upload failed {path}: {error}", file=sys.stderr)
         return False
     return True
+
+
+def probe_storage_write(base, service_key):
+    path = f".probe/{int(time.time())}.txt"
+    url = f"{base}/storage/v1/object/{BUCKET}/{urllib.parse.quote(path)}"
+    try:
+        request(url, service_headers(service_key, {
+            "Content-Type": "text/plain", "x-upsert": "true",
+        }), method="POST", body=b"probe", timeout=30)
+        return "ok"
+    except urllib.error.HTTPError as error:
+        return f"http {error.code}: {error.read()[:200].decode('utf-8', 'replace')}"
+    except (urllib.error.URLError, OSError) as error:
+        return f"network: {error!r}"
 
 
 def patch_product(base, service_key, product_id, image_url):
@@ -301,8 +326,13 @@ def main():
     parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--check-key", action="store_true")
     parser.add_argument("--out", default="")
     args = parser.parse_args()
+
+    if args.check_key:
+        print("storage-write:", probe_storage_write(args.url, args.service_key))
+        return
 
     if not args.dry_run and not args.service_key:
         sys.exit("SUPABASE_SERVICE_ROLE_KEY is required to apply (or pass --dry-run)")
