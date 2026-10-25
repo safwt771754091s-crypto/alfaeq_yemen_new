@@ -91,7 +91,8 @@ def request(url, headers, method="GET", body=None, timeout=40, retries=1):
     raise last
 
 
-def load_products(base, key, limit=0, pending_only=True, offset=0):
+def load_products(base, key, limit=0, pending_only=True, offset=0, known=None):
+    known = known or set()
     products, start, page = [], offset, 1000
     headers = {"apikey": key, "Authorization": f"Bearer {key}"}
     while True:
@@ -103,9 +104,14 @@ def load_products(base, key, limit=0, pending_only=True, offset=0):
         rows = json.loads(request(url, headers).read().decode())
         if not rows:
             break
-        products.extend(rows)
+        for row in rows:
+            if str(row["id"]) in known:
+                continue
+            products.append(row)
+            if limit and len(products) >= limit:
+                break
         start += len(rows)
-        if len(rows) < page or (limit and len(products) >= limit):
+        if (limit and len(products) >= limit) or len(rows) < page:
             break
     return products[:limit] if limit else products
 
@@ -350,7 +356,8 @@ def main():
         except (OSError, ValueError):
             pass
     products = load_products(args.url, args.publishable_key, args.limit,
-                             pending_only=not args.overwrite, offset=args.offset)
+                             pending_only=not args.overwrite, offset=args.offset,
+                             known=known)
     pending = [p for p in products
                if (args.overwrite or not str(p.get("image_url") or "").strip())
                and str(p["id"]) not in known]
