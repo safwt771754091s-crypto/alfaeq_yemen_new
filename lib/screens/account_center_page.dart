@@ -15,6 +15,7 @@ import 'my_follows_page.dart';
 import 'my_orders_page.dart';
 import 'notifications_page.dart';
 import 'support_chat_page.dart';
+import 'wallet_deposit_page.dart';
 import 'wallet_vouchers_page.dart';
 import 'world_home_page.dart';
 
@@ -292,6 +293,7 @@ class _AccountCenterPageState extends State<AccountCenterPage> {
                     subtitle: '${CurrencyService.symbolFor(CurrencyService.instance.displayCurrency)} ${CurrencyService.instance.convertBetween((_stats['balance'] as num? ?? 0).toDouble(), (_stats['currency'] ?? 'USD').toString(), CurrencyService.instance.displayCurrency)}',
                     onTap: () => _open(const WalletCenterPage())),
                 _tile(Icons.confirmation_number_outlined, 'رموز شحن المحفظة', onTap: () => _open(const WalletVouchersPage())),
+                _tile(Icons.account_balance_outlined, 'إيداع الرصيد', subtitle: 'حسابات بنك الكريمي الرسمية', onTap: () => _open(const WalletDepositPage())),
                 _tile(Icons.currency_exchange, 'العملة المعروضة',
                     subtitle: CurrencyService.labelFor(CurrencyService.instance.displayCurrency),
                     trailing: const CurrencySelector()),
