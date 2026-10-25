@@ -557,15 +557,22 @@ flutter pub get && flutter analyze && flutter test && flutter build web --releas
   (`apply_product_images.py`) + barcode enrichment (`enrich_product_images.py`, +109).
 - Remaining ~1551 have no free source; need merchant uploads or a paid data source.
 
-## 2026-10-25 — Reels + Live shipped; DDL still needs the owner
+## 2026-10-25 — Reels + Live SHIPPED and APPLIED LIVE
 - Merged: #163 فيديو الفائق (Reels), #165 البث المباشر (Live rooms) — additive migrations
   `20261025010000_reels_v1.sql`, `20261025020000_live_rooms_v1.sql`. Both features are wired
   (home + Discover + ServicesHub) with guard tests; analyze clean, 99 tests, web build OK.
-- The sandbox STILL has no DDL path: only repo secret `SUPABASE_SERVICE_ROLE_KEY` (no
-  SUPABASE_ACCESS_TOKEN, no DB URL). service_role writes rows via PostgREST but cannot run DDL.
-- New opt-in applier: `.github/workflows/apply-migrations.yml` (manual workflow_dispatch,
-  needs a `SUPABASE_DB_URL` repo secret, path-guarded, ON_ERROR_STOP). Docs:
-  `docs/database/APPLYING_MIGRATIONS.md`. Check a migration landed: PostgREST 200 vs 404.
-- 2026-10-25 ~14:40Z: `reels`/`live_rooms`/`reel_comments`/`live_messages` were 404 => the two
-  migrations were NOT yet applied. Reels/Live pages show an Arabic empty state meanwhile.
+- **Both migrations APPLIED LIVE 2026-10-25 ~16:25Z** via the Management API
+  `POST https://api.supabase.com/v1/projects/<ref>/database/query` with a scoped token the
+  owner created (sbp_, resource=Project `alfaeq_yemen_prod`, permission Database:Write).
+  Verified live: tables `reels`/`reel_comments`/`reel_likes`/`live_rooms`/`live_messages`/
+  `live_likes` all 200; RLS on all 6; 10 policies per family; triggers (reel_likes_count,
+  reel_comments_count, reels_touch, live_likes_count, live_gift_total, live_rooms_touch);
+  realtime publication has all 5; storage buckets `reels` (public, 50MB) + `moments`.
+  RPCs match the app exactly: reels_feed/reel_comments_list/reel_register_view/
+  notify_reel_comment/live_start_room/live_end_room/live_register_view/live_rooms_feed/
+  live_messages_list. Functional smoke test passed (insert reel -> view_count++ -> delete).
+- DDL path learned: a plain `sb_secret_...` key or a `service_role` JWT canNOT run DDL
+  ("JWT could not be decoded" / PostgREST only); you need an `sbp_` token with Database:Write.
+- Owner's fallback (no token) is the SQL Editor, or the opt-in
+  `.github/workflows/apply-migrations.yml` (manual workflow_dispatch, needs `SUPABASE_DB_URL`).
 - `gh pr merge` fails on a DRAFT PR — run `gh pr ready <n>` first.
