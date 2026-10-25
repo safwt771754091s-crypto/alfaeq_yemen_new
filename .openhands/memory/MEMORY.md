@@ -546,3 +546,13 @@ flutter pub get && flutter analyze && flutter test && flutter build web --releas
 - Product image search tool+workflow merged (#154-#158): `tools/search_product_images.py`, `.github/workflows/product-images-search.yml` (daily 02:30 UTC; providers google->ddg). Strict matching (all name tokens or barcode in URL); resumes via `--known-file`; outputs `catalog/product-images-map.json` (ready), `image-search-review.json`, `image-search-missed.json`.
 - BLOCKER: repo secret `SUPABASE_SERVICE_ROLE_KEY` is invalid (20 chars, not a JWT) -> Storage uploads always fail (400/403) and no product image was ever applied. anon key cannot write to Storage and PATCHes `products` silently (200, no effect). Owner must set the real service_role key.
 - ai-gateway is healthy; free fallbacks llm7 + pollinations verified answering Arabic.
+
+## 2026-10-25 — service-role key FIXED; images now upload
+- Repo secret `SUPABASE_SERVICE_ROLE_KEY` is now VALID (owner updated 2026-10-25T03:04Z);
+  `--check-key` returns `storage-write: ok`. NOTE: an `eyJ...` prefix proves nothing — `anon`
+  also starts that way. Confirm with the workflow, not the prefix.
+- Sweep bug fixed (PR #160): `load_products` applied `--offset` before the `--known-file`
+  filter, so batches re-read the same page forever. Now known ids are skipped during pagination.
+- Images: start 1541 → 2341 with images (of 3892 active). Applied the ready map
+  (`apply_product_images.py`) + barcode enrichment (`enrich_product_images.py`, +109).
+- Remaining ~1551 have no free source; need merchant uploads or a paid data source.
