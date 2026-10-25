@@ -117,6 +117,16 @@ class CatalogService {
     return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
   }
 
+  /// A single store by id, for deep links (e.g. opening a followed store).
+  Future<CatalogDocument> storeById(String id) async {
+    if (!useSupabase || !SupabaseService.isInitialized) {
+      throw StateError('خدمة الكتالوج الجديدة غير مفعلة.');
+    }
+    final row = await SupabaseService.client.from('stores').select().eq('id', id).maybeSingle();
+    if (row == null) throw StateError('المتجر غير موجود');
+    return CatalogDocument.fromSupabase(Map<String, dynamic>.from(row));
+  }
+
   Future<void> addToCart(String uid, CatalogDocument product, {num? saleQuantity}) async {
     if (!useSupabase || !SupabaseService.isInitialized) {
       throw StateError('خدمة السلة الجديدة غير مفعلة.');

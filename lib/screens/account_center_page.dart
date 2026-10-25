@@ -11,6 +11,7 @@ import 'cart_page.dart';
 import 'conversations_page.dart';
 import 'location_picker_page.dart';
 import 'moments_page.dart';
+import 'my_follows_page.dart';
 import 'my_orders_page.dart';
 import 'notifications_page.dart';
 import 'support_chat_page.dart';
@@ -302,6 +303,7 @@ class _AccountCenterPageState extends State<AccountCenterPage> {
               ]),
               _group('التواصل والخدمات', [
                 _tile(Icons.chat_bubble_outline, 'المحادثات', onTap: () => _open(const ConversationsPage())),
+                _tile(Icons.favorite_outline, 'متابعاتي', onTap: () => _open(const MyFollowsPage())),
                 _tile(Icons.auto_awesome_outlined, 'اللحظات', onTap: () => _open(const MomentsPage())),
                 _tile(Icons.support_agent_outlined, 'دعم الفائق', onTap: () => _open(const SupportChatPage())),
                 _tile(Icons.grid_view_outlined, 'كل الخدمات', onTap: () => _open(const ServicesHubPage())),
