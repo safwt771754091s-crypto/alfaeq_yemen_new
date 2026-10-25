@@ -1,0 +1,87 @@
+name: Apply Migrations
+
+# Manual, opt-in helper to apply additive SQL migrations to the live database.
+#
+# Requires a repo secret SUPABASE_DB_URL (the Postgres connection string from
+# Supabase -> Project Settings -> Database -> Connection string -> URI).
+# It is never printed. This workflow only runs when dispatched by hand.
+#
+# Defaults to the two additive feature migrations shipped on 2026-10-25.
+# Pass a space-separated `files` input to apply something else.
+
+on:
+  workflow_dispatch:
+    inputs:
+      files:
+        description: 'Space-separated migration paths (relative to repo root)'
+        required: true
+        default: 'supabase/migrations/20261025010000_reels_v1.sql supabase/migrations/20261025020000_live_rooms_v1.sql'
+      dry_run:
+        description: 'Only check connectivity, do not apply'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard — secret present
+        run: |
+          if [ -z "${{ secrets.SUPABASE_DB_URL }}" ]; then
+            echo "::error::SUPABASE_DB_URL is not set. Add it under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      - name: Validate migration paths
+        env:
+          FILES: ${{ inputs.files }}
+        run: |
+          set -e
+          for f in $FILES; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Missing file: $f"
+              exit 1
+            fi
+            case "$f" in
+              supabase/migrations/*.sql) ;;
+              *) echo "::error::Refusing to apply outside supabase/migrations: $f"; exit 1 ;;
+            esac
+          done
+          echo "Files to apply: $FILES"
+
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Connectivity check
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: psql "$DB_URL" -v ON_ERROR_STOP=1 -c "select version();"
+
+      - name: Apply migrations
+        if: ${{ inputs.dry_run == false }}
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          FILES: ${{ inputs.files }}
+        run: |
+          set -e
+          for f in $FILES; do
+            echo "::group::Applying $f"
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$f"
+            echo "::endgroup::"
+          done
+          echo "All migrations applied."
+
+      - name: Summary
+        run: |
+          {
+            echo "### Apply Migrations"
+            echo ""
+            echo "- Files: \`${{ inputs.files }}\`"
+            echo "- Dry run: \`${{ inputs.dry_run }}\`"
+            echo "- Status: done"
+          } >> "$GITHUB_STEP_SUMMARY"

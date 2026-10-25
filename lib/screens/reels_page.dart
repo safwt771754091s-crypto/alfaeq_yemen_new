@@ -114,7 +114,7 @@ class _ReelsPageState extends State<ReelsPage> {
                 return const Center(child: CircularProgressIndicator(color: Colors.white));
               }
               if (snap.hasError) {
-                return _empty('تعذر تحميل الفيديوهات', '${snap.error}', _reload);
+                return _empty('تعذر تحميل الفيديوهات', 'تأكد من إعداد الخدمة ثم أعد المحاولة.', _reload);
               }
               final rows = snap.data ?? const [];
               if (rows.isEmpty) {
