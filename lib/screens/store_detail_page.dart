@@ -8,6 +8,7 @@ import '../services/currency_service.dart';
 import '../services/catalog_service.dart';
 import '../services/review_service.dart';
 import '../services/supabase_service.dart';
+import '../widgets/follow_button.dart';
 import 'cart_page.dart';
 import 'product_detail_page.dart';
 
@@ -168,6 +169,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
         appBar: AppBar(
           title: Text(_name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)),
           actions: [
+            FollowButton(targetType: 'store', targetId: widget.store.id, compact: true),
+            const SizedBox(width: 4),
             IconButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage())), tooltip: 'السلة', icon: const Icon(Icons.shopping_cart_outlined)),
           ],
         ),
