@@ -20,3 +20,6 @@ supabase/.temp/
 # Local tooling artifacts
 .flutter-plugins-dependencies
 .openhands/
+
+# Agent scratch space
+.agent_tmp/

@@ -297,7 +297,28 @@ void main() {
       // Discover must expose the WeChat-style entries.
       expect(home, contains('MiniProgramsPage()'));
       expect(home, contains('MomentsPage()'));
+      expect(home, contains('ReelsPage()'));
       expect(home, contains('ServicesHubPage()'));
+    });
+
+    test('reels (فيديو الفائق) mirrors the Moments architecture', () {
+      final page = File('lib/screens/reels_page.dart').readAsStringSync();
+      expect(page, contains('class ReelsPage'));
+      expect(page, contains('class ReelsComposerPage'));
+      expect(page, contains("_service.registerView("));
+      expect(page, contains('VideoPlayerController'));
+
+      final service = File('lib/services/reels_service.dart').readAsStringSync();
+      expect(service, contains("rpc('reels_feed'"));
+      expect(service, contains("rpc('reel_comments_list'"));
+      expect(service, contains("rpc('notify_reel_comment'"));
+      expect(service, contains("from('reel_likes')"));
+
+      final migration = File('supabase/migrations/20261025010000_reels_v1.sql').readAsStringSync();
+      expect(migration, contains('create table if not exists public.reels'));
+      expect(migration, contains('function public.reels_feed'));
+      expect(migration, contains('function public.reel_register_view'));
+      expect(migration, contains("'reels'"));
     });
 
     test('contacts directory mirrors WeChat Contacts', () {
