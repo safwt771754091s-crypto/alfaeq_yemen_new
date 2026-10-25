@@ -47,6 +47,10 @@ jobs:
           python3 tools/build_product_gallery.py --out catalog || echo "::warning::gallery refresh failed, shipping the committed copy"
           mkdir -p build/web/catalog
           cp -f catalog/index.html catalog/products.json catalog/missing-images.json build/web/catalog/
+      - name: Publish store pages (download + privacy)
+        run: |
+          mkdir -p build/web/store
+          cp -f store/web/index.html store/web/privacy.html store/web/icon-512.png build/web/store/
       - uses: actions/upload-artifact@v7
         with:
           name: alfaeq-yemen-web
