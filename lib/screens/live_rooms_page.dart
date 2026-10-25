@@ -88,7 +88,7 @@ class _LiveLobbyPageState extends State<LiveLobbyPage> {
                 return const Center(child: CircularProgressIndicator());
               }
               final rows = snap.data ?? const [];
-              if (rows.isEmpty) {
+              if (snap.hasError || rows.isEmpty) {
                 return const Center(
                   child: Padding(
                     padding: EdgeInsets.all(28),
