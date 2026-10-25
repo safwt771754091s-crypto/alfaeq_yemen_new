@@ -50,7 +50,7 @@ jobs:
       - name: Publish store pages (download + privacy)
         run: |
           mkdir -p build/web/store
-          cp -f store/web/index.html store/web/privacy.html store/web/icon-512.png build/web/store/
+          cp -f store/site/index.html store/site/privacy.html store/site/icon-512.png build/web/store/
       - uses: actions/upload-artifact@v7
         with:
           name: alfaeq-yemen-web
