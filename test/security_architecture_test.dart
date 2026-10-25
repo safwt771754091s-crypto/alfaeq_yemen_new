@@ -298,7 +298,28 @@ void main() {
       expect(home, contains('MiniProgramsPage()'));
       expect(home, contains('MomentsPage()'));
       expect(home, contains('ReelsPage()'));
+      expect(home, contains('LiveLobbyPage()'));
       expect(home, contains('ServicesHubPage()'));
+    });
+
+    test('live rooms (البث المباشر) mirror the Reels architecture', () {
+      final page = File('lib/screens/live_rooms_page.dart').readAsStringSync();
+      expect(page, contains('class LiveLobbyPage'));
+      expect(page, contains('class LiveRoomPage'));
+      expect(page, contains('VideoPlayerController'));
+
+      final service = File('lib/services/live_service.dart').readAsStringSync();
+      expect(service, contains("rpc('live_rooms_feed'"));
+      expect(service, contains("rpc('live_messages_list'"));
+      expect(service, contains("rpc('live_start_room'"));
+      expect(service, contains("rpc('live_end_room'"));
+      expect(service, contains("from('live_messages')"));
+
+      final migration = File('supabase/migrations/20261025020000_live_rooms_v1.sql').readAsStringSync();
+      expect(migration, contains('create table if not exists public.live_rooms'));
+      expect(migration, contains('function public.live_rooms_feed'));
+      expect(migration, contains('function public.live_start_room'));
+      expect(migration, contains('function public.live_end_room'));
     });
 
     test('reels (فيديو الفائق) mirrors the Moments architecture', () {
