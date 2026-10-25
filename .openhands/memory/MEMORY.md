@@ -596,3 +596,30 @@ flutter pub get && flutter analyze && flutter test && flutter build web --releas
 - WeChat parity gaps still open: red packets (الهدايا الحمراء), stickers, live video
   transport, chat media/voice messages, Official Accounts (公众号), and the
   mini-program catalogue content.
+
+## 2026-10-25 (latest) — Master bank deposits + absolute owner
+- Owner account = `safwt771754091s@gmail.com` (uid 0eebb087-88e9-41c8-9f34-caf890adb54b,
+  public.users role='owner', owner=true, admin=true). Verified live.
+- Migration `20261025040000_master_bank_deposits_v1.sql` (applied live, HTTP 201):
+  - `master_bank_accounts` (currency unique YER/SAR/USD) seeded with Al-Kuraimi
+    numbers YER 3009540813, SAR 3065094443, USD 3065190868.
+  - `wallet_deposits` (uid, currency, amount, receipt_ref, receipt_url, status,
+    credited, balance_after, reviewed_by/at/note) + unique (currency,receipt_ref)
+    where status<>'rejected'; RLS self-read/insert, owner-only update; realtime.
+  - `master_permissions` (uid, permission, granted); owners hold ALL by default
+    (`has_master_permission` coalesces missing row to true).
+  - `private.is_master_owner()` (DB-backed: owner/admin/role) + `is_platform_staff()`
+    now also DB-backed so owner reaches admin tables without a JWT app_role claim.
+  - RPCs: `wallet_deposit_create`, `wallet_deposits_list`, `wallet_deposit_decide`
+    (idempotent credit via `private.deposit_credit`, ledger key `deposit:<id>`),
+    `master_permissions_list/set`, `has_master_permission`.
+  - Private storage bucket `deposits` (10MB) + owner-scoped policies.
+- App: `WalletDepositPage` (إيداع الرصيد) + `WalletDepositsReviewPage` (اعتماد
+  الإيداعات, owner-gated); `WalletDepositService`; wired into account center and
+  admin dashboard. Version 1.0.11+11 (PR #174 merged).
+- Gotcha: this file_picker version (13.1.0) API is `FilePicker.pickFile(...)` +
+  `PlatformFile.readAsBytes()` — there is NO `FilePicker.platform`.
+- Wallet model: one wallet per user, PK uid; `private.wallet_credit_internal`
+  raises `wallet_currency_mismatch` if the wallet currency differs and balance>0.
+- Verified live E2E: customer create deposit -> owner list -> approve -> balance
+  50 USD; customer `wallet_deposit_decide` -> `not_authorized`.
