@@ -556,3 +556,16 @@ flutter pub get && flutter analyze && flutter test && flutter build web --releas
 - Images: start 1541 → 2341 with images (of 3892 active). Applied the ready map
   (`apply_product_images.py`) + barcode enrichment (`enrich_product_images.py`, +109).
 - Remaining ~1551 have no free source; need merchant uploads or a paid data source.
+
+## 2026-10-25 — Reels + Live shipped; DDL still needs the owner
+- Merged: #163 فيديو الفائق (Reels), #165 البث المباشر (Live rooms) — additive migrations
+  `20261025010000_reels_v1.sql`, `20261025020000_live_rooms_v1.sql`. Both features are wired
+  (home + Discover + ServicesHub) with guard tests; analyze clean, 99 tests, web build OK.
+- The sandbox STILL has no DDL path: only repo secret `SUPABASE_SERVICE_ROLE_KEY` (no
+  SUPABASE_ACCESS_TOKEN, no DB URL). service_role writes rows via PostgREST but cannot run DDL.
+- New opt-in applier: `.github/workflows/apply-migrations.yml` (manual workflow_dispatch,
+  needs a `SUPABASE_DB_URL` repo secret, path-guarded, ON_ERROR_STOP). Docs:
+  `docs/database/APPLYING_MIGRATIONS.md`. Check a migration landed: PostgREST 200 vs 404.
+- 2026-10-25 ~14:40Z: `reels`/`live_rooms`/`reel_comments`/`live_messages` were 404 => the two
+  migrations were NOT yet applied. Reels/Live pages show an Arabic empty state meanwhile.
+- `gh pr merge` fails on a DRAFT PR — run `gh pr ready <n>` first.
