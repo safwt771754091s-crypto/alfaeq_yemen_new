@@ -576,3 +576,23 @@ flutter pub get && flutter analyze && flutter test && flutter build web --releas
 - Owner's fallback (no token) is the SQL Editor, or the opt-in
   `.github/workflows/apply-migrations.yml` (manual workflow_dispatch, needs `SUPABASE_DB_URL`).
 - `gh pr merge` fails on a DRAFT PR — run `gh pr ready <n>` first.
+
+## 2026-10-25 (later) — Publishing + WeChat parity: follows
+- Releases: bumped pubspec 1.0.8+8 -> 1.0.9+9 (Reels+Live, PR #171) -> 1.0.10+10
+  (adds follows, PR #172). Android Release workflow builds apk+aab on every main
+  push; download with `gh run download <id>` then `gh release create vX.Y.Z <apk> <aab>`.
+  Owner installs the APK directly from the GitHub release.
+- Follows feature (PR #172): `20261025030000_follows_v1.sql` — `public.follows`
+  (follower_id uuid, target_type store|user, target_id TEXT because stores.id is
+  text), RLS (read all authenticated, write own), `follow_count_sync` trigger keeps
+  `stores.follower_count`, RPCs `follow_toggle(text,text)`/`follow_state`/`my_follows`.
+  Applied live + verified (toggle -> count 1 -> list -> 0). App: `FollowService`,
+  `FollowButton` (store app bar), `MyFollowsPage` (account center), `storeById`.
+- Gotcha: `stores.id` and `orders`/etc. ids are TEXT, not uuid — join to auth.users
+  with `u.id::text = target_id`.
+- ai-gateway Edge Function works: sign up a user via `/auth/v1/signup` (email confirm
+  is OFF) to get a JWT, then POST `/functions/v1/ai-gateway`; returns Arabic answers
+  via codestral-latest.
+- WeChat parity gaps still open: red packets (الهدايا الحمراء), stickers, live video
+  transport, chat media/voice messages, Official Accounts (公众号), and the
+  mini-program catalogue content.
