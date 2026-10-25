@@ -23,3 +23,7 @@ supabase/.temp/
 
 # Agent scratch space
 .agent_tmp/
+
+# Local Android release keystore backup (NEVER commit - losing/leaking it
+# breaks Play updates and allows forged releases)
+.secrets-backup/
