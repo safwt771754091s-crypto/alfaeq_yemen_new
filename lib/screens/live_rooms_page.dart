@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../core/sound_prefs.dart';
 import '../services/live_service.dart';
 
 const _blue = Color(0xFF0D6EFD);
@@ -235,10 +236,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     final room = rows.firstWhere((r) => r['id']?.toString() == widget.roomId, orElse: () => const {});
     final url = room['playback_url']?.toString() ?? '';
     if (url.isEmpty) return;
+    final soundOn = await SoundPrefs.load();
     final controller = VideoPlayerController.networkUrl(Uri.parse(url));
     try {
       await controller.initialize();
       await controller.setLooping(true);
+      _muted = !soundOn;
       await controller.setVolume(_muted ? 0 : 1);
       if (!mounted) {
         await controller.dispose();
@@ -338,6 +341,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               onPressed: () => setState(() {
                 _muted = !_muted;
                 video.setVolume(_muted ? 0 : 1);
+                SoundPrefs.set(!_muted);
               }),
               icon: Icon(_muted ? Icons.volume_off : Icons.volume_up, color: Colors.white),
             ),
