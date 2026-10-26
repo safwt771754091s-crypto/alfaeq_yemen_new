@@ -9,7 +9,9 @@ import '../services/profile_service.dart';
 import '../widgets/currency_selector.dart';
 import 'cart_page.dart';
 import 'conversations_page.dart';
+import 'driver_application_page.dart';
 import 'location_picker_page.dart';
+import 'merchant_application_page.dart';
 import 'moments_page.dart';
 import 'my_follows_page.dart';
 import 'my_orders_page.dart';
@@ -302,6 +304,10 @@ class _AccountCenterPageState extends State<AccountCenterPage> {
                 _tile(Icons.person_outline, 'تعديل الملف الشخصي', onTap: _editProfile),
                 _tile(Icons.lock_outline, 'تغيير كلمة المرور', onTap: _changePassword),
                 _tile(Icons.alternate_email, 'تغيير البريد الإلكتروني', subtitle: _email, onTap: _changeEmail),
+              ]),
+              _group('اعمل معنا', [
+                _tile(Icons.storefront_outlined, 'انضم كتاجر', subtitle: 'افتح متجرك على الفائق يمن', onTap: () => _open(const MerchantApplicationPage())),
+                _tile(Icons.delivery_dining_outlined, 'انضم كمندوب توصيل', subtitle: 'اعمل مندوباً واستلم مهام التوصيل', onTap: () => _open(const DriverApplicationPage())),
               ]),
               _group('التواصل والخدمات', [
                 _tile(Icons.chat_bubble_outline, 'المحادثات', onTap: () => _open(const ConversationsPage())),
