@@ -675,3 +675,24 @@ flutter pub get && flutter analyze && flutter test && flutter build web --releas
   (paste from the public raw URL), or (b) add SUPABASE_DB_URL then dispatch the workflow.
 - Supabase project ref is `esvljorjzgrpnrxnma` (project alfaeq_yemen_prod); client uses the
   default publishable key `sb_publishable_xJfLBgrqWM8yEa3FM9qfig_FwnfTKue`.
+
+## Red packets (حزمة حمراء 🧧) — v1.0.13, PR #182
+- WeChat-style red packets in chat. Migration
+  `supabase/migrations/20261026020000_red_packets_v1.sql` (NOT YET APPLIED to prod).
+- Tables `red_packets` + `red_packet_claims`; RPCs red_packet_create/open/details/
+  claims_list/reclaim. Money legs use wallet_ledger with idempotency keys
+  `rp-lock-<pkt>`, `rp-claim-<pkt>-<uid>`, `rp-refund-<pkt>`. No minting.
+- UI: send_red_packet_sheet.dart, red_packet_page.dart, wired into DirectChatPage
+  (contacts_page.dart) + GroupChatPage. Version bumped 1.0.12+12 -> 1.0.13+13.
+- Verified with a REAL PostgreSQL 17 harness (not just static analysis). This caught
+  two runtime bugs `flutter analyze` cannot see:
+  1. `round(double precision, int)` does not exist -> cast `(...)::numeric`.
+  2. In `RETURNS TABLE` PL/pgSQL functions the OUT column names (remaining_amount,
+     opened_count, ...) shadow table columns -> must qualify (`rp.opened_count`) or
+     select INTO locals. This is a recurring trap for this codebase.
+- Harness lives in git-ignored `.agent_tmp/redpacket_harness/` (bootstrap.sql stubs
+  auth.uid()/auth.jwt() via GUCs + minimal tables; assertions.sql proves conservation).
+- Local PG setup that works here: `apt-get install postgresql` (Debian 13 -> PG17),
+  initdb -A trust, `pg_ctl -o "-p 55432 -k /tmp"`, then create roles anon/authenticated/
+  service_role before applying RLS migrations (stock PG lacks Supabase roles).
+- Sandbox has no Android SDK, so `flutter build apk` fails locally; CI builds it.
