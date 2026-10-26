@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../core/sound_prefs.dart';
 import '../services/reels_service.dart';
 
 const _blue = Color(0xFF0D6EFD);
@@ -192,23 +193,37 @@ class _ReelViewState extends State<_ReelView> {
       setState(() => _failed = true);
       return;
     }
+    final soundOn = await SoundPrefs.load();
     final controller = VideoPlayerController.networkUrl(Uri.parse(url));
     try {
       await controller.initialize();
-      await controller.setLooping(true);
-      await controller.setVolume(_muted ? 0 : 1);
-      if (!mounted) {
-        await controller.dispose();
-        return;
-      }
-      setState(() {
-        _video = controller;
-        _ready = true;
-      });
-      if (widget.active) await controller.play();
     } catch (_) {
       await controller.dispose();
       if (mounted) setState(() => _failed = true);
+      return;
+    }
+    await controller.setLooping(true);
+    _muted = !soundOn;
+    await controller.setVolume(_muted ? 0 : 1);
+    if (!mounted) {
+      await controller.dispose();
+      return;
+    }
+    setState(() {
+      _video = controller;
+      _ready = true;
+    });
+    if (!widget.active) return;
+    try {
+      await controller.play();
+    } catch (_) {
+      // Browsers may block autoplay with sound; fall back to muted playback.
+      _muted = true;
+      await controller.setVolume(0);
+      try {
+        await controller.play();
+      } catch (_) {}
+      if (mounted) setState(() {});
     }
   }
 
@@ -249,6 +264,7 @@ class _ReelViewState extends State<_ReelView> {
       _muted = !_muted;
       video.setVolume(_muted ? 0 : 1);
     });
+    SoundPrefs.set(!_muted);
   }
 
   String get _author => widget.reel['author_name']?.toString().trim().isNotEmpty == true
