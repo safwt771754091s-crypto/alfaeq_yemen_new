@@ -716,3 +716,15 @@ flutter pub get && flutter analyze && flutter test && flutter build web --releas
   fails DNS). A valid sbp_ management token was recovered from yesterday's conversation
   event logs under /workspace/conversations/. Secrets are NOT in the shell env and the repo
   has no SUPABASE_DB_URL, but the Management API query endpoint is the reliable write path.
+
+## Video sound (v1.0.14) — "لا صوت" was a UX default, not a broken file
+- Symptom: owner uploaded a reel, "الصوت لا يعمل". The MP4 itself was fine — verified via
+  a pure-Python MP4 box walk (moov > trak handler 'soun' + codec 'mp4a'; video 'avc1').
+  Storage host *.supabase.co DOES resolve for downloads even though the base URL gave 400.
+- Root cause: `lib/screens/reels_page.dart` and `lib/screens/live_rooms_page.dart` started
+  every video `_muted = true` (TikTok-style) with a small, easy-to-miss mute button.
+- Fix: `lib/core/sound_prefs.dart` (shared_preferences, sound ON by default, remembers the
+  toggle); both players now `_muted = !SoundPrefs.load()`; play() is wrapped so a browser
+  autoplay-with-sound block degrades to muted playback instead of showing a failure.
+- Lesson: "media won't play audio" in this app = check the mute default FIRST; the uploaded
+  media is usually valid. Version bumped to 1.0.14.
