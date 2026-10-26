@@ -28,6 +28,8 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
   String? _selectedStoreId;
   String _saleUnit = 'piece';
   String _priceCurrency = 'YER';
+  String _productSearch = '';
+  int _productPage = 1;
   bool _saving = false;
   final _eventBus = AlfaeqEventBusService();
 
@@ -254,31 +256,66 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
         future: AuthService().hasOwnerClaim(),
         builder: (context, ownerSnapshot) {
           final isOwner = ownerSnapshot.data == true;
-          return StreamBuilder<List<Map<String, dynamic>>>(
-            stream: isOwner
-                ? SupabaseService.client.from('products').stream(primaryKey: ['id']).limit(200)
-                : SupabaseService.client.from('products').stream(primaryKey: ['id']).eq('owner_id', uid).limit(200),
+          return FutureBuilder<_ProductPage>(
+            future: _loadProductsPage(uid, isOwner),
             builder: (context, snapshot) {
-    if (snapshot.hasError) return _error(snapshot.error.toString());
-    if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
-    final docs = snapshot.data ?? const <Map<String, dynamic>>[]; final filtered = _selectedStoreId == null ? docs : docs.where((doc) => doc['store_id'] == _selectedStoreId).toList();
-    if (filtered.isEmpty) return const _EmptyCard(text: 'لا توجد أصناف لهذا المتجر بعد.');
-    const maxRows = 150;
-    final visible = filtered.take(maxRows).toList();
-    return Column(children: [
-      Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text('عرض ${visible.length} من ${filtered.length} صنفًا${isOwner ? ' (كل الأصناف)' : ''} — استخدم البحث/التصفية للوصول إلى الباقي.', style: const TextStyle(color: Colors.black54, fontSize: 12), textAlign: TextAlign.center),
-      ),
-      ...visible.map((doc) { final data = doc; return Card(elevation: 0, child: ListTile(leading: const Icon(Icons.inventory_2_outlined), title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('مخزون: ${data['stock'] ?? 0} • حالة: ${data['status'] ?? 'active'}'), trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [Text(CurrencyService.instance.formatProduct(data), style: const TextStyle(fontWeight: FontWeight.w900)), TextButton(onPressed: () => _updateProduct(doc), child: const Text('تعديل'))]), onTap: () => _updateProduct(doc))); }),
-    ]);
-          });
+              if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
+              if (snapshot.hasError) return _error(snapshot.error.toString());
+              final page = snapshot.data ?? const _ProductPage([], 0);
+              if (page.total == 0) return const _EmptyCard(text: 'لا توجد أصناف مطابقة.');
+              return Column(children: [
+                TextField(
+                  onChanged: (v) => setState(() { _productSearch = v; _productPage = 1; }),
+                  decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'ابحث باسم الصنف للوصول السريع', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 6),
+                Text('إجمالي الأصناف: ${page.total}${isOwner ? ' (كل الأصناف)' : ''} • ظاهر الآن ${page.items.length}',
+                    style: const TextStyle(color: Colors.black54, fontSize: 12), textAlign: TextAlign.center),
+                ...page.items.map((data) => Card(elevation: 0, child: ListTile(
+                      leading: const Icon(Icons.inventory_2_outlined),
+                      title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                      subtitle: Text('مخزون: ${data['stock'] ?? 0} • حالة: ${data['status'] ?? 'active'}'),
+                      trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+                        Text(CurrencyService.instance.formatProduct(data), style: const TextStyle(fontWeight: FontWeight.w900)),
+                        TextButton(onPressed: () => _updateProduct(data), child: const Text('تعديل')),
+                      ]),
+                      onTap: () => _updateProduct(data),
+                    ))),
+                if (page.items.length < page.total)
+                  Padding(padding: const EdgeInsets.only(top: 8), child: OutlinedButton.icon(
+                        onPressed: () => setState(() => _productPage++),
+                        icon: const Icon(Icons.expand_more),
+                        label: Text('عرض المزيد (${page.total - page.items.length} متبقٍ)'),
+                      )),
+              ]);
+            },
+          );
         },
       );
+
+  /// Server-side paging so the owner can browse the whole catalog instead of a
+  /// 200-row realtime window. `total` is the exact server count of the filter.
+  Future<_ProductPage> _loadProductsPage(String uid, bool isOwner) async {
+    const pageSize = 30;
+    var query = SupabaseService.client.from('products').select();
+    if (_selectedStoreId != null) {
+      query = query.eq('store_id', _selectedStoreId!);
+    } else if (!isOwner) {
+      query = query.eq('owner_id', uid);
+    }
+    final search = _productSearch.trim();
+    if (search.isNotEmpty) query = query.ilike('name', '%$search%');
+    final res = await query
+        .order('created_at', ascending: false)
+        .range(0, _productPage * pageSize - 1)
+        .count(CountOption.exact);
+    return _ProductPage(res.data, res.count);
+  }
 
   Widget _error(String text) => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(14), child: Text('تعذر تحميل البيانات.\n$text')));
 }
 
+class _ProductPage { final List<Map<String, dynamic>> items; final int total; const _ProductPage(this.items, this.total); }
 class _HeroCard extends StatelessWidget { @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF0B6E4F), Color(0xFF124E78)]), borderRadius: BorderRadius.circular(26)), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.storefront, color: Colors.white, size: 34), SizedBox(height: 10), Text('مركز أعمالك في الفائق يمن', style: TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900)), SizedBox(height: 8), Text('أنشئ متجرك، أدر الكتالوج والأسعار والمخزون، وتابع جاهزية بياناتك للبيع داخل المنصة.', style: TextStyle(color: Colors.white70, height: 1.5))])); }
 class _SectionTitle extends StatelessWidget { final String title; final IconData icon; const _SectionTitle({required this.title, required this.icon}); @override Widget build(BuildContext context) => Row(children: [Icon(icon, color: Theme.of(context).colorScheme.primary), const SizedBox(width: 8), Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900))]); }
 class _EmptyCard extends StatelessWidget { final String text; const _EmptyCard({required this.text}); @override Widget build(BuildContext context) => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(18), child: Center(child: Text(text)))); }
