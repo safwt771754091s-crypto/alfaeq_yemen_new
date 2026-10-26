@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
+import 'red_packet_page.dart';
+import 'send_red_packet_sheet.dart';
 
 /// WeChat-style group conversation: message stream, composer, and an
 /// "add members" sheet that lists the caller's chat contacts.
@@ -96,6 +98,36 @@ class _GroupChatPageState extends State<GroupChatPage> {
                       final row = messages[i];
                       final mine = row['sender_id']?.toString() == _uid;
                       final sender = (row['metadata'] is Map ? (row['metadata'] as Map)['sender_name'] : null)?.toString();
+                      final meta = row['metadata'];
+                      final packetId = meta is Map ? meta['packet_id']?.toString() : null;
+                      if (packetId != null) {
+                        return Align(
+                          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+                          child: GestureDetector(
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RedPacketPage(packetId: packetId, title: 'الحزمة الحمراء 🧧'))),
+                            child: Container(
+                              constraints: const BoxConstraints(maxWidth: 300),
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(colors: [Color(0xFFE67E22), Color(0xFFC0392B)]),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(children: [
+                                const Icon(Icons.card_giftcard, color: Colors.white, size: 30),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Text((row['body'] ?? 'حزمة حمراء 🧧').toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                                    const SizedBox(height: 2),
+                                    Text('${meta is Map ? meta['amount'] ?? '' : ''} ${meta is Map ? meta['currency'] ?? '' : ''} • اضغط للفتح', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                  ]),
+                                ),
+                              ]),
+                            ),
+                          ),
+                        );
+                      }
                       return Align(
                         alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                         child: Column(
@@ -140,6 +172,14 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'حزمة حمراء',
+                    onPressed: () async {
+                      final sent = await showSendRedPacketSheet(context, threadId: widget.threadId);
+                      if (sent && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال الحزمة الحمراء 🧧')));
+                    },
+                    icon: const Icon(Icons.card_giftcard, color: Color(0xFFC0392B)),
+                  ),
                   IconButton.filled(onPressed: _sending ? null : _send, icon: const Icon(Icons.send)),
                 ]),
               ),
