@@ -1,4 +1,5 @@
 import '../services/supabase_service.dart';
+import 'package:postgrest/postgrest.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
@@ -213,6 +214,21 @@ class AdminDashboard extends StatelessWidget {
 
   Future<_AdminStats> _loadStats() async {
     final client = SupabaseService.client;
+    // PostgREST caps a response at max_rows (1000), so counting returned rows
+    // silently under-reports large tables. Ask for the exact count instead.
+    Future<int> exactCount(PostgrestFilterBuilder<List<Map<String, dynamic>>> q) async {
+      try {
+        return (await q.order('created_at').count(CountOption.exact)).count;
+      } catch (_) {
+        // Tables without created_at, or transient errors: fall back to rows.
+        try {
+          return (await q.count(CountOption.exact)).count;
+        } catch (_) {
+          return -1;
+        }
+      }
+    }
+
     final results = await Future.wait([
       client.from('users').select('uid'),
       client.from('stores').select('id'),
@@ -242,10 +258,10 @@ class AdminDashboard extends StatelessWidget {
       loggedInUsers: uids.length,
       loginEvents: loginRows.length,
       stores: (results[1] as List).length,
-      products: (results[2] as List).length,
-      orders: (results[3] as List).length,
-      walletOperations: (results[4] as List).length,
-      auditLogs: (results[5] as List).length,
+      products: await exactCount(client.from('products').select('id')),
+      orders: await exactCount(client.from('orders').select('id')),
+      walletOperations: await exactCount(client.from('wallet_operations').select('id')),
+      auditLogs: await exactCount(client.from('audit_logs').select('id')),
     );
   }
 
@@ -271,7 +287,7 @@ class _Metric extends StatelessWidget {
   final IconData icon;
   const _Metric({required this.label, required this.value, required this.icon});
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6), decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(14)), child: Column(children: [Icon(icon, size: 22), const SizedBox(height: 5), Text('$value', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10))]));
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6), decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(14)), child: Column(children: [Icon(icon, size: 22), const SizedBox(height: 5), Text(value < 0 ? '—' : '$value', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10))]));
 }
 
 class _QuickAction { final IconData icon; final String title; final VoidCallback onTap; const _QuickAction(this.icon, this.title, this.onTap); }

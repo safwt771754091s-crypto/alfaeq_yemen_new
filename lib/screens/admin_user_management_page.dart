@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/permission_catalog.dart';
 import '../services/supabase_service.dart';
+import 'permissions_editor.dart';
 import 'package:flutter/material.dart';
 
 class AdminUserManagementPage extends StatefulWidget {
@@ -18,16 +20,9 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
     'owner': 'مالك المنصة', 'admin': 'مدير', 'supervisor': 'مشرف', 'developer': 'مطور',
     'finance': 'مالية', 'merchant': 'تاجر', 'driver': 'مندوب', 'customer': 'عميل',
   };
-  static const permissionLabels = <String, String>{
-    'manageMerchants': 'إضافة وإدارة التجار',
-    'approveMerchants': 'اعتماد التجار',
-    'manageProducts': 'إدارة الأصناف',
-    'importProducts': 'استيراد/سحب الأصناف من Excel',
-    'viewUsers': 'عرض الحسابات',
-    'developerCenter': 'مركز المطور والأمن',
-    'automation': 'أتمتة المنصة',
-    'manageDispatch': 'إدارة المندوبين والتوزيع',
-    'manageWallets': 'إدارة المحافظ',
+  // The full platform catalog (36 permissions), not just the legacy subset.
+  static final Map<String, String> permissionLabels = {
+    for (final p in PermissionCatalog.all) p.id: p.label,
   };
 
   @override
@@ -73,30 +68,9 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
 
   Future<void> _setPermissions(Map<String, dynamic> user) async {
     final uid = user['uid'] as String?; if (uid == null) return;
-    final current = Set<String>.from((user['permissions'] as List? ?? const []).whereType<String>());
-    final selected = Set<String>.from(current);
-    final result = await showDialog<Set<String>>(
-      context: context,
-      builder: (context) => StatefulBuilder(builder: (context, setDialogState) => AlertDialog(
-        title: Text('صلاحيات ${user['displayName'] ?? user['email'] ?? 'المشرف'}'),
-        content: SizedBox(width: 500, child: SingleChildScrollView(child: Column(children: permissionLabels.entries.map((entry) => CheckboxListTile(
-          value: selected.contains(entry.key),
-          title: Text(entry.value),
-          dense: true,
-          onChanged: (value) => setDialogState(() => value == true ? selected.add(entry.key) : selected.remove(entry.key)),
-        )).toList()))),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(context, selected), child: const Text('حفظ الصلاحيات'))],
-      )),
-    );
-    if (result == null) return;
-    try {
-      await _adminUsers('set_permissions', {'uid': uid, 'permissions': result.toList()});
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ صلاحيات الحساب على الخادم.')));
-      await _loadUsers();
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
+    final name = (user['displayName'] ?? user['email'] ?? 'الحساب').toString();
+    await showPermissionsEditor(context, uid: uid, title: 'صلاحيات $name');
+    await _loadUsers();
   }
 
   Future<void> _setDisabled(Map<String, dynamic> user, bool disabled) async {
@@ -143,7 +117,7 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage> {
     final phone = user['phoneNumber'] as String? ?? '';
     final title = name.isEmpty ? (email.isEmpty ? phone : email) : name;
     final initial = title.isEmpty ? '?' : title.characters.first.toUpperCase();
-    final canConfigure = role == 'admin' || role == 'supervisor';
+    final canConfigure = role == 'owner' || role == 'admin' || role == 'supervisor';
     final permissions = List<String>.from((user['permissions'] as List? ?? const []).whereType<String>());
     return Card(margin: const EdgeInsets.only(bottom: 10), child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
       ListTile(contentPadding: EdgeInsets.zero, leading: Stack(children: [CircleAvatar(child: Text(initial)), if (online) Positioned(left: 0, bottom: 0, child: Container(width: 13, height: 13, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.green, border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2))))]),
