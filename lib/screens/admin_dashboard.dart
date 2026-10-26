@@ -10,10 +10,12 @@ import 'cart_page.dart';
 import 'bulk_product_import_page.dart';
 import 'developer_page.dart';
 import 'dispatch_center_page.dart';
+import 'driver_applications_review_page.dart';
 import 'fx_rates_page.dart';
 import 'location_picker_page.dart';
 import 'local_payment_review_page.dart';
 import 'merchant_approval_page.dart';
+import 'merchant_applications_review_page.dart';
 import 'merchant_invites_page.dart';
 import 'merchant_portal_page.dart';
 import 'platform_control_page.dart';
@@ -90,6 +92,7 @@ class AdminDashboard extends StatelessWidget {
                 _ActionCard(icon: Icons.card_giftcard, title: 'رموز شحن المحفظة', subtitle: 'إصدار رموز شحن مدفوعة وتتبّع استخدامها', onTap: () => _open(context, const WalletVouchersPage())),
                 _ActionCard(icon: Icons.message_outlined, title: 'أتمتة واتساب', subtitle: 'استقبال منتجات التجار عبر WhatsApp Business وربطها بالمتجر', onTap: () => _open(context, WhatsAppAutomationPage())),
                 _ActionCard(icon: Icons.fact_check_outlined, title: 'اعتماد المتاجر', subtitle: 'مراجعة واعتماد طلبات التجار', onTap: () => _open(context, MerchantApprovalPage())),
+                _ActionCard(icon: Icons.person_add_alt_outlined, title: 'طلبات التجار الجديدة', subtitle: 'مراجعة طلبات الانضمام الذاتي كتاجر', onTap: () => _open(context, const MerchantApplicationsReviewPage())),
                 _ActionCard(icon: Icons.campaign_outlined, title: 'تحديثات الصفحة الرئيسية', subtitle: 'نشر أخبار وعروض تظهر فوراً في قسم «آخر تحديثات الفائق»', onTap: () => _open(context, const SiteUpdatesPage())),
                 _ActionCard(icon: Icons.receipt_long_outlined, title: 'مراجعة الحوالات المحلية', subtitle: 'تأكيد أو رفض إشعارات التحويل البنكي ودفع الطلبات', onTap: () => _open(context, const LocalPaymentReviewPage())),
                 _ActionCard(icon: Icons.account_balance_outlined, title: 'اعتماد إيداعات المحفظة', subtitle: 'مراجعة طلبات الإيداع عبر بنك الكريمي واعتمادها لإضافة الرصيد', onTap: () => _open(context, const WalletDepositsReviewPage())),
@@ -98,6 +101,7 @@ class AdminDashboard extends StatelessWidget {
                 _ActionCard(icon: Icons.add_business_outlined, title: 'إدخال البيانات', subtitle: 'إضافة المتاجر والمنتجات مع تحديد موقع المتجر على الخريطة', onTap: () => _open(context, AdminDataEntry())),
                 _ActionCard(icon: Icons.table_view_outlined, title: 'استيراد Excel بالجملة', subtitle: 'رفع Excel/CSV ومعاينة الأصناف ثم اعتمادها دفعة واحدة', onTap: () => _open(context, const BulkProductImportPage())),
                 _ActionCard(icon: Icons.local_shipping_outlined, title: 'التوزيع والمندوبون', subtitle: 'تشغيل التوزيع ومتابعة الطلبات', onTap: () => _open(context, DispatchCenterPage())),
+                _ActionCard(icon: Icons.person_add_alt, title: 'طلبات المندوبين الجديدة', subtitle: 'مراجعة طلبات الانضمام الذاتي كمندوب توصيل', onTap: () => _open(context, const DriverApplicationsReviewPage())),
                 _ActionCard(icon: Icons.code_outlined, title: 'مركز المطور والأمن', subtitle: 'الفحص، سجل التدقيق، وتقارير الحماية', onTap: () => _open(context, DeveloperPage())),
                 _ActionCard(icon: Icons.auto_awesome, title: 'ذكاء الفائق', subtitle: 'مساعد المنصة: بحث، طلبات، سلة، وتنفيذ خدمات بتأكيدك', onTap: () => _open(context, const AiAssistantPage())),
                 const SizedBox(height: 18),
