@@ -645,3 +645,33 @@ flutter pub get && flutter analyze && flutter test && flutter build web --releas
   https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/ (public repo, public Pages).
 - Repo `safwt771754091s-crypto/alfaeq_yemen_new` is PUBLIC; GITHUB_TOKEN has broad
   scopes (repo, admin:org, workflow, ...) so secrets can be pushed via the API.
+
+## 2026-10-26 — merchant/driver roles: state + self-service applications
+- Confirmed READY: `MerchantPortalPage`/`MerchantCenterPage`/`MerchantOrdersPage` and
+  `DriverCenterPage`/`DispatchCenterPage` are fully wired to Supabase. No stubs.
+  AuthGate routes by `public.users.role`: merchant→MerchantPortalPage, driver→DriverCenterPage.
+- GAP that existed: no in-app way to BECOME a merchant/driver. Merchants came via an
+  admin invite link (`redeem_merchant_invite`), drivers via an admin role change in
+  AdminUserManagementPage + approval in DispatchCenterPage.
+- Fix (PR #180, merged dfcf6865): self-service applications.
+  - Migration `supabase/migrations/20261026010000_merchant_driver_applications_v1.sql`
+    (NOT YET APPLIED to prod — see below).
+  - Tables merchant_applications / driver_applications; RPCs public.merchant_application_
+    submit/decide/cancel and driver_application_* (private SECURITY DEFINER + public invoker
+    wrappers). One-pending-per-user partial unique index. RLS: owner-or-staff read, self-only
+    pending insert, staff-only update.
+  - `private.merchant_application_decide` creates store `store-<uid>` and sets role=merchant;
+    `driver_application_decide` inserts into public.drivers and sets role=driver (only from
+    customer/finance/support). Both notify via private.notify_user.
+  - protect_user_privileges() now delegates staff check to is_platform_staff() (DB-backed).
+  - UI: account_center "اعمل معنا" → MerchantApplicationPage / DriverApplicationPage;
+    admin_dashboard → MerchantApplicationsReviewPage / DriverApplicationsReviewPage.
+  - test/merchant_driver_applications_test.dart; analyze clean, 122 tests pass.
+- IMPORTANT environment fact: THIS sandbox has NO network route to `*.supabase.co`
+  (DNS resolution fails; curl HTTP 000) although github.com works. So live DB cannot be
+  introspected or migrated from here. There is also NO `SUPABASE_DB_URL` repo secret, so
+  `.github/workflows/apply-migrations.yml` cannot be dispatched successfully yet.
+  To apply the migration the owner must either (a) run the SQL in Supabase → SQL Editor
+  (paste from the public raw URL), or (b) add SUPABASE_DB_URL then dispatch the workflow.
+- Supabase project ref is `esvljorjzgrpnrxnma` (project alfaeq_yemen_prod); client uses the
+  default publishable key `sb_publishable_xJfLBgrqWM8yEa3FM9qfig_FwnfTKue`.
