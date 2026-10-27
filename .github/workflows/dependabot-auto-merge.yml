@@ -24,19 +24,22 @@ jobs:
       github.event.pull_request.user.login == 'dependabot[bot]' &&
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Wait for all checks to pass
+        id: wait
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          sha="$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json headRefOid -q .headRefOid)"
+          sha="$(gh pr view "$PR" --repo "$REPO" --json headRefOid -q .headRefOid)"
           echo "Watching checks for PR #$PR at $sha"
-          deadline=$(( $(date +%s) + 2100 ))
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          deadline=$(( $(date +%s) + 2400 ))
           while true; do
-            runs="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/check-runs?per_page=100")"
+            runs="$(gh api "repos/$REPO/commits/$sha/check-runs?per_page=100")"
             # Keep only the newest check run per name and drop this workflow's own
             # checks (current and legacy job names); otherwise the loop waits on
             # itself and can never observe zero pending checks.
@@ -63,7 +66,28 @@ jobs:
             sleep 30
           done
 
+      - name: Confirm the verified commit is still the head
+        id: confirm
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          VERIFIED_SHA: ${{ steps.wait.outputs.sha }}
+        run: |
+          set -euo pipefail
+          # A `synchronize` push during the wait starts a fresh run for the new
+          # head. Merging here would land code whose checks were never green, so
+          # defer to that newer run instead of merging under stale checks.
+          current="$(gh pr view "$PR" --repo "$REPO" --json headRefOid -q .headRefOid)"
+          if [ "$current" = "$VERIFIED_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::PR #$PR head moved ($VERIFIED_SHA -> $current); deferring to the newer run."
+          fi
+
       - name: Approve and merge
+        if: steps.confirm.outputs.current == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
