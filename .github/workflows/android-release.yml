@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   android-release:
@@ -93,3 +93,34 @@ jobs:
           name: alfaeq-yemen-release-aab
           path: build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+
+      # نشر الإصدار على GitHub Releases ليصل الرابط الثابت
+      # /releases/latest/download/app-release.apk إلى أحدث نسخة دائماً.
+      - name: Read app version
+        id: version
+        run: |
+          version="$(sed -nE 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+)\+[0-9]+.*/\1/p' pubspec.yaml | head -1)"
+          if [ -z "$version" ]; then
+            echo "::error::Could not read version from pubspec.yaml"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: الفائق يمن — الإصدار ${{ steps.version.outputs.version }}
+          body: |
+            تحديث جديد لتطبيق الفائق يمن (ويب + أندرويد).
+
+            - رابط مشاركة وإعلان مع شعار الفائق يمن (تاجر / سائق / أصدقاء).
+            - روابط جاهزة للنسخ والمشاركة عبر واتساب.
+
+            > أُنشئ هذا الإصدار بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابة عن المالك.
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+          fail_on_unmatched_files: true
+          make_latest: true

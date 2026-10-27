@@ -106,5 +106,14 @@ void main() {
       expect(build, contains('store/site/logo.png'));
       expect(build, contains('store/site/ad-banner.png'));
     });
+
+    test('the android workflow publishes a GitHub release so the APK link stays live', () {
+      final wf = File('.github/workflows/android-release.yml').readAsStringSync();
+      expect(wf, contains('contents: write'), reason: 'publishing a release needs write permission');
+      expect(wf, contains('softprops/action-gh-release'), reason: 'the APK must be published as a release');
+      expect(wf, contains('tag_name: v\${{ steps.version.outputs.version }}'),
+          reason: 'the release tag must track the app version');
+      expect(wf, contains('app-release.apk'), reason: 'the APK asset must be attached');
+    });
   });
 }
