@@ -140,12 +140,68 @@ class _WhatsAppAutomationPageState extends State<WhatsAppAutomationPage> {
     }
   }
 
+  Future<void> _configureApi() async {
+    final accessToken = TextEditingController();
+    final phoneId = TextEditingController();
+    final verifyToken = TextEditingController();
+    final appSecret = TextEditingController();
+    Map<String, dynamic> current = {};
+    try {
+      final res = await SupabaseService.client.rpc('get_whatsapp_config');
+      current = Map<String, dynamic>.from(res as Map? ?? {});
+    } catch (_) {
+      // A non-staff caller cannot read the config; the save below will also be refused.
+    }
+    if (!mounted) return;
+    final webhook = '${SupabaseService.projectUrl}/functions/v1/whatsapp-webhook';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ربط واجهة واتساب (Meta)'),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('الصق قيم Meta هنا مرة واحدة. تُخزَّن في Supabase Vault ولا تظهر لأي مستخدم.'),
+          const SizedBox(height: 10),
+          SelectableText('رابط Webhook المطلوب في Meta:\n$webhook', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+          const SizedBox(height: 8),
+          SelectableText('رمز التحقق الحالي: ' + ((current['verify_token'] ?? 'غير مضبوط').toString()),
+              style: const TextStyle(fontSize: 12)),
+          const SizedBox(height: 10),
+          TextField(controller: accessToken, decoration: const InputDecoration(labelText: 'Access Token (الرمز الدائم)')),
+          TextField(controller: phoneId, decoration: const InputDecoration(labelText: 'Phone Number ID')),
+          TextField(controller: verifyToken, decoration: const InputDecoration(labelText: 'Verify Token (كلمة سرية تختارها أنت)')),
+          TextField(controller: appSecret, decoration: const InputDecoration(labelText: 'App Secret')),
+        ])),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حفظ')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _loading = true);
+    try {
+      await SupabaseService.client.rpc('set_whatsapp_config', params: {
+        'p_access_token': accessToken.text.trim().isEmpty ? null : accessToken.text.trim(),
+        'p_phone_number_id': phoneId.text.trim().isEmpty ? null : phoneId.text.trim(),
+        'p_verify_token': verifyToken.text.trim().isEmpty ? null : verifyToken.text.trim(),
+        'p_app_secret': appSecret.text.trim().isEmpty ? null : appSecret.text.trim(),
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ إعدادات واتساب بأمان.')));
+      setState(() {});
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الحفظ: ' + e.toString())));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
       appBar: AppBar(title: const Text('أتمتة واتساب', style: TextStyle(fontWeight: FontWeight.w900)),
         actions: [
+          IconButton(onPressed: _configureApi, icon: const Icon(Icons.settings_outlined), tooltip: 'ربط واجهة واتساب'),
           IconButton(onPressed: _setStoreContact, icon: const Icon(Icons.storefront_outlined), tooltip: 'رقم واتساب المتجر'),
           IconButton(onPressed: _bindNumber, icon: const Icon(Icons.add_link), tooltip: 'ربط رقم'),
         ]),
@@ -163,7 +219,10 @@ class _WhatsAppAutomationPageState extends State<WhatsAppAutomationPage> {
               const SizedBox(height: 8),
               const Text('الربط التشغيلي يمر الآن عبر Supabase Edge Functions وقاعدة البيانات الإنتاجية.'),
               const SizedBox(height: 10),
-              const SelectableText('Supabase Edge Function: whatsapp-webhook', style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
+              SelectableText('Webhook: ${SupabaseService.projectUrl}/functions/v1/whatsapp-webhook',
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+              const SizedBox(height: 8),
+              const Text('اضغط ⚙️ لربط واجهة Meta (Access Token وPhone Number ID وVerify Token وApp Secret).'),
             ]))),
             const SizedBox(height: 12),
             const Text('الأرقام المرتبطة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),

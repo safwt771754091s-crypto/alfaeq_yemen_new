@@ -698,5 +698,15 @@ void main() {
       expect(match, isNotNull, reason: 'pubspec.yaml must declare version: x.y.z+build');
       expect(int.parse(match!.group(4)!), greaterThanOrEqualTo(5));
     });
+
+    test('the WhatsApp console can provision the Meta webhook from the app', () {
+      final page = File('lib/screens/whatsapp_automation_page.dart').readAsStringSync();
+      expect(page, contains("rpc('set_whatsapp_config'"),
+          reason: 'staff must be able to save the Meta credentials from the app');
+      expect(page, contains('/functions/v1/whatsapp-webhook'),
+          reason: 'the console must show the webhook URL to paste into Meta');
+      // Credentials must be entered by the user, never hardcoded.
+      expect(page, isNot(contains('EAA')));
+    });
   });
 }
