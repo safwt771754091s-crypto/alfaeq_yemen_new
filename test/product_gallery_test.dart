@@ -44,5 +44,19 @@ void main() {
       final refresh = File('.github/workflows/product-gallery.yml').readAsStringSync();
       expect(refresh, contains('tools/build_product_gallery.py'));
     });
+
+    test('the store download never pins a version and the QR codes stay fresh', () {
+      final html = File('store/site/index.html').readAsStringSync();
+      expect(html, contains('/releases/latest/download/app-release.apk'));
+      // A pinned /releases/download/vX.Y.Z/ link would freeze the audience on an
+      // old build, so the store page must not reference one.
+      expect(RegExp(r'/releases/download/v\d').hasMatch(html), isFalse,
+          reason: 'store page must not pin a release version');
+      expect(html, isNot(contains('tinyurl.com')));
+
+      final build = File('.github/workflows/flutter_build.yml').readAsStringSync();
+      expect(build, contains('tools/build_store_qr.py'),
+          reason: 'the QR codes must be regenerated during deploy');
+    });
   });
 }

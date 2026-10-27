@@ -49,6 +49,8 @@ jobs:
           cp -f catalog/index.html catalog/products.json catalog/missing-images.json build/web/catalog/
       - name: Publish store pages (download + privacy)
         run: |
+          pip install --quiet segno || echo "::warning::segno unavailable; keeping committed QR codes"
+          python3 tools/build_store_qr.py || echo "::warning::QR refresh failed; keeping committed copies"
           mkdir -p build/web/store
           cp -f store/site/index.html store/site/privacy.html store/site/icon-512.png store/site/qr-app.png store/site/qr-android.png build/web/store/
       - uses: actions/upload-artifact@v7
