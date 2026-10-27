@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/auth_service.dart';
 import '../services/super_alfaeq_catalog_importer.dart';
 import '../services/supabase_service.dart';
+import '../core/login_portal.dart';
 import 'admin_dashboard.dart';
 import 'customer_session_shell.dart';
 import 'driver_center_page.dart';
@@ -79,7 +81,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       return ResetPasswordPage(onDone: () => setState(() => _passwordRecovery = false));
     }
     final user = _auth.currentUser;
-    if (user == null) return const LoginPage();
+    if (user == null) {
+      return LoginPage(portal: kIsWeb ? loginPortalFromUri(Uri.base) : null);
+    }
 
     return FutureBuilder<String>(
       future: _auth.role(),

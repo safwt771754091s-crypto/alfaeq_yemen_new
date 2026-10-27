@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import '../core/login_portal.dart';
 import '../services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  /// When set, the screen greets a specific audience (merchant or driver).
+  /// The account role still decides the destination after sign-in.
+  final LoginPortal? portal;
+  const LoginPage({super.key, this.portal});
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -151,7 +156,13 @@ class _LoginPageState extends State<LoginPage> {
           Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(24), child: Form(key: _formKey, child: Column(children: [
             const CircleAvatar(radius: 36, child: Icon(Icons.storefront, size: 38)), const SizedBox(height: 16),
             const Text('الفائق يمن', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)), const SizedBox(height: 6),
-            Text(_register ? 'إنشاء حساب جديد' : 'تسجيل الدخول إلى حسابك'), const SizedBox(height: 24),
+            if (widget.portal != null) ...[
+              Chip(label: Text(widget.portal!.badge, style: const TextStyle(fontWeight: FontWeight.w800)), visualDensity: VisualDensity.compact),
+              const SizedBox(height: 4),
+              Text(widget.portal!.subtitle, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
+              const SizedBox(height: 8),
+            ],
+            Text(_register ? 'إنشاء حساب جديد' : (widget.portal?.title ?? 'تسجيل الدخول إلى حسابك')), const SizedBox(height: 24),
             if (_register) ...[
               TextFormField(controller: _name, textInputAction: TextInputAction.next, decoration: const InputDecoration(labelText: 'الاسم', prefixIcon: Icon(Icons.person_outline)), validator: (v) => v == null || v.trim().isEmpty ? 'أدخل الاسم' : null),
               const SizedBox(height: 12),
