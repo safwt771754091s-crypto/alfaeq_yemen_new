@@ -21,6 +21,8 @@ void main() {
         reason: 'شاشة التحميل لا تُخفى عند أول إطار من التطبيق');
     expect(html.contains('جارٍ تجهيز التطبيق'), isTrue,
         reason: 'نص شاشة التحميل بالعربية مفقود');
+    expect(html.contains('logo.png'), isTrue,
+        reason: 'شاشة التحميل يجب أن تعرض شعار الفائق يمن');
   });
 
   test('يحوّل روابط الدور من #/driver إلى ?portal= قبل إقلاع المحرك', () {

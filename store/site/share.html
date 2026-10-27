@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الفائق يمن — رابط المشاركة</title>
+<meta name="description" content="شارك تطبيق الفائق يمن مع أصدقائك: رابط واحد يفتح المنصة كاملة.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="الفائق يمن">
+<meta property="og:title" content="الفائق يمن — سوقك الشامل في اليمن">
+<meta property="og:description" content="تسوّق، توصيل، محفظة، دفع QR، بث مباشر وذكاء اصطناعي عربي — في تطبيق واحد.">
+<meta property="og:image" content="logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="logo.png">
+<style>
+:root{--navy:#0A2540;--blue:#0D6EFD;--gold:#FFC107;--green:#0B6E4F}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",Tahoma,Arial,sans-serif;background:#F5F8FF;color:#1a2233;line-height:1.8}
+.hero{background:linear-gradient(135deg,var(--blue),var(--navy));color:#fff;text-align:center;padding:48px 20px 60px}
+.hero img.logo{width:120px;height:120px;border-radius:26px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.hero h1{margin:16px 0 6px;font-size:32px;font-weight:900}
+.hero p{margin:0 auto;max-width:600px;opacity:.94;font-size:17px}
+main{max-width:900px;margin:-36px auto 0;padding:0 18px 60px}
+.card{background:#fff;border:1px solid #E2E8F4;border-radius:16px;padding:22px;box-shadow:0 6px 24px rgba(10,37,64,.06);margin-bottom:18px}
+h2{color:var(--navy);font-size:20px;margin:0 0 12px}
+.linkbox{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.linkbox input{flex:1;min-width:240px;padding:13px 14px;border:1px solid #CBD5E1;border-radius:12px;font-size:15px;direction:ltr;background:#F8FAFC}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:13px 20px;border-radius:12px;font-weight:800;text-decoration:none;font-size:15px;border:0;cursor:pointer}
+.btn-primary{background:var(--gold);color:#3a2c00}
+.btn-green{background:var(--green);color:#fff}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-ghost{background:#EEF3FF;color:var(--navy);border:1px solid #D6E2FF}
+.btns{margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;text-align:center}
+.qr{background:#F5F8FF;border:1px solid #E2E8F4;border-radius:14px;padding:16px}
+.qr img{width:100%;max-width:200px;background:#fff;padding:8px;border-radius:12px;display:block;margin:0 auto 8px}
+.qr b{display:block;color:var(--navy);font-size:16px}
+.qr span{color:#5a6b85;font-size:13px}
+code{background:#0A2540;color:#9fe0ff;padding:2px 8px;border-radius:6px;font-size:14px;direction:ltr;display:inline-block}
+footer{text-align:center;padding:22px;color:#667085;font-size:13px}
+a.plain{color:var(--blue)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 20px;border-radius:12px;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="hero">
+  <img class="logo" src="logo.png" alt="شعار الفائق يمن">
+  <h1>الفائق يمن</h1>
+  <p>شارك الرابط مع أصدقائك — يفتح المنصة كاملة: تسوّق، توصيل، محفظة، دفع QR، فيديو وبث مباشر، وذكاء اصطناعي عربي.</p>
+  <div class="btns">
+    <a class="btn btn-primary" href="https://github.com/safwt771754091s-crypto/alfaeq_yemen_new/releases/latest/download/app-release.apk">⬇️ حمّل نسخة أندرويد (APK)</a>
+    <a class="btn btn-ghost" href="https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/">🌐 افتح نسخة الويب</a>
+  </div>
+</div>
+
+<main>
+  <div class="card">
+    <h2>رابط المشاركة</h2>
+    <p>انسخ الرابط وأرسله لمن تريد، أو شاركه مباشرة على واتساب.</p>
+    <div class="linkbox">
+      <input id="shareUrl" type="text" readonly value="https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/">
+      <button class="btn btn-blue" onclick="copyLink()">📋 نسخ الرابط</button>
+    </div>
+    <div class="btns" style="justify-content:flex-start">
+      <a class="btn btn-green" id="waShare" href="#">🟢 شارك على واتساب</a>
+      <a class="btn btn-ghost" id="tgShare" href="#">✈️ تلغرام</a>
+      <a class="btn btn-ghost" id="xShare" href="#">𝕏 تويتر</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>شارك بالرمز (QR)</h2>
+    <div class="grid">
+      <div class="qr">
+        <b>🌐 نسخة الويب</b>
+        <img src="qr-app.png" alt="رمز QR لنسخة الويب">
+        <span>افتح التطبيق مباشرة من المتصفح.</span>
+      </div>
+      <div class="qr">
+        <b>📱 تحميل الأندرويد</b>
+        <img src="qr-android.png" alt="رمز QR لتحميل الأندرويد">
+        <span>صوّر الرمز بكاميرا الجوال لتحميل APK.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>روابط خاصة</h2>
+    <p>
+      <a class="plain" href="index.html">صفحة التحميل والمعلومات</a> ·
+      <a class="plain" href="privacy.html">سياسة الخصوصية</a> ·
+      <a class="plain" href="../?portal=merchant">دخول التاجر</a> ·
+      <a class="plain" href="../?portal=driver">دخول المندوب (السائق)</a>
+    </p>
+  </div>
+
+  <p style="text-align:center;color:#667085;font-size:14px">
+    أُنشئت هذه الصفحة بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابة عن مالك المستودع.
+  </p>
+</main>
+<footer>© 2026 الفائق يمن — جميع الحقوق محفوظة</footer>
+<div class="toast" id="toast">تم نسخ الرابط ✅</div>
+<script>
+  var APP_URL = "https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/";
+  var MSG = "تطبيق الفائق يمن 🛒 — سوقك الشامل في اليمن. جرّبه مباشرة:\n" + APP_URL;
+
+  function copyLink() {
+    var el = document.getElementById('shareUrl');
+    el.select();
+    el.setSelectionRange(0, 99999);
+    try { document.execCommand('copy'); } catch (e) {}
+    if (navigator.clipboard) navigator.clipboard.writeText(APP_URL).catch(function () {});
+    var t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 1800);
+  }
+
+  var enc = encodeURIComponent(MSG);
+  document.getElementById('waShare').href = "https://wa.me/?text=" + enc;
+  document.getElementById('tgShare').href = "https://t.me/share/url?url=" + encodeURIComponent(APP_URL) + "&text=" + encodeURIComponent("تطبيق الفائق يمن 🛒");
+  document.getElementById('xShare').href = "https://twitter.com/intent/tweet?text=" + enc;
+</script>
+</body>
+</html>

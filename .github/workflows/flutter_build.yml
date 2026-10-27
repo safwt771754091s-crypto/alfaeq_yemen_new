@@ -40,6 +40,8 @@ jobs:
         run: |
           flutter build web --release --pwa-strategy=none --no-web-resources-cdn --base-href /alfaeq_yemen_new/ --dart-define=SUPABASE_URL="https://esvljorjykzgrpnrxnma.supabase.co" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" --dart-define=RECAPTCHA_ENTERPRISE_SITE_KEY="$RECAPTCHA_ENTERPRISE_SITE_KEY"
           rm -f build/web/flutter_service_worker.js
+          # شعار الفائق يمن لشاشة التحميل والأيقونة (مجلد web/ مستبعد من git فيُنشأ هنا).
+          cp -f store/site/logo.png build/web/logo.png
       - name: Refresh the public product gallery
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
@@ -52,7 +54,7 @@ jobs:
           pip install --quiet segno || echo "::warning::segno unavailable; keeping committed QR codes"
           python3 tools/build_store_qr.py || echo "::warning::QR refresh failed; keeping committed copies"
           mkdir -p build/web/store
-          cp -f store/site/index.html store/site/privacy.html store/site/icon-512.png store/site/qr-app.png store/site/qr-android.png build/web/store/
+          cp -f store/site/index.html store/site/privacy.html store/site/share.html store/site/icon-512.png store/site/logo.png store/site/ad-banner.png store/site/qr-app.png store/site/qr-android.png build/web/store/
       - uses: actions/upload-artifact@v7
         with:
           name: alfaeq-yemen-web
