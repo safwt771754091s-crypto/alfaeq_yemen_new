@@ -78,6 +78,9 @@ void main() {
       expect(html, contains('wa.me/?text='), reason: 'WhatsApp sharing must be wired');
       expect(html, contains('?portal=merchant'), reason: 'the merchant link must be offered');
       expect(html, contains('?portal=driver'), reason: 'the driver link must be offered');
+      expect(html, contains('رابط التاجر'), reason: 'the merchant link must be labelled for the owner');
+      expect(html, contains('رابط السائق'), reason: 'the driver link must be labelled for the owner');
+      expect(html, contains('copyLink('), reason: 'each ready link must have a copy button');
       // A pinned version link would freeze the audience on an old build.
       expect(RegExp(r'/releases/download/v\d').hasMatch(html), isFalse,
           reason: 'the share page must not pin a release version');

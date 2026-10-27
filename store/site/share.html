@@ -41,6 +41,8 @@ footer{text-align:center;padding:22px;color:#667085;font-size:13px}
 a.plain{color:var(--blue)}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 20px;border-radius:12px;opacity:0;transition:opacity .3s;pointer-events:none}
 .toast.show{opacity:1}
+.linkrow{border:1px solid #E2E8F4;border-radius:14px;padding:14px;margin-bottom:12px;background:#FBFDFF}
+.linkname{font-weight:900;color:var(--navy);margin-bottom:8px;font-size:16px}
 </style>
 </head>
 <body>
@@ -56,17 +58,9 @@ a.plain{color:var(--blue)}
 
 <main>
   <div class="card">
-    <h2>رابط المشاركة</h2>
-    <p>انسخ الرابط وأرسله لمن تريد، أو شاركه مباشرة على واتساب.</p>
-    <div class="linkbox">
-      <input id="shareUrl" type="text" readonly value="https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/">
-      <button class="btn btn-blue" onclick="copyLink()">📋 نسخ الرابط</button>
-    </div>
-    <div class="btns" style="justify-content:flex-start">
-      <a class="btn btn-green" id="waShare" href="#">🟢 شارك على واتساب</a>
-      <a class="btn btn-ghost" id="tgShare" href="#">✈️ تلغرام</a>
-      <a class="btn btn-ghost" id="xShare" href="#">𝕏 تويتر</a>
-    </div>
+    <h2>الروابط الجاهزة للإرسال</h2>
+    <p>انسخ أي رابط وأرسله لمن تريد، أو اضغط «واتساب» لإرساله مباشرة.</p>
+    <div id="links"></div>
   </div>
 
   <div class="card">
@@ -86,12 +80,10 @@ a.plain{color:var(--blue)}
   </div>
 
   <div class="card">
-    <h2>روابط خاصة</h2>
+    <h2>روابط أخرى</h2>
     <p>
       <a class="plain" href="index.html">صفحة التحميل والمعلومات</a> ·
-      <a class="plain" href="privacy.html">سياسة الخصوصية</a> ·
-      <a class="plain" href="../?portal=merchant">دخول التاجر</a> ·
-      <a class="plain" href="../?portal=driver">دخول المندوب (السائق)</a>
+      <a class="plain" href="privacy.html">سياسة الخصوصية</a>
     </p>
   </div>
 
@@ -103,23 +95,45 @@ a.plain{color:var(--blue)}
 <div class="toast" id="toast">تم نسخ الرابط ✅</div>
 <script>
   var APP_URL = "https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/";
-  var MSG = "تطبيق الفائق يمن 🛒 — سوقك الشامل في اليمن. جرّبه مباشرة:\n" + APP_URL;
+  var MERCHANT_URL = APP_URL + "?portal=merchant";
+  var DRIVER_URL = APP_URL + "?portal=driver";
+  var SHARE_URL = APP_URL + "store/share.html";
+  var APK_URL = "https://github.com/safwt771754091s-crypto/alfaeq_yemen_new/releases/latest/download/app-release.apk";
 
-  function copyLink() {
-    var el = document.getElementById('shareUrl');
+  var LINKS = [
+    { icon: "📤", name: "رابط الجمهور (للأصدقاء)", url: APP_URL,
+      msg: "تطبيق الفائق يمن 🛒 — سوقك الشامل في اليمن. جرّبه مباشرة:" },
+    { icon: "🏪", name: "رابط التاجر", url: MERCHANT_URL,
+      msg: "مرحباً، رابط التسجيل كتاجر في الفائق يمن لإضافة أصنافك وبيعها:" },
+    { icon: "🛵", name: "رابط السائق (المندوب)", url: DRIVER_URL,
+      msg: "مرحباً، رابط التسجيل كمندوب توصيل في الفائق يمن:" },
+    { icon: "📱", name: "رابط تحميل الأندرويد", url: APK_URL,
+      msg: "حمّل تطبيق الفائق يمن للأندرويد مباشرة:" }
+  ];
+
+  function row(l, i) {
+    return '<div class="linkrow">' +
+      '<div class="linkname">' + l.icon + ' ' + l.name + '</div>' +
+      '<div class="linkbox">' +
+        '<input id="u' + i + '" type="text" readonly value="' + l.url + '">' +
+        '<button class="btn btn-blue" onclick="copyLink(' + i + ')">📋 نسخ</button>' +
+        '<a class="btn btn-green" target="_blank" rel="noopener" ' +
+          'href="https://wa.me/?text=' + encodeURIComponent(l.msg + "\n" + l.url) + '">🟢 واتساب</a>' +
+      '</div>' +
+    '</div>';
+  }
+  document.getElementById('links').innerHTML = LINKS.map(row).join('');
+
+  function copyLink(i) {
+    var el = document.getElementById('u' + i);
     el.select();
     el.setSelectionRange(0, 99999);
     try { document.execCommand('copy'); } catch (e) {}
-    if (navigator.clipboard) navigator.clipboard.writeText(APP_URL).catch(function () {});
+    if (navigator.clipboard) navigator.clipboard.writeText(el.value).catch(function () {});
     var t = document.getElementById('toast');
     t.classList.add('show');
     setTimeout(function () { t.classList.remove('show'); }, 1800);
   }
-
-  var enc = encodeURIComponent(MSG);
-  document.getElementById('waShare').href = "https://wa.me/?text=" + enc;
-  document.getElementById('tgShare').href = "https://t.me/share/url?url=" + encodeURIComponent(APP_URL) + "&text=" + encodeURIComponent("تطبيق الفائق يمن 🛒");
-  document.getElementById('xShare').href = "https://twitter.com/intent/tweet?text=" + enc;
 </script>
 </body>
 </html>
