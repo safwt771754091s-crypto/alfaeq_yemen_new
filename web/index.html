@@ -9,8 +9,78 @@
   <meta name="theme-color" content="#0B6E4F">
   <meta name="alfaeq-web-version" content="latest-2026-09-23">
   <title>الفائق يمن</title>
+  <style>
+    /* شاشة تحميل تظهر فوراً قبل إقلاع محرك Flutter. بدونها يرى المستخدم على
+       الشبكات البطيئة (اليمن) صفحة بيضاء لنحو دقيقة فيظن أن التطبيق معطّل. */
+    html, body { margin: 0; height: 100%; background: #F7F9F8; }
+    #alfaeq-loader {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 18px; background: #F7F9F8;
+      font-family: "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif; color: #0B6E4F;
+      transition: opacity .35s ease;
+    }
+    #alfaeq-loader.alfaeq-hide { opacity: 0; pointer-events: none; }
+    #alfaeq-loader .alfaeq-mark {
+      width: 72px; height: 72px; border-radius: 20px; background: #0B6E4F;
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-size: 34px; font-weight: 900;
+    }
+    #alfaeq-loader .alfaeq-name { font-size: 22px; font-weight: 900; }
+    #alfaeq-loader .alfaeq-spin {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 3px solid #cfe3da; border-top-color: #0B6E4F;
+      animation: alfaeq-spin .9s linear infinite;
+    }
+    #alfaeq-loader .alfaeq-hint { font-size: 13px; color: #5b6b66; }
+    @keyframes alfaeq-spin { to { transform: rotate(360deg); } }
+  </style>
+  <script>
+    // روابط الدور مثل #/driver يفسّرها محرك Flutter كاسم مسار غير موجود فيمسحه،
+    // فتضيع هوية الجمهور. نحولها هنا — قبل إقلاع المحرك — إلى صيغة الاستعلام
+    // ?portal=... التي يقرأها التطبيق ويحافظ عليها المحرك.
+    (function () {
+      try {
+        var params = new URLSearchParams(location.search);
+        var hash = location.hash || '';
+        // دعوة التاجر تُقرأ كمعامل استعلام ويجب ألّا نلمس الرابط الذي يحملها.
+        if (params.has('merchant_invite') || hash.indexOf('merchant_invite') !== -1) return;
+        var haystack = [
+          hash,
+          params.get('portal') || '',
+          params.get('mode') || '',
+          params.get('role') || ''
+        ].join(' ').toLowerCase();
+        var portal = /driver|courier|delivery|مندوب|سائق/.test(haystack)
+          ? 'driver'
+          : (/merchant|vendor|seller|تاجر|متجر/.test(haystack) ? 'merchant' : '');
+        if (!portal) return;
+        params.set('portal', portal);
+        history.replaceState(null, '', location.pathname + '?' + params.toString());
+      } catch (e) { /* never block startup */ }
+    })();
+
+    // إخفاء شاشة التحميل عند أول إطار من التطبيق (أو بعد مهلة أمان).
+    (function () {
+      function hide() {
+        var el = document.getElementById('alfaeq-loader');
+        if (!el) return;
+        el.classList.add('alfaeq-hide');
+        setTimeout(function () { el.parentNode && el.parentNode.removeChild(el); }, 400);
+      }
+      window.addEventListener('flutter-first-frame', hide);
+      setTimeout(hide, 60000);
+    })();
+  </script>
 </head>
 <body>
+  <div id="alfaeq-loader" role="status" aria-live="polite">
+    <div class="alfaeq-mark">ف</div>
+    <div class="alfaeq-name">الفائق يمن</div>
+    <div class="alfaeq-spin"></div>
+    <div class="alfaeq-hint">جارٍ تجهيز التطبيق… قد يستغرق لحظات على الشبكات البطيئة.</div>
+  </div>
   <script src="flutter_bootstrap.js" defer></script>
+
 </body>
 </html>

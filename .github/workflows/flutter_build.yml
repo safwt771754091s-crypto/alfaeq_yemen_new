@@ -141,6 +141,36 @@ jobs:
               throw new Error('Flutter engine did not start when gstatic.com is blocked: the app must bundle its web resources (build with --no-web-resources-cdn)');
             }
             if (normal.errors.length) throw new Error('Browser console/page errors detected: ' + normal.errors.join(' | '));
+
+            // شاشة التحميل: يجب أن تظهر فوراً قبل إقلاع المحرك حتى لا يرى
+            // المستخدم على الشبكات البطيئة (اليمن) صفحة بيضاء.
+            const loaderCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+            const loaderPage = await loaderCtx.newPage();
+            await loaderPage.route('**/flutter_bootstrap.js', (r) => r.abort());
+            await loaderPage.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            const loader = await loaderPage.evaluate(() => {
+              const el = document.getElementById('alfaeq-loader');
+              return { present: !!el, text: el ? el.innerText : '' };
+            });
+            await loaderCtx.close();
+            if (!loader.present || !loader.text.includes('الفائق')) {
+              throw new Error('Loading screen missing: slow-network users will see a blank page');
+            }
+
+            // روابط الدور: #/driver يجب أن تتحول إلى ?portal=driver قبل إقلاع المحرك.
+            const portalCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+            const portalPage = await portalCtx.newPage();
+            await portalPage.route('**/flutter_bootstrap.js', (r) => r.abort());
+            await portalPage.goto(url + '#/driver', { waitUntil: 'domcontentloaded', timeout: 60000 });
+            const portal = await portalPage.evaluate(() => ({
+              search: location.search,
+              hash: location.hash,
+            }));
+            await portalCtx.close();
+            console.log('portal redirect:', JSON.stringify(portal));
+            if (!portal.search.includes('portal=driver') || portal.hash) {
+              throw new Error('Role link #/driver was not rewritten to ?portal=driver');
+            }
             await browser.close();
           })();
           NODE
