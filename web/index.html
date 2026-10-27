@@ -8,6 +8,18 @@
   <meta name="description" content="الفائق يمن — منصة رقمية متكاملة تبدأ من اليمن">
   <meta name="theme-color" content="#0B6E4F">
   <meta name="alfaeq-web-version" content="latest-2026-09-23">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="الفائق يمن">
+  <meta property="og:title" content="الفائق يمن — سوقك الشامل في اليمن">
+  <meta property="og:description" content="تسوّق، توصيل، محفظة، دفع QR، بث مباشر وذكاء اصطناعي عربي — في تطبيق واحد.">
+  <meta property="og:image" content="$FLUTTER_BASE_HREFlogo.png">
+  <meta property="og:url" content="$FLUTTER_BASE_HREF">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="الفائق يمن — سوقك الشامل في اليمن">
+  <meta name="twitter:description" content="تسوّق، توصيل، محفظة، دفع QR، بث مباشر وذكاء اصطناعي عربي — في تطبيق واحد.">
+  <meta name="twitter:image" content="$FLUTTER_BASE_HREFlogo.png">
+  <link rel="icon" type="image/png" href="$FLUTTER_BASE_HREFlogo.png">
+  <link rel="apple-touch-icon" href="$FLUTTER_BASE_HREFlogo.png">
   <title>الفائق يمن</title>
   <style>
     /* شاشة تحميل تظهر فوراً قبل إقلاع محرك Flutter. بدونها يرى المستخدم على
@@ -21,10 +33,9 @@
       transition: opacity .35s ease;
     }
     #alfaeq-loader.alfaeq-hide { opacity: 0; pointer-events: none; }
-    #alfaeq-loader .alfaeq-mark {
-      width: 72px; height: 72px; border-radius: 20px; background: #0B6E4F;
-      color: #fff; display: flex; align-items: center; justify-content: center;
-      font-size: 34px; font-weight: 900;
+    #alfaeq-loader .alfaeq-logo {
+      width: 84px; height: 84px; border-radius: 22px;
+      box-shadow: 0 6px 18px rgba(11, 110, 79, .22);
     }
     #alfaeq-loader .alfaeq-name { font-size: 22px; font-weight: 900; }
     #alfaeq-loader .alfaeq-spin {
@@ -75,7 +86,7 @@
 </head>
 <body>
   <div id="alfaeq-loader" role="status" aria-live="polite">
-    <div class="alfaeq-mark">ف</div>
+    <img class="alfaeq-logo" src="logo.png" alt="شعار الفائق يمن" width="84" height="84">
     <div class="alfaeq-name">الفائق يمن</div>
     <div class="alfaeq-spin"></div>
     <div class="alfaeq-hint">جارٍ تجهيز التطبيق… قد يستغرق لحظات على الشبكات البطيئة.</div>

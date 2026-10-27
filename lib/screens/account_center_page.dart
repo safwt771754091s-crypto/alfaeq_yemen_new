@@ -319,8 +319,11 @@ class _AccountCenterPageState extends State<AccountCenterPage> {
               ]),
               _group('عام', [
                 _tile(Icons.info_outline, 'عن التطبيق', subtitle: _version.isEmpty ? null : 'الإصدار $_version', onTap: _about),
-                _tile(Icons.share_outlined, 'شارك التطبيق',
-                    onTap: () => launchUrl(Uri.parse('https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/'))),
+                _tile(Icons.share_outlined, 'شارك التطبيق', subtitle: 'رابط واحد يفتح المنصة',
+                    onTap: () => launchUrl(
+                          Uri.parse('https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/store/share.html'),
+                          mode: LaunchMode.externalApplication,
+                        )),
               ]),
               const SizedBox(height: 12),
               Padding(
