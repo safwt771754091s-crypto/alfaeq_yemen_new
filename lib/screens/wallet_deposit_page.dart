@@ -119,14 +119,15 @@ class _WalletDepositPageState extends State<WalletDepositPage> {
       _snack('أدخل رقم الإيصال الصادر من الكريمي.');
       return;
     }
+    if (_receiptBytes == null) {
+      _snack('أرفق صورة السند البنكي كإثبات للتحويل قبل الإرسال.');
+      return;
+    }
     setState(() => _submitting = true);
     try {
-      String? path;
-      if (_receiptBytes != null) {
-        final name = _receiptName ?? 'receipt.jpg';
-        final ext = name.contains('.') ? name.split('.').last : 'jpg';
-        path = await _service.uploadReceipt(_receiptBytes!, ext);
-      }
+      final name = _receiptName ?? 'receipt.jpg';
+      final ext = name.contains('.') ? name.split('.').last : 'jpg';
+      final path = await _service.uploadReceipt(_receiptBytes!, ext);
       await _service.create(
         currency: _currency,
         amount: amount,
@@ -142,7 +143,7 @@ class _WalletDepositPageState extends State<WalletDepositPage> {
         _receiptName = null;
         _submitting = false;
       });
-      _snack('تم إرسال طلب الإيداع، بانتظار مراجعة إدارة الفائق يمن.');
+      _snack('تم إرسال طلب الإيداع مع صورة السند، بانتظار مراجعة إدارة الفائق يمن.');
       _loadMyDeposits();
     } catch (e) {
       if (!mounted) return;
@@ -181,6 +182,8 @@ class _WalletDepositPageState extends State<WalletDepositPage> {
             const _SectionTitle('بيانات الحوالة'),
             const SizedBox(height: 8),
             _currencySelector(),
+            const SizedBox(height: 12),
+            if (_selectedAccount != null) _selectedAccountBanner(_selectedAccount!),
             const SizedBox(height: 12),
             TextField(
               controller: _amountController,
@@ -233,8 +236,9 @@ class _WalletDepositPageState extends State<WalletDepositPage> {
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'حوّل المبلغ إلى أحد الحسابات الرسمية أدناه، ثم أدخل رقم الإيصال وأرفق صورة السند. '
-                'سيراجع فريق الفائق يمن الطلب ويُضاف الرصيد إلى محفظتك بعد الاعتماد.',
+                'اختر العملة (ريال يمني / سعودي / دولار)، حوّل المبلغ إلى حساب بنك الكريمي الرسمي الظاهر أدناه، '
+                'ثم أدخل رقم الإيصال وأرفق صورة السند. صورة السند إلزامية كإثبات للتحويل، '
+                'وسيراجع فريق الفائق يمن الطلب ويُضاف الرصيد إلى محفظتك بعد الاعتماد.',
                 style: TextStyle(height: 1.5),
               ),
             ),
@@ -325,19 +329,106 @@ class _WalletDepositPageState extends State<WalletDepositPage> {
         }).toList(),
       );
 
-  Widget _receiptPicker() => OutlinedButton.icon(
-        onPressed: _pickReceipt,
-        icon: const Icon(Icons.attach_file),
-        label: Text(
-          _receiptName == null ? 'إرفاق صورة السند (اختياري)' : 'مرفق: $_receiptName',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(48),
-          alignment: Alignment.centerRight,
-        ),
+  Widget _receiptPicker() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          OutlinedButton.icon(
+            onPressed: _pickReceipt,
+            icon: const Icon(Icons.attach_file),
+            label: Text(
+              _receiptName == null ? 'إرفاق صورة السند (إلزامي) *' : 'مرفق: $_receiptName',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              alignment: Alignment.centerRight,
+              side: BorderSide(color: _receiptBytes == null ? Colors.red.shade300 : _blue),
+            ),
+          ),
+          if (_receiptBytes != null) ...[
+            const SizedBox(height: 8),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.memory(
+                    _receiptBytes!,
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Positioned(
+                  top: 4,
+                  left: 4,
+                  child: Material(
+                    color: Colors.black54,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: 'إزالة الصورة',
+                      icon: const Icon(Icons.close, color: Colors.white, size: 18),
+                      onPressed: () => setState(() {
+                        _receiptBytes = null;
+                        _receiptName = null;
+                      }),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       );
+
+  /// بطاقة تبرز الحساب الرسمي المطلوب التحويل إليه حسب العملة المختارة،
+  /// مع رقم الحساب جاهزاً للنسخ.
+  Widget _selectedAccountBanner(Map<String, dynamic> a) {
+    final currency = (a['currency'] ?? '').toString();
+    final number = (a['account_number'] ?? '').toString();
+    final bank = (a['bank_name'] ?? 'بنك الكريمي').toString();
+    final label = switch (currency) {
+      'YER' => 'ريال يمني',
+      'SAR' => 'ريال سعودي',
+      'USD' => 'دولار أمريكي',
+      _ => currency,
+    };
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF3EF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _blue.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('حوّل مبلغ $label إلى هذا الحساب', style: const TextStyle(fontWeight: FontWeight.w900, color: _navy)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.account_balance, color: _blue, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('$bank · $number',
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.5)),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'نسخ رقم الحساب',
+                icon: const Icon(Icons.copy, size: 18),
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: number));
+                  _snack('تم نسخ رقم الحساب');
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _depositHistory() {
     if (_myDeposits.isEmpty) {

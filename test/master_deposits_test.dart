@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('master bank deposits migration', () {
     final sql = File('supabase/migrations/20261025040000_master_bank_deposits_v1.sql').readAsStringSync();
-
     test('creates the three required tables', () {
       for (final table in const ['master_bank_accounts', 'wallet_deposits', 'master_permissions']) {
         expect(sql, contains('create table if not exists public.$table'), reason: 'missing $table');
@@ -72,6 +71,11 @@ void main() {
       final deposit = File('lib/screens/wallet_deposit_page.dart').readAsStringSync();
       expect(deposit, contains('رقم الإيصال'));
       expect(deposit, contains('إرفاق صورة السند'));
+      // صورة السند إلزامية: الصفحة تمنع الإرسال بلا صورة.
+      expect(deposit, contains('_receiptBytes == null'));
+      expect(deposit, contains('صورة السند البنكي كإثبات'));
+      // بطاقة الحساب المطلوب حسب العملة.
+      expect(deposit, contains('_selectedAccountBanner'));
 
       final review = File('lib/screens/wallet_deposits_review_page.dart').readAsStringSync();
       expect(review, contains('hasOwnerClaim'));
@@ -81,6 +85,27 @@ void main() {
     test('entry points are wired into the account center and admin dashboard', () {
       expect(File('lib/screens/account_center_page.dart').readAsStringSync(), contains('WalletDepositPage'));
       expect(File('lib/screens/admin_dashboard.dart').readAsStringSync(), contains('WalletDepositsReviewPage'));
+    });
+  });
+
+  group('deposit receipt is mandatory (proof of transfer)', () {
+    final sql = File('supabase/migrations/20261028010000_wallet_deposit_receipt_required_v1.sql').readAsStringSync();
+
+    test('makes receipt_url NOT NULL with a non-empty check', () {
+      expect(sql, contains('alter column receipt_url set not null'));
+      expect(sql, contains('wallet_deposits_receipt_url_present'));
+      expect(sql, contains("check (btrim(receipt_url) <> '')"));
+    });
+
+    test('backfills legacy rows instead of dropping them', () {
+      expect(sql, contains("where receipt_url is null or btrim(receipt_url) = ''"));
+      expect(sql, contains('legacy:no-receipt-attached'));
+    });
+
+    test('RPC rejects a deposit without a receipt image', () {
+      expect(sql, contains('wallet_deposit_create'));
+      expect(sql, contains("raise exception 'receipt_image_required'"));
+      expect(sql, contains("if v_url = '' then"));
     });
   });
 }
