@@ -708,5 +708,25 @@ void main() {
       // Credentials must be entered by the user, never hardcoded.
       expect(page, isNot(contains('EAA')));
     });
+
+    test('the web app can open without internet after the first visit', () {
+      final sw = File('store/site/flutter_service_worker.js');
+      final manifest = File('store/site/manifest.json');
+      final index = File('web/index.html').readAsStringSync();
+      final workflow = File('.github/workflows/flutter_build.yml').readAsStringSync();
+
+      expect(sw.existsSync(), isTrue, reason: 'an offline service worker must ship with the web app');
+      expect(manifest.existsSync(), isTrue, reason: 'a PWA manifest is required to install the app on a phone');
+      final swSource = sw.readAsStringSync();
+      expect(swSource, contains('addEventListener(\'fetch\''));
+      expect(swSource, contains('main.dart.js'),
+          reason: 'the engine bundle must be precached or offline start fails');
+      expect(index, contains('manifest.json'));
+      expect(index, contains("serviceWorker.register"));
+      // The build must copy our offline worker over the generated one.
+      expect(workflow, contains('cp -f store/site/flutter_service_worker.js build/web/flutter_service_worker.js'));
+      expect(workflow, contains('App does not open without internet'),
+          reason: 'CI must fail when the offline path breaks');
+    });
   });
 }

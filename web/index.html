@@ -7,6 +7,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="الفائق يمن — منصة رقمية متكاملة تبدأ من اليمن">
   <meta name="theme-color" content="#0B6E4F">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="الفائق يمن">
+  <link rel="manifest" href="$FLUTTER_BASE_HREFmanifest.json">
   <meta name="alfaeq-web-version" content="latest-2026-09-23">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="الفائق يمن">
@@ -92,6 +97,38 @@
     <div class="alfaeq-hint">جارٍ تجهيز التطبيق… قد يستغرق لحظات على الشبكات البطيئة.</div>
   </div>
   <script src="flutter_bootstrap.js" defer></script>
+  <script>
+    // تسجيل عامل الخدمة ليعمل التطبيق بدون إنترنت بعد أول فتح، مع إظهار
+    // زر «تثبيت على الشاشة» على الجوالات التي تدعم التثبيت.
+    (function () {
+      if ('serviceWorker' in navigator) {
+        // نسجّل فوراً (لا ننتظر load) لأن محرك Flutter كبير وقد يتأخر حدث load
+        // طويلاً على الشبكات البطيئة.
+        navigator.serviceWorker.register('flutter_service_worker.js', { scope: './' }).catch(function () {});
+      }
+      var deferred = null;
+      var button = null;
+      window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        deferred = event;
+        if (!button) {
+          button = document.createElement('button');
+          button.textContent = '📲 ثبّت التطبيق على شاشتك';
+          button.setAttribute('aria-label', 'تثبيت التطبيق على الشاشة');
+          button.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:10000;border:0;border-radius:999px;padding:12px 22px;background:#0B6E4F;color:#fff;font:900 15px "Noto Sans Arabic",Tahoma,sans-serif;box-shadow:0 8px 22px rgba(11,110,79,.35);cursor:pointer';
+          button.addEventListener('click', function () {
+            button.remove();
+            button = null;
+            if (deferred) { deferred.prompt(); deferred = null; }
+          });
+          document.body.appendChild(button);
+        }
+      });
+      window.addEventListener('appinstalled', function () {
+        if (button) { button.remove(); button = null; }
+      });
+    })();
+  </script>
 
 </body>
 </html>
