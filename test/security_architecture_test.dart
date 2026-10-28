@@ -778,5 +778,31 @@ void main() {
       expect(direct, contains('showSendTransferSheet'));
       expect(group, contains('showSendTransferSheet'));
     });
+
+    test('official store account chat is server-driven and routed as its own type', () {
+      final migration = File('supabase/migrations/20261028030000_store_official_account_v1.sql').readAsStringSync();
+      final service = File('lib/services/store_chat_service.dart').readAsStringSync();
+      final page = File('lib/screens/store_chat_page.dart').readAsStringSync();
+      final conversations = File('lib/screens/conversations_page.dart').readAsStringSync();
+      // Store replies come from SECURITY DEFINER RPCs; the client never inserts.
+      expect(migration, contains('function public.start_store_thread'));
+      expect(migration, contains('function public.store_chat_action'));
+      expect(migration, contains('function public.store_chat_store'));
+      expect(migration, contains("thread_type, title"));
+      expect(migration, contains("'store'"));
+      // Store auto-replies are system messages, so sender must be nullable.
+      expect(migration, contains('alter column sender_id drop not null'));
+      expect(service, contains("rpc('start_store_thread'"));
+      expect(service, contains("rpc('store_chat_action'"));
+      expect(service, isNot(contains("from('chat_messages').insert")));
+      expect(page, contains("'store_menu'"));
+      // A store thread must route to StoreChatPage, not the support fallback.
+      expect(conversations, contains("type == 'store'"));
+      expect(conversations, contains('StoreChatPage('));
+      // The store page exposes the "message the store" entry point.
+      final storePage = File('lib/screens/store_detail_page.dart').readAsStringSync();
+      expect(storePage, contains('StoreChatService().start'));
+      expect(storePage, contains('StoreChatPage('));
+    });
   });
 }
