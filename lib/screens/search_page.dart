@@ -1,15 +1,20 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_sections.dart';
 import '../services/currency_service.dart';
 import '../services/catalog_service.dart';
+import '../services/smart_scan_service.dart';
 import '../services/supabase_service.dart';
 import '../services/unified_search_service.dart';
 import 'cart_page.dart';
 import 'barcode_scanner_page.dart';
 import 'mini_programs_page.dart';
+import 'product_detail_page.dart';
+import 'store_detail_page.dart';
+import 'wallet_qr_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
 const _navy = Color(0xFF0A2540);
@@ -102,8 +107,50 @@ class _SearchPageState extends State<SearchPage> {
     );
     final value = code?.trim();
     if (value == null || value.isEmpty || !mounted) return;
-    _controller.text = value;
-    _submit(value);
+    await _handleScan(value);
+  }
+
+  /// Smart scan: classify the code and route it (pay / store / product / link
+  /// / search) instead of always treating it as a barcode.
+  Future<void> _handleScan(String value) async {
+    SmartScanResult result;
+    try {
+      result = await const SmartScanService().resolve(value);
+    } catch (_) {
+      result = SmartScanResult(kind: SmartScanKind.search, raw: value);
+    }
+    if (!mounted) return;
+    switch (result.kind) {
+      case SmartScanKind.payment:
+        await Navigator.push(context, MaterialPageRoute(builder: (_) => WalletQrPage(initialPayeeUid: result.uid)));
+      case SmartScanKind.store:
+        final id = result.storeId ?? '';
+        try {
+          final store = await CatalogService().storeById(id);
+          if (!mounted) return;
+          await Navigator.push(context, MaterialPageRoute(builder: (_) => StoreDetailPage(store: store)));
+        } catch (e) {
+          if (mounted) _snack('تعذر فتح المتجر: $e');
+        }
+      case SmartScanKind.product:
+        final row = result.product;
+        if (row != null) {
+          await Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: CatalogDocument.fromSupabase(row))));
+        }
+      case SmartScanKind.url:
+        final url = result.url;
+        if (url != null) {
+          final uri = Uri.tryParse(url);
+          if (uri != null && await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } else if (mounted) {
+            _snack('تعذر فتح الرابط.');
+          }
+        }
+      case SmartScanKind.search:
+        _controller.text = value;
+        _submit(value);
+    }
   }
 
   Future<void> _addToCart(Map<String, dynamic> row) async {
@@ -160,7 +207,7 @@ class _SearchPageState extends State<SearchPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        tooltip: 'مسح الباركود',
+                        tooltip: 'المسح الذكي',
                         icon: const Icon(Icons.qr_code_scanner, color: _navy),
                         onPressed: _scanBarcode,
                       ),
