@@ -825,5 +825,17 @@ void main() {
       expect(page, contains('_shelfStrip'));
       expect(page, contains('_manageShelf'));
     });
+
+    test('mini-program launcher offers search, favorites and recents', () {
+      final page = File('lib/screens/mini_programs_page.dart').readAsStringSync();
+      final prefs = File('lib/core/mini_programs_prefs.dart').readAsStringSync();
+      expect(page, contains('class MiniProgramsPage extends StatefulWidget'));
+      expect(page, contains('MiniProgramsPrefs.markUsed'));
+      expect(page, contains('MiniProgramsPrefs.toggleFavorite'));
+      expect(page, contains('ابحث عن خدمة'));
+      expect(prefs, contains('mini_programs_recent'));
+      expect(prefs, contains('mini_programs_favorites'));
+      expect(prefs, contains('SharedPreferences'));
+    });
   });
 }
