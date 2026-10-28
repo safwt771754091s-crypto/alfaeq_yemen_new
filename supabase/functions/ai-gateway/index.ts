@@ -37,7 +37,8 @@ const fallbackModel = env("AI_FALLBACK_MODEL");
 const freeFallbackEnabled = env("AI_ENABLE_FREE_FALLBACK") !== "false";
 const FREE_FALLBACKS: AiProvider[] = freeFallbackEnabled
   ? [
-    // Pollinations answers fast and supports tool-calling, so it goes first.
+    // Pollinations has the higher free limit and supports tool-calling, so it
+    // goes before llm7 (which rate-limits after a couple of calls).
     { name: "pollinations", chatUrl: "https://text.pollinations.ai/openai", apiKey: "", model: "openai-fast" },
     { name: "llm7", chatUrl: "https://api.llm7.io/v1/chat/completions", apiKey: "unused", model: "default" },
   ]
