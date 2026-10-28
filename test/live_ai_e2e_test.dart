@@ -17,6 +17,8 @@ void main() {
   const password = String.fromEnvironment('LIVE_AI_PASSWORD');
   final enabled = email.isNotEmpty && password.isNotEmpty;
 
+  // This live check makes many sequential AI calls, each of which can take
+  // several seconds, so it needs a generous per-test timeout.
   test('live AI assistant answers with real catalog data', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
     // flutter_test installs an HttpOverrides that fails every request with 400.
@@ -59,5 +61,5 @@ void main() {
       stdout.writeln('CONFIRM_RESULT: $confirmed');
       expect(confirmed.trim().isNotEmpty, isTrue);
     }
-  }, skip: enabled ? false : 'set LIVE_AI_EMAIL/LIVE_AI_PASSWORD to run');
+  }, timeout: const Timeout(Duration(minutes: 4)), skip: enabled ? false : 'set LIVE_AI_EMAIL/LIVE_AI_PASSWORD to run');
 }

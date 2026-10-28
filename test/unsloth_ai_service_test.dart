@@ -24,6 +24,12 @@ void main() {
       expect(message, contains('غير مهيأة'));
     });
 
+    test('maps an empty provider reply to Arabic guidance', () {
+      final message = UnslothAiService.describeError({'error': 'ai_provider_empty'});
+      expect(message, contains('رداً صالحاً'));
+      expect(message, isNot(contains('ai_provider_empty')));
+    });
+
     test('falls back to the raw code when unknown', () {
       expect(UnslothAiService.describeError({'error': 'something_else'}), 'something_else');
     });

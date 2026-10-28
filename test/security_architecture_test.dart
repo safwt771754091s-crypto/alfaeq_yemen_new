@@ -278,6 +278,28 @@ void main() {
       expect(fn, contains('callProviders(usableProviders'));
     });
 
+    test('a transient 429 retries the chain instead of failing the request', () {
+      // A free provider's rolling per-minute limit used to fail the whole
+      // request as soon as it 429'd once. The chain must retry the provider and
+      // sweep the whole list again before surfacing an error.
+      final fn = File('supabase/functions/ai-gateway/index.ts').readAsStringSync();
+      expect(fn, contains('CHAIN_ATTEMPTS'));
+      expect(fn, contains('PROVIDER_ATTEMPTS'));
+      expect(fn, contains('sawTransient'));
+    });
+
+    test('an empty provider reply is not returned as a blank answer', () {
+      // Some free providers answer 200 with no content and no tool calls; the
+      // app renders only `content`, so a blank reply must be treated as a
+      // provider failure and the chain must keep trying.
+      final fn = File('supabase/functions/ai-gateway/index.ts').readAsStringSync();
+      expect(fn, contains('detectEmptyCompletion'));
+      expect(fn, contains('ai_provider_empty'));
+      final service = File('lib/services/unsloth_ai_service.dart').readAsStringSync();
+      expect(service, contains("case 'ai_provider_empty'"),
+          reason: 'the app must translate an empty reply into Arabic guidance');
+    });
+
     test('catalog pages past the PostgREST 1000-row cap', () {
       // Supabase/PostgREST caps every response at 1000 rows regardless of the
       // requested limit, so the UI must page through the catalog or it silently
