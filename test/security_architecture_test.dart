@@ -255,6 +255,29 @@ void main() {
       expect(fn, isNot(contains('/v1/v1/chat/completions')));
     });
 
+    test('a free provider quota notice is not shown to the user as an answer', () {
+      // A free upstream can answer 200 OK with a body that is really a quota
+      // notice (Pollinations: "API key ... reached its budget"). That must be
+      // detected and treated as a provider failure so the app never renders it.
+      final fn = File('supabase/functions/ai-gateway/index.ts').readAsStringSync();
+      expect(fn, contains('detectProviderNotice'));
+      expect(fn, contains('ai_provider_notice'));
+      expect(fn, contains('isProviderNotice'));
+      final service = File('lib/services/unsloth_ai_service.dart').readAsStringSync();
+      expect(service, contains("case 'ai_provider_notice'"),
+          reason: 'the app must translate the notice error into Arabic guidance');
+    });
+
+    test('a misconfigured provider URL is skipped instead of retried', () {
+      // A secret holding a random hex value (not a URL) used to cost three
+      // retries per request before the chain fell through. Providers whose
+      // chat URL is not a valid http(s) URL must be dropped up front.
+      final fn = File('supabase/functions/ai-gateway/index.ts').readAsStringSync();
+      expect(fn, contains('isValidHttpUrl'));
+      expect(fn, contains('usableProviders'));
+      expect(fn, contains('callProviders(usableProviders'));
+    });
+
     test('catalog pages past the PostgREST 1000-row cap', () {
       // Supabase/PostgREST caps every response at 1000 rows regardless of the
       // requested limit, so the UI must page through the catalog or it silently

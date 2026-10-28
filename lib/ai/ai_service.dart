@@ -12,6 +12,7 @@ class AlfaeqAiService {
   final UnslothAiService _ai;
   final SupabaseClient _client;
   final List<Map<String,dynamic>> _messages=[];
+  final Map<String,Map<String,Object?>> _turnResults={};
   _PendingAiAction? _pending;
   AlfaeqAiService({AlfaeqAiToolRegistry? tools,AlfaeqAiPermissionGateway? permissions,UnslothAiService? ai,SupabaseClient? client})
       :_tools=tools??AlfaeqAiToolRegistry(),_permissions=permissions??AlfaeqAiPermissionGateway(),_ai=ai??UnslothAiService(),_client=client??SupabaseService.client{resetConversation();}
@@ -31,6 +32,7 @@ class AlfaeqAiService {
     return result;
   }
   Future<String> _run() async {
+    _turnResults.clear();
     for (var round = 0; round < 6; round++) {
       final data = await _ai.chatCompletion(messages: List<Map<String, dynamic>>.from(_messages), tools: _schemas, maxTokens: 1400);
       final assistant = _ai.extractAssistantMessage(data);
@@ -52,7 +54,13 @@ class AlfaeqAiService {
           final decoded = raw is String ? jsonDecode(raw) : raw;
           if (decoded is Map) args = Map<String, dynamic>.from(decoded);
         } catch (_) {}
-        final result = await _execute(name, Map<String, Object?>.from(args));
+        // A model can emit the same call twice in one turn (e.g. two identical
+        // get_my_wallet calls). Re-running a mutation would double-apply it and
+        // re-reading needlessly burns provider quota, so identical calls in the
+        // same turn reuse the first result.
+        final cacheKey = '$name:${jsonEncode(args)}';
+        final result = _turnResults[cacheKey] ??
+            await _execute(name, Map<String, Object?>.from(args));
         if (result['permission'] == 'confirmation_required') {
           _pending = _PendingAiAction(name: name, args: Map<String, Object?>.from(args), id: callId);
           // Every tool_call in an assistant message needs a matching tool
@@ -72,6 +80,7 @@ class AlfaeqAiService {
           }
           return 'هذه العملية تحتاج تأكيدك. راجع التفاصيل ثم اضغط «تأكيد التنفيذ».';
         }
+        _turnResults[cacheKey] = result;
         _messages.add({'role': 'tool', 'tool_call_id': callId, 'name': name, 'content': jsonEncode(result)});
       }
     }

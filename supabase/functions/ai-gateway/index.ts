@@ -37,8 +37,10 @@ const fallbackModel = env("AI_FALLBACK_MODEL");
 const freeFallbackEnabled = env("AI_ENABLE_FREE_FALLBACK") !== "false";
 const FREE_FALLBACKS: AiProvider[] = freeFallbackEnabled
   ? [
+    // Pollinations has the higher free limit and supports tool-calling, so it
+    // goes before llm7 (which rate-limits after a couple of calls).
+    { name: "pollinations", chatUrl: "https://text.pollinations.ai/openai", apiKey: "", model: "openai-fast" },
     { name: "llm7", chatUrl: "https://api.llm7.io/v1/chat/completions", apiKey: "unused", model: "default" },
-    { name: "pollinations", chatUrl: "https://text.pollinations.ai/openai", apiKey: "", model: "openai" },
   ]
   : [];
 
@@ -53,9 +55,65 @@ for (const candidate of FREE_FALLBACKS) {
   if (!providers.some((p) => p.chatUrl === candidate.chatUrl)) providers.push(candidate);
 }
 
+// A misconfigured secret (e.g. a random hex value instead of a URL) would make
+// every request burn three retries on an unparseable URL before falling through.
+// Such a provider is dropped up front so the working provider answers fast.
+const usableProviders = providers.filter((p) => isValidHttpUrl(p.chatUrl));
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 const MAX_MESSAGES = 80;
 const MAX_MESSAGE_CHARS = 120_000;
 const MAX_TOKENS = 4096;
+
+// A free upstream can answer 200 OK while the body is really a quota/limit
+// notice (e.g. Pollinations' "API key ... reached its budget"). Returning that
+// as an assistant reply shows the user a broken message, so it is treated as a
+// provider failure and the chain moves on. Only explicit quota phrases are
+// matched so a normal answer that merely mentions "budget" is never dropped.
+const PROVIDER_NOTICE_PATTERNS = [
+  /reached (?:its|your) budget/i,
+  /raise the (?:key )?budget/i,
+  /free (?:tier )?limit reached/i,
+  /quota (?:exceeded|exhausted|reached)/i,
+  /(?:rate|request) limit (?:reached|exceeded)/i,
+  /insufficient (?:credits|balance|quota)/i,
+];
+
+function isProviderNotice(text: string): boolean {
+  if (!text) return false;
+  return PROVIDER_NOTICE_PATTERNS.some((re) => re.test(text));
+}
+
+/// Returns a stable error code when a 2xx body is really an upstream notice,
+/// or null when the body is a genuine assistant answer.
+function detectProviderNotice(body: string, contentType: string): string | null {
+  if (!contentType.includes("json")) return null;
+  try {
+    const parsed = JSON.parse(body);
+    const message = parsed?.choices?.[0]?.message;
+    if (message && typeof message.content === "string" && isProviderNotice(message.content)) {
+      return "ai_provider_notice";
+    }
+    // Some providers put the notice in `error` even with a 200 status.
+    if (parsed?.error && typeof parsed.error === "string" && isProviderNotice(parsed.error)) {
+      return "ai_provider_notice";
+    }
+    if (parsed?.error && typeof parsed?.error?.message === "string" && isProviderNotice(parsed.error.message)) {
+      return "ai_provider_notice";
+    }
+  } catch {
+    /* not JSON: an ordinary text answer, not a notice */
+  }
+  return null;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -69,7 +127,7 @@ Deno.serve(async (req) => {
   if (!supabaseUrl || !serviceRoleKey) {
     return json({ error: "server_configuration_missing" }, 503);
   }
-  if (providers.length === 0) {
+  if (usableProviders.length === 0) {
     // No provider configured (no secrets and free fallback disabled).
     // Server-side secrets: AI_BASE_URL, AI_MODEL and AI_API_KEY.
     return json({ error: "ai_provider_not_configured" }, 503);
@@ -128,7 +186,7 @@ Deno.serve(async (req) => {
     ...(typeof body.top_p === "number" ? { top_p: body.top_p } : {}),
   };
 
-  const result = await callProviders(providers, payload);
+  const result = await callProviders(usableProviders, payload);
   return new Response(result.body, {
     status: result.status,
     headers: { ...corsHeaders, "Content-Type": result.contentType },
@@ -161,6 +219,15 @@ async function callProviders(providers: AiProvider[], payload: Record<string, un
     return {
       status: 429,
       body: JSON.stringify({ error: "ai_provider_rate_limited", upstream_status: 429 }),
+      contentType: "application/json",
+    };
+  }
+  // A quota/limit notice is not a transient outage: tell the app so it can show
+  // the right guidance instead of "try again later".
+  if (lastBody.includes("ai_provider_notice")) {
+    return {
+      status: 503,
+      body: JSON.stringify({ error: "ai_provider_notice", upstream_status: 200 }),
       contentType: "application/json",
     };
   }
@@ -203,6 +270,20 @@ async function callUpstream(
 
     const text = await upstream.text();
     const contentType = upstream.headers.get("Content-Type") ?? "application/json";
+
+    // A 2xx body that is really a quota/limit notice must not be returned as an
+    // answer. Treat it as a provider failure so the next provider is tried.
+    if (upstream.ok) {
+      const notice = detectProviderNotice(text, contentType);
+      if (notice) {
+        return {
+          status: 503,
+          body: JSON.stringify({ error: notice, upstream_status: 200 }),
+          contentType: "application/json",
+        };
+      }
+    }
+
     const transient = upstream.status === 429 || upstream.status === 502 ||
       upstream.status === 503 || upstream.status === 504;
 
