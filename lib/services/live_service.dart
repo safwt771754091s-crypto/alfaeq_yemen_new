@@ -51,6 +51,27 @@ class LiveService {
     await sendMessage(roomId, gift, kind: 'gift');
   }
 
+  /// The room's product shelf (الشراء أثناء البث), as the viewer sees it.
+  Future<List<Map<String, dynamic>>> shelf(String roomId) async {
+    final data = await _db.rpc('live_room_products_list', params: {'p_room_id': roomId});
+    return _rows(data);
+  }
+
+  Future<void> addToShelf(String roomId, String productId) async {
+    await _db.rpc('live_room_products_add', params: {'p_room_id': roomId, 'p_product_id': productId});
+  }
+
+  Future<void> removeFromShelf(String roomId, String productId) async {
+    await _db.rpc('live_room_products_remove', params: {'p_room_id': roomId, 'p_product_id': productId});
+  }
+
+  /// Shelf stream so a product added mid-stream appears without a refresh.
+  Stream<List<Map<String, dynamic>>> shelfStream(String roomId) => _db
+      .from('live_room_products')
+      .stream(primaryKey: ['room_id', 'product_id'])
+      .eq('room_id', roomId)
+      .map((rows) => rows.map((e) => Map<String, dynamic>.from(e)).toList());
+
   Future<void> setLike(String roomId, bool liked) async {
     final uid = currentUserId;
     if (uid == null) throw StateError('يجب تسجيل الدخول.');
