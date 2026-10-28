@@ -268,6 +268,16 @@ void main() {
           reason: 'the app must translate the notice error into Arabic guidance');
     });
 
+    test('a misconfigured provider URL is skipped instead of retried', () {
+      // A secret holding a random hex value (not a URL) used to cost three
+      // retries per request before the chain fell through. Providers whose
+      // chat URL is not a valid http(s) URL must be dropped up front.
+      final fn = File('supabase/functions/ai-gateway/index.ts').readAsStringSync();
+      expect(fn, contains('isValidHttpUrl'));
+      expect(fn, contains('usableProviders'));
+      expect(fn, contains('callProviders(usableProviders'));
+    });
+
     test('catalog pages past the PostgREST 1000-row cap', () {
       // Supabase/PostgREST caps every response at 1000 rows regardless of the
       // requested limit, so the UI must page through the catalog or it silently

@@ -54,6 +54,20 @@ for (const candidate of FREE_FALLBACKS) {
   if (!providers.some((p) => p.chatUrl === candidate.chatUrl)) providers.push(candidate);
 }
 
+// A misconfigured secret (e.g. a random hex value instead of a URL) would make
+// every request burn three retries on an unparseable URL before falling through.
+// Such a provider is dropped up front so the working provider answers fast.
+const usableProviders = providers.filter((p) => isValidHttpUrl(p.chatUrl));
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 const MAX_MESSAGES = 80;
 const MAX_MESSAGE_CHARS = 120_000;
 const MAX_TOKENS = 4096;
@@ -112,7 +126,7 @@ Deno.serve(async (req) => {
   if (!supabaseUrl || !serviceRoleKey) {
     return json({ error: "server_configuration_missing" }, 503);
   }
-  if (providers.length === 0) {
+  if (usableProviders.length === 0) {
     // No provider configured (no secrets and free fallback disabled).
     // Server-side secrets: AI_BASE_URL, AI_MODEL and AI_API_KEY.
     return json({ error: "ai_provider_not_configured" }, 503);
@@ -171,7 +185,7 @@ Deno.serve(async (req) => {
     ...(typeof body.top_p === "number" ? { top_p: body.top_p } : {}),
   };
 
-  const result = await callProviders(providers, payload);
+  const result = await callProviders(usableProviders, payload);
   return new Response(result.body, {
     status: result.status,
     headers: { ...corsHeaders, "Content-Type": result.contentType },
