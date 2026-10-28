@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../core/sound_prefs.dart';
+import '../services/catalog_service.dart';
 import '../services/live_service.dart';
+import '../services/supabase_service.dart';
+import 'cart_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
 const _navy = Color(0xFF0A2540);
@@ -214,12 +217,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   List<Map<String, dynamic>> _messages = const [];
   bool _ready = false;
   bool _muted = true;
+  List<Map<String, dynamic>> _shelf = const [];
+  bool _addingToCart = false;
 
   @override
   void initState() {
     super.initState();
     _service.registerView(widget.roomId, 1);
     _loadMessages();
+    _loadShelf();
     _initVideo();
   }
 
@@ -262,6 +268,50 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       final rows = await _service.messages(widget.roomId);
       if (mounted) setState(() => _messages = rows);
     } catch (_) {}
+  }
+
+  Future<void> _loadShelf() async {
+    try {
+      final rows = await _service.shelf(widget.roomId);
+      if (mounted) setState(() => _shelf = rows);
+    } catch (_) {}
+  }
+
+  /// Adds a shelf item to the existing cart, then lets the viewer check out
+  /// through the normal cart page (same audited order RPCs as any purchase).
+  Future<void> _buy(Map<String, dynamic> product) async {
+    final uid = SupabaseService.client.auth.currentUser?.id;
+    if (uid == null) {
+      _snack('يجب تسجيل الدخول للشراء.');
+      return;
+    }
+    if (_addingToCart) return;
+    setState(() => _addingToCart = true);
+    try {
+      final doc = CatalogDocument(
+        id: (product['product_id'] ?? '').toString(),
+        data: {
+          'name': product['name'],
+          'price': product['price'],
+          'currency': product['currency'],
+          'image_url': product['image_url'],
+          'stock': product['stock'],
+          'store_id': product['store_id'],
+          'owner_id': product['owner_id'],
+          'status': 'active',
+        },
+      );
+      await CatalogService().addToCart(uid, doc);
+      if (!mounted) return;
+      _snack('أُضيف «${product['name']}» إلى السلة.');
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage()));
+    } on StateError catch (e) {
+      _snack(e.message);
+    } catch (e) {
+      _snack('تعذر الإضافة إلى السلة: $e');
+    } finally {
+      if (mounted) setState(() => _addingToCart = false);
+    }
   }
 
   Future<void> _send() async {
@@ -311,6 +361,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             title: const Text('غرفة البث', style: TextStyle(fontWeight: FontWeight.w900)),
             actions: [
               if (widget.isHost)
+                IconButton(
+                  onPressed: _manageShelf,
+                  tooltip: 'منتجات البث',
+                  icon: const Icon(Icons.inventory_2_outlined),
+                ),
+              if (widget.isHost)
                 TextButton(
                   onPressed: _end,
                   child: const Text('إنهاء', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w900)),
@@ -320,12 +376,120 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           body: Column(
             children: [
               AspectRatio(aspectRatio: 16 / 9, child: _stage()),
+              if (_shelf.isNotEmpty) _shelfStrip(),
               Expanded(child: _chat()),
               _composer(),
             ],
           ),
         ),
       );
+
+  /// The buy-while-watching strip under the video.
+  Widget _shelfStrip() => Container(
+        height: 96,
+        color: const Color(0xFF121A26),
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          itemCount: _shelf.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, i) {
+            final p = _shelf[i];
+            final price = p['price'];
+            final currency = (p['currency'] ?? '').toString();
+            return SizedBox(
+              width: 150,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text((p['name'] ?? 'صنف').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 2),
+                        Text('${price ?? ''} $currency', style: const TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.w900)),
+                      ],
+                    ),
+                  ),
+                  IconButton.filled(
+                    onPressed: _addingToCart ? null : () => _buy(p),
+                    tooltip: 'اشترِ الآن',
+                    style: IconButton.styleFrom(backgroundColor: const Color(0xFF07C160), minimumSize: const Size(36, 36)),
+                    icon: const Icon(Icons.add_shopping_cart, size: 18, color: Colors.white),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+
+  Future<void> _manageShelf() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheet) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.7,
+                child: Column(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text('منتجات البث', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                    ),
+                    Expanded(
+                      child: FutureBuilder<List<CatalogDocument>>(
+                        future: CatalogService().activeProducts(limit: 100),
+                        builder: (context, snap) {
+                          if (snap.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+                          final products = snap.data ?? const <CatalogDocument>[];
+                          if (products.isEmpty) return const Center(child: Text('لا توجد منتجات متاحة.'));
+                          return ListView.builder(
+                            itemCount: products.length,
+                            itemBuilder: (context, i) {
+                              final doc = products[i];
+                              final onShelf = _shelf.any((s) => s['product_id']?.toString() == doc.id);
+                              return CheckboxListTile(
+                                value: onShelf,
+                                title: Text((doc.data['name'] ?? 'صنف').toString(), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                subtitle: Text('${doc.data['price'] ?? ''} ${doc.data['currency'] ?? ''}'),
+                                onChanged: (v) async {
+                                  try {
+                                    if (v == true) {
+                                      await _service.addToShelf(widget.roomId, doc.id);
+                                    } else {
+                                      await _service.removeFromShelf(widget.roomId, doc.id);
+                                    }
+                                    await _loadShelf();
+                                    setSheet(() {});
+                                  } catch (e) {
+                                    if (mounted) _snack('تعذر تحديث القائمة: $e');
+                                  }
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _stage() {
     final video = _video;

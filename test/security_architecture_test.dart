@@ -804,5 +804,26 @@ void main() {
       expect(storePage, contains('StoreChatService().start'));
       expect(storePage, contains('StoreChatPage('));
     });
+
+    test('live commerce attaches a shelf and reuses the audited checkout', () {
+      final migration = File('supabase/migrations/20261028040000_live_room_products_v1.sql').readAsStringSync();
+      final service = File('lib/services/live_service.dart').readAsStringSync();
+      final page = File('lib/screens/live_rooms_page.dart').readAsStringSync();
+      // The shelf lives in its own table; only the host manages it server-side.
+      expect(migration, contains('create table if not exists public.live_room_products'));
+      expect(migration, contains('function public.live_room_products_add'));
+      expect(migration, contains('function public.live_room_products_remove'));
+      expect(migration, contains('function public.live_room_products_list'));
+      expect(migration, contains('not_room_host'));
+      // No money movement is re-implemented for live: it reuses the cart.
+      expect(migration, isNot(contains('wallet_debit_internal')));
+      expect(service, contains("rpc('live_room_products_list'"));
+      expect(service, contains("rpc('live_room_products_add'"));
+      // The room page adds to the existing cart and opens the normal checkout.
+      expect(page, contains('CatalogService().addToCart'));
+      expect(page, contains('CartPage()'));
+      expect(page, contains('_shelfStrip'));
+      expect(page, contains('_manageShelf'));
+    });
   });
 }
