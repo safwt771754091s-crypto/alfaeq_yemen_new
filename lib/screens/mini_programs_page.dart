@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_sections.dart';
+import '../core/mini_programs_prefs.dart';
 import '../services/currency_service.dart';
 import '../services/catalog_service.dart';
 import '../services/supabase_service.dart';
@@ -32,45 +33,149 @@ IconData miniProgramIcon(String name) {
 
 /// WeChat-style mini-program launcher: every platform section is a compact,
 /// self-contained "app" that opens with its own header and product surface.
-class MiniProgramsPage extends StatelessWidget {
+/// The launcher adds search, favorites and a "recently used" row.
+class MiniProgramsPage extends StatefulWidget {
   const MiniProgramsPage({super.key});
 
   @override
-  Widget build(BuildContext context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Scaffold(
-          appBar: AppBar(title: const Text('البرامج المصغّرة', style: TextStyle(fontWeight: FontWeight.w900))),
-          body: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              const Text('البرامج المصغّرة', style: TextStyle(color: _navy, fontSize: 26, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 6),
-              const Text('افتح خدمة الفائق كتطبيق مصغّر مستقل: تسوّق، اطلب، واحجز دون مغادرة المنصة.', style: TextStyle(color: Colors.black54)),
-              const SizedBox(height: 18),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: appSections.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .92),
-                itemBuilder: (context, i) {
-                  final section = appSections[i];
-                  return _MiniProgramCard(section: section);
-                },
+  State<MiniProgramsPage> createState() => _MiniProgramsPageState();
+}
+
+class _MiniProgramsPageState extends State<MiniProgramsPage> {
+  final _search = TextEditingController();
+  String _query = '';
+  List<String> _recent = const [];
+  List<String> _favorites = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final recent = await MiniProgramsPrefs.recent();
+    final favorites = await MiniProgramsPrefs.favorites();
+    if (mounted) setState(() { _recent = recent; _favorites = favorites; });
+  }
+
+  List<AppSection> get _filtered {
+    final q = _query.trim();
+    if (q.isEmpty) return appSections;
+    return appSections
+        .where((s) => s.title.contains(q) || s.subtitle.contains(q))
+        .toList();
+  }
+
+  List<AppSection> _sectionsFor(List<String> ids) {
+    final byId = {for (final s in appSections) s.id: s};
+    return [for (final id in ids) if (byId[id] != null) byId[id]!];
+  }
+
+  List<AppSection> get _recentSections => _sectionsFor(_recent);
+  List<AppSection> get _favoriteSections => _sectionsFor(_favorites);
+
+  Future<void> _open(AppSection section) async {
+    await MiniProgramsPrefs.markUsed(section.id);
+    if (!mounted) return;
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => MiniProgramPage(section: section)));
+  }
+
+  Future<void> _toggleFavorite(AppSection section) async {
+    await MiniProgramsPrefs.toggleFavorite(section.id);
+    await _load();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final favorites = _favoriteSections;
+    final recents = _recentSections;
+    final filtered = _filtered;
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('البرامج المصغّرة', style: TextStyle(fontWeight: FontWeight.w900))),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            const Text('البرامج المصغّرة', style: TextStyle(color: _navy, fontSize: 26, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            const Text('افتح خدمة الفائق كتطبيق مصغّر مستقل: تسوّق، اطلب، واحجز دون مغادرة المنصة.', style: TextStyle(color: Colors.black54)),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _search,
+              onChanged: (v) => setState(() => _query = v.trim()),
+              decoration: InputDecoration(
+                hintText: 'ابحث عن خدمة...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
               ),
+            ),
+            if (_query.isEmpty && favorites.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              const Text('المفضلة', style: TextStyle(color: _navy, fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 10),
+              _miniGrid(favorites, onLongPress: _toggleFavorite),
             ],
-          ),
+            if (_query.isEmpty && recents.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              const Text('المستخدمة مؤخراً', style: TextStyle(color: _navy, fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 10),
+              _miniGrid(recents, onLongPress: _toggleFavorite),
+            ],
+            const SizedBox(height: 18),
+            Text(_query.isEmpty ? 'كل البرامج' : 'نتائج البحث', style: const TextStyle(color: _navy, fontSize: 18, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 10),
+            if (filtered.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: Center(child: Text('لا توجد خدمة مطابقة لبحثك.', style: TextStyle(color: Colors.black54))),
+              )
+            else
+              _miniGrid(filtered, onLongPress: _toggleFavorite),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _miniGrid(List<AppSection> sections, {required Future<void> Function(AppSection) onLongPress}) => GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: sections.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .92),
+        itemBuilder: (context, i) {
+          final section = sections[i];
+          return _MiniProgramCard(
+            section: section,
+            isFavorite: _favorites.contains(section.id),
+            onTap: () => _open(section),
+            onLongPress: () => onLongPress(section),
+          );
+        },
       );
 }
 
 class _MiniProgramCard extends StatelessWidget {
   final AppSection section;
-  const _MiniProgramCard({required this.section});
+  final bool isFavorite;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+  const _MiniProgramCard({required this.section, this.isFavorite = false, required this.onTap, required this.onLongPress});
 
   @override
   Widget build(BuildContext context) => InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MiniProgramPage(section: section))),
+        onTap: onTap,
+        onLongPress: onLongPress,
         child: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
@@ -81,14 +186,25 @@ class _MiniProgramCard extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFFE7F0FF), Color(0xFFDCE9FF)]),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(miniProgramIcon(section.icon), color: _blue, size: 28),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFFE7F0FF), Color(0xFFDCE9FF)]),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(miniProgramIcon(section.icon), color: _blue, size: 28),
+                  ),
+                  if (isFavorite)
+                    const Positioned(
+                      top: -4,
+                      left: -4,
+                      child: Icon(Icons.star, color: Colors.amber, size: 16),
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
               Text(section.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontSize: 11.5, fontWeight: FontWeight.w800)),
