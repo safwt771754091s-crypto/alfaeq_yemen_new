@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
+import '../widgets/chat_transfer_bubble.dart';
 import 'red_packet_page.dart';
 import 'send_red_packet_sheet.dart';
+import 'send_transfer_sheet.dart';
 
 /// WeChat-style group conversation: message stream, composer, and an
 /// "add members" sheet that lists the caller's chat contacts.
+///
+/// Also serves 1:1 threads when a [peerUid] is supplied, in which case the
+/// composer offers a "transfer money" button next to the red packet.
 class GroupChatPage extends StatefulWidget {
   final String threadId;
   final String title;
-  const GroupChatPage({super.key, required this.threadId, required this.title});
+  final String? peerUid;
+  final String? peerName;
+  const GroupChatPage({super.key, required this.threadId, required this.title, this.peerUid, this.peerName});
   @override
   State<GroupChatPage> createState() => _GroupChatPageState();
 }
@@ -99,6 +106,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
                       final mine = row['sender_id']?.toString() == _uid;
                       final sender = (row['metadata'] is Map ? (row['metadata'] as Map)['sender_name'] : null)?.toString();
                       final meta = row['metadata'];
+                      if (meta is Map && meta['kind'] == 'transfer') {
+                        return ChatTransferBubble(meta: meta, mine: mine);
+                      }
                       final packetId = meta is Map ? meta['packet_id']?.toString() : null;
                       if (packetId != null) {
                         return Align(
@@ -172,6 +182,20 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  if (widget.peerUid != null)
+                    IconButton(
+                      tooltip: 'تحويل مبلغ',
+                      onPressed: () async {
+                        final sent = await showSendTransferSheet(
+                          context,
+                          threadId: widget.threadId,
+                          toUid: widget.peerUid!,
+                          toName: widget.peerName ?? 'المستلم',
+                        );
+                        if (sent && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم التحويل ✅')));
+                      },
+                      icon: const Icon(Icons.send_to_mobile, color: Color(0xFF07C160)),
+                    ),
                   IconButton(
                     tooltip: 'حزمة حمراء',
                     onPressed: () async {

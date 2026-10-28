@@ -751,5 +751,32 @@ void main() {
       expect(workflow, contains('App does not open without internet'),
           reason: 'CI must fail when the offline path breaks');
     });
+
+    test('chat money transfer stays server-side and posts a structured bubble', () {
+      final service = File('lib/services/chat_transfer_service.dart').readAsStringSync();
+      final migration = File('supabase/migrations/20261028020000_chat_p2p_transfer_v1.sql').readAsStringSync();
+      // The client only calls RPCs and never edits balances.
+      expect(service, contains("rpc('chat_transfer_send'"));
+      expect(service, contains("rpc('direct_thread_peer'"));
+      expect(service, isNot(contains("from('wallets').update")));
+      // The wrapper delegates to the single audited wallet mutation.
+      expect(migration, contains('function public.chat_transfer_send'));
+      expect(migration, contains('public.wallet_transfer('));
+      expect(migration, contains("'kind', 'transfer'"));
+      expect(migration, contains('transfer_requires_direct_thread'));
+      // A group transfer would be ambiguous, so it must be rejected server-side.
+      expect(migration, contains('function public.thread_member_count'));
+    });
+
+    test('both chat renderers draw the transfer bubble and the direct composer offers it', () {
+      final direct = File('lib/screens/contacts_page.dart').readAsStringSync();
+      final group = File('lib/screens/group_chat_page.dart').readAsStringSync();
+      for (final page in [direct, group]) {
+        expect(page, contains("meta['kind'] == 'transfer'"));
+        expect(page, contains('ChatTransferBubble'));
+      }
+      expect(direct, contains('showSendTransferSheet'));
+      expect(group, contains('showSendTransferSheet'));
+    });
   });
 }
