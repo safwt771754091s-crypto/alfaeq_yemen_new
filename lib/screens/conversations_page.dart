@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import 'ai_assistant_page.dart';
 import 'contacts_page.dart';
 import 'group_chat_page.dart';
+import 'store_chat_page.dart';
 import 'support_chat_page.dart';
 
 /// WeChat-style "Chats" tab: a unified conversation list where the first entry
@@ -194,6 +195,7 @@ class _ThreadTile extends StatelessWidget {
     final type = (row['thread_type'] ?? '').toString();
     final isGroup = type == 'group';
     final isDirect = type == 'direct';
+    final isStore = type == 'store';
     final rawTitle = (row['title'] ?? '').toString();
     // Direct threads carry no title; fall back to the peer's name.
     final title = rawTitle.isNotEmpty ? rawTitle : (displayTitle ?? (isDirect ? 'محادثة' : 'محادثة'));
@@ -211,14 +213,16 @@ class _ThreadTile extends StatelessWidget {
                     ? GroupChatPage(threadId: id, title: title)
                     : isDirect
                         ? DirectChatPage(threadId: id, title: title.isEmpty ? 'محادثة' : title)
-                        : SupportChatPage(initialThreadId: id),
+                        : isStore
+                            ? StoreChatPage(threadId: id, title: title.isEmpty ? 'متجر' : title)
+                            : SupportChatPage(initialThreadId: id),
               ),
             );
           },
           leading: CircleAvatar(
             radius: 26,
             backgroundColor: const Color(0xFFF1F6FF),
-            child: Icon(isGroup ? Icons.groups_outlined : isDirect ? Icons.person_outline : isSupport ? Icons.support_agent_outlined : Icons.forum_outlined, color: const Color(0xFF0B63CE)),
+            child: Icon(isGroup ? Icons.groups_outlined : isDirect ? Icons.person_outline : isStore ? Icons.storefront_outlined : isSupport ? Icons.support_agent_outlined : Icons.forum_outlined, color: const Color(0xFF0B63CE)),
           ),
           title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900), maxLines: 1, overflow: TextOverflow.ellipsis),
           subtitle: StreamBuilder<List<Map<String, dynamic>>>(

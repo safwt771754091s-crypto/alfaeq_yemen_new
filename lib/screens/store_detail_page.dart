@@ -7,10 +7,12 @@ import '../core/product_units.dart';
 import '../services/currency_service.dart';
 import '../services/catalog_service.dart';
 import '../services/review_service.dart';
+import '../services/store_chat_service.dart';
 import '../services/supabase_service.dart';
 import '../widgets/follow_button.dart';
 import 'cart_page.dart';
 import 'product_detail_page.dart';
+import 'store_chat_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
 const _navy = Color(0xFF0A2540);
@@ -158,6 +160,23 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
     }
   }
 
+  Future<void> _openStoreChat() async {
+    if (SupabaseService.client.auth.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول لمراسلة المتجر.')));
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final threadId = await const StoreChatService().start(widget.store.id);
+      if (!mounted) return;
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => StoreChatPage(threadId: threadId, title: _name)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyStoreChatError(e))));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final address = (_data['address'] ?? '').toString();
@@ -171,6 +190,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           actions: [
             FollowButton(targetType: 'store', targetId: widget.store.id, compact: true),
             const SizedBox(width: 4),
+            IconButton(onPressed: _openStoreChat, tooltip: 'راسل المتجر', icon: const Icon(Icons.forum_outlined)),
             IconButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage())), tooltip: 'السلة', icon: const Icon(Icons.shopping_cart_outlined)),
           ],
         ),
