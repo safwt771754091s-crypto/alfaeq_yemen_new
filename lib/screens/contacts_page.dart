@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../services/chat_transfer_service.dart';
 import '../services/supabase_service.dart';
+import '../widgets/chat_transfer_bubble.dart';
 import 'group_chat_page.dart';
 import 'red_packet_page.dart';
 import 'send_red_packet_sheet.dart';
+import 'send_transfer_sheet.dart';
 
 const _blue = Color(0xFF0D6EFD);
 const _surface = Color(0xFFF5F7FA);
@@ -221,12 +224,21 @@ class DirectChatPage extends StatefulWidget {
 class _DirectChatPageState extends State<DirectChatPage> {
   final _message = TextEditingController();
   bool _sending = false;
+  ChatPeer? _peer;
   String? get _uid => SupabaseService.client.auth.currentUser?.id;
 
   @override
   void initState() {
     super.initState();
     _markRead();
+    _loadPeer();
+  }
+
+  Future<void> _loadPeer() async {
+    try {
+      final peer = await const ChatTransferService().peer(widget.threadId);
+      if (mounted) setState(() => _peer = peer);
+    } catch (_) {/* transfer button simply stays hidden */}
   }
 
   Future<void> _markRead() async {
@@ -278,6 +290,9 @@ class _DirectChatPageState extends State<DirectChatPage> {
                     final row = messages[i];
                     final mine = row['sender_id']?.toString() == _uid;
                     final meta = row['metadata'];
+                    if (meta is Map && meta['kind'] == 'transfer') {
+                      return ChatTransferBubble(meta: meta, mine: mine);
+                    }
                     final packetId = meta is Map ? meta['packet_id']?.toString() : null;
                     if (packetId != null) {
                       return Align(
@@ -339,6 +354,20 @@ class _DirectChatPageState extends State<DirectChatPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                if (_peer != null)
+                  IconButton(
+                    tooltip: 'تحويل مبلغ',
+                    onPressed: () async {
+                      final sent = await showSendTransferSheet(
+                        context,
+                        threadId: widget.threadId,
+                        toUid: _peer!.uid,
+                        toName: _peer!.name,
+                      );
+                      if (sent && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم التحويل ✅')));
+                    },
+                    icon: const Icon(Icons.send_to_mobile, color: Color(0xFF07C160)),
+                  ),
                 IconButton(
                   tooltip: 'حزمة حمراء',
                   onPressed: () async {
