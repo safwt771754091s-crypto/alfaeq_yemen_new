@@ -38,8 +38,8 @@ Flutter (AlfaeqAiService)
 عندما يستنفد المزوّد الأساسي حصّته أو يُرجِع `429`، تُجرَّب المزوّدات المجانية التالية تلقائياً
 داخل `ai-gateway` (لا تحتاج أي سر، وكلها متوافقة مع OpenAI وتدعم استدعاء الأدوات):
 
-1. `LLM7` — `https://api.llm7.io/v1/chat/completions` (النموذج `default`).
-2. `Pollinations` — `https://text.pollinations.ai/openai` (النموذج `openai`).
+1. `Pollinations` — `https://text.pollinations.ai/openai` (النموذج `openai-fast`).
+2. `LLM7` — `https://api.llm7.io/v1/chat/completions` (النموذج `default`).
 
 الترتيب: المزوّد الأساسي ← `AI_FALLBACK_*` ← المزوّدون المجانيون. يمكن تعطيلهم بـ
 `AI_ENABLE_FREE_FALLBACK=false`. ملاحظة: هذه خدمات مجانية عامة، لذا يُفضّل ضبط مزوّد
@@ -55,6 +55,7 @@ Flutter (AlfaeqAiService)
 6. **شارة السلة ثابتة على صفر:** أصبحت شارة السلة (الرئيسية والتنقل السفلي) تقرأ العدد الحقيقي من `carts` عبر Supabase Realtime.
 7. **صفحة الخدمات بلا Scaffold:** كانت `ServicesHubPage` تُرجع `ListView` بلا شريط علوي. أصبحت `Scaffold` كامل.
 8. **تحذيرات `flutter analyze`:** أُصلحت 11 ملاحظة (متغيرات/استيرادات غير مستخدمة، `set literal` زائد، `catch` غير قابل للوصول).
+9. **إشعار حد المزوّد المجاني يُعرض كأنه رد:** بعض المزوّدين المجانيين يردّون `200 OK` بينما المحتوى إشعار استهلاك (مثل «API key reached its budget»)، فكان يظهر للمستخدم كنص مساعد مكسور. أصبحت البوابة تكتشف الإشعار (`ai_provider_notice`) وتعتبره فشل مزوّد فتجرب التالي، مع رسالة عربية واضحة في التطبيق.
 
 ## اختبار قبول الذكاء (AI read-only / mutation)
 
