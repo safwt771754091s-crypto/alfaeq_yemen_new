@@ -10,13 +10,23 @@ import '../services/supabase_service.dart';
 /// recent transfers list. All money movement happens in the server-side
 /// `wallet_transfer` RPC -- the client never edits balances directly.
 class WalletQrPage extends StatefulWidget {
-  const WalletQrPage({super.key});
+  final String? initialPayeeUid;
+  const WalletQrPage({super.key, this.initialPayeeUid});
   @override
   State<WalletQrPage> createState() => _WalletQrPageState();
 }
 
 class _WalletQrPageState extends State<WalletQrPage> {
   int _refresh = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final uid = widget.initialPayeeUid?.trim();
+    if (uid != null && uid.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _pay(uid));
+    }
+  }
 
   void _reload() => setState(() => _refresh++);
 

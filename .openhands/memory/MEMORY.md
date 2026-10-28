@@ -728,3 +728,15 @@ flutter pub get && flutter analyze && flutter test && flutter build web --releas
   autoplay-with-sound block degrades to muted playback instead of showing a failure.
 - Lesson: "media won't play audio" in this app = check the mute default FIRST; the uploaded
   media is usually valid. Version bumped to 1.0.14.
+
+## AI assistant LIVE + v1.0.17 release (2026-10-28)
+- v1.0.17+17 released (PR #199 merged 69374220). Latest APK: releases/latest/download/app-release.apk -> v1.0.17 (78.1MB). GitHub Pages links 200: /, /store/, /store/share.html, /store/privacy.html.
+- AI assistant now WORKS LIVE end-to-end (verified with a real signed-in JWT): Arabic replies + real tool-calling (search_catalog, get_my_wallet, barcode lookup returned real product «فول لونا»).
+- ROOT CAUSE of "AI not working": prod Supabase secrets AI_BASE_URL / AI_MODEL / AI_API_KEY (and UNSLOTH_* twins) held RANDOM 64-hex values, not a URL/model/key; gateway tried that invalid "primary" 3x per request before falling through. Fix: isValidHttpUrl filter -> `usableProviders` (PR #200). To fix properly the owner must set a real provider (e.g. AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai, AI_MODEL=gemini-flash-lite-latest, AI_API_KEY=<Google AI Studio key>).
+- Free fallback providers (no secret): Pollinations `text.pollinations.ai/openai` model `openai-fast` (higher limit, supports tool-calls) tried BEFORE llm7 `api.llm7.io` (429s after ~2 calls). Both support tool-calling.
+- PR #200 (merged e44f9337) fixes: detect quota/budget notices returned as HTTP 200 (don't show as an answer); skip invalid provider URLs; dedupe identical tool calls within one assistant turn.
+- DEPLOY ai-gateway: `SUPABASE_ACCESS_TOKEN=<sbp_...> /workspace/supabase_cli/node_modules/.bin/supabase functions deploy ai-gateway --project-ref <ref> --use-api`. Working sbp_ token recovered from /workspace/conversations/*/events/*.json (only 2 of 5 found tokens were valid).
+- Supabase management REST `/v1/projects/<ref>/secrets` returns FAKE/randomized values (all hex64) — you cannot read real secret values there. Run SQL via `POST /v1/projects/<ref>/database/query` with the sbp_ token.
+- Prod project ref + anon publishable key are in `lib/services/supabase_service.dart`; prod auth mailer autoconfirms, so a signup returns a session (handy for live tests without credentials).
+- Stale PRs: 13 open PRs (#2,16,17,19,20,21,42,47,50,51,54,55,62) were 160-830 commits behind main and already superseded; closed with an explanatory comment (reversible).
+

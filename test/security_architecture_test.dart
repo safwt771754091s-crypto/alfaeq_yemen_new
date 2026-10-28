@@ -837,5 +837,24 @@ void main() {
       expect(prefs, contains('mini_programs_favorites'));
       expect(prefs, contains('SharedPreferences'));
     });
+
+    test('smart scan routes payment, store, product and links', () {
+      final service = File('lib/services/smart_scan_service.dart').readAsStringSync();
+      final search = File('lib/screens/search_page.dart').readAsStringSync();
+      final wallet = File('lib/screens/wallet_qr_page.dart').readAsStringSync();
+      expect(service, contains('enum SmartScanKind'));
+      expect(service, contains("host == 'pay'"));
+      expect(service, contains("host == 'store'"));
+      expect(service, contains("host == 'product'"));
+      expect(service, contains('_productByCode'));
+      // The search page routes by kind instead of always searching.
+      expect(search, contains('SmartScanService().resolve'));
+      expect(search, contains('SmartScanKind.payment'));
+      expect(search, contains('WalletQrPage(initialPayeeUid'));
+      expect(search, contains('StoreDetailPage('));
+      expect(search, contains('ProductDetailPage('));
+      // A scanned payment code opens the pay sheet for that payee.
+      expect(wallet, contains('initialPayeeUid'));
+    });
   });
 }
