@@ -16,7 +16,12 @@ function normalizeChatUrl(base: string): string {
   if (!trimmed) return "";
   if (trimmed.endsWith("/chat/completions")) return trimmed;
   if (trimmed.endsWith("/v1")) return `${trimmed}/chat/completions`;
-  if (trimmed.endsWith("/openai")) return trimmed;
+  // `/openai` is a *base* for OpenAI-compatible providers and still needs the
+  // chat path appended. Gemini's documented base is
+  // `https://generativelanguage.googleapis.com/v1beta/openai`, so treating it
+  // as a complete endpoint made every primary request 404 and the app silently
+  // fell back to the free providers.
+  if (trimmed.endsWith("/openai")) return `${trimmed}/chat/completions`;
   return `${trimmed}/v1/chat/completions`;
 }
 
@@ -38,8 +43,9 @@ const freeFallbackEnabled = env("AI_ENABLE_FREE_FALLBACK") !== "false";
 const FREE_FALLBACKS: AiProvider[] = freeFallbackEnabled
   ? [
     // Pollinations has the higher free limit and supports tool-calling, so it
-    // goes before llm7 (which rate-limits after a couple of calls).
-    { name: "pollinations", chatUrl: "https://text.pollinations.ai/openai", apiKey: "", model: "openai-fast" },
+    // goes before llm7 (which rate-limits after a couple of calls). The full
+    // chat endpoint is used so the URL never depends on normalization.
+    { name: "pollinations", chatUrl: "https://text.pollinations.ai/openai/chat/completions", apiKey: "", model: "openai-fast" },
     { name: "llm7", chatUrl: "https://api.llm7.io/v1/chat/completions", apiKey: "unused", model: "default" },
   ]
   : [];
@@ -111,6 +117,26 @@ function detectProviderNotice(body: string, contentType: string): string | null 
     }
   } catch {
     /* not JSON: an ordinary text answer, not a notice */
+  }
+  return null;
+}
+
+/// Returns a stable error code when a 2xx body carries no assistant content and
+/// no tool calls (some free providers emit a reasoning-only or empty completion
+/// under load). The app renders only `content`, so such a reply is unusable and
+/// the chain must keep trying. Returns null for a usable answer.
+function detectEmptyCompletion(body: string, contentType: string): string | null {
+  if (!contentType.includes("json")) return null;
+  try {
+    const parsed = JSON.parse(body);
+    const message = parsed?.choices?.[0]?.message;
+    if (!message) return null;
+    const hasTools = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
+    const content = message.content;
+    const hasContent = typeof content === "string" ? content.trim().length > 0 : content != null;
+    if (!hasTools && !hasContent) return "ai_provider_empty";
+  } catch {
+    /* not JSON: nothing to classify */
   }
   return null;
 }
@@ -196,21 +222,37 @@ Deno.serve(async (req) => {
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Try each configured provider in order. A dead model, a bad key or a 429 on
-// one provider must never stop the chain: only a 2xx answer ends it. Every
-// other outcome moves on to the next provider.
+// one provider must never stop the chain: only a usable 2xx answer ends it.
+// Each provider is retried (a free provider's per-minute limit often clears in
+// a couple of seconds) and the whole chain is swept twice, so a transient 429
+// does not surface to the user while a sibling provider is still healthy.
+const CHAIN_ATTEMPTS = 2;
+const PROVIDER_ATTEMPTS = 2;
+
 async function callProviders(providers: AiProvider[], payload: Record<string, unknown>) {
   let lastStatus = 502;
   let lastBody = "";
 
-  for (const provider of providers) {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
-    const result = await callUpstream(provider.chatUrl, { ...payload, model: provider.model }, headers);
+  for (let chain = 0; chain < CHAIN_ATTEMPTS; chain++) {
+    let sawTransient = false;
+    for (const provider of providers) {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
+      const result = await callUpstream(provider.chatUrl, { ...payload, model: provider.model }, headers);
 
-    if (result.status >= 200 && result.status < 300) return result;
+      if (result.status >= 200 && result.status < 300) return result;
 
-    lastStatus = result.status;
-    lastBody = result.body;
+      lastStatus = result.status;
+      lastBody = result.body;
+      if (lastStatus === 429 || lastStatus === 502 || lastStatus === 503 || lastStatus === 504) {
+        sawTransient = true;
+      }
+    }
+    // Only sweep the chain again after a transient failure (a rolling quota
+    // window or a brief outage). A hard 404/401/402 will not fix itself, so
+    // retrying it would only add latency.
+    if (chain < CHAIN_ATTEMPTS - 1 && sawTransient) await delay(1200);
+    else if (chain < CHAIN_ATTEMPTS - 1) break;
   }
 
   // Every provider failed: surface one stable, client-friendly code instead of
@@ -247,7 +289,7 @@ async function callUpstream(
   payload: unknown,
   headers: Record<string, string>,
 ) {
-  const attempts = 3;
+  const attempts = PROVIDER_ATTEMPTS;
   let lastStatus = 502;
   let lastBody = JSON.stringify({ error: "ai_provider_unreachable" });
   let lastContentType = "application/json";
@@ -281,6 +323,16 @@ async function callUpstream(
           body: JSON.stringify({ error: notice, upstream_status: 200 }),
           contentType: "application/json",
         };
+      }
+      // An empty 2xx body (some free providers return one under load) is not a
+      // usable answer: treat it as a failure so the chain keeps trying.
+      const empty = detectEmptyCompletion(text, contentType);
+      if (empty) {
+        lastStatus = 502;
+        lastBody = JSON.stringify({ error: empty, upstream_status: 200 });
+        lastContentType = "application/json";
+        if (i < attempts - 1) await delay(300 * (i + 1));
+        continue;
       }
     }
 

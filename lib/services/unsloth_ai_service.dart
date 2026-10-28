@@ -74,6 +74,8 @@ class UnslothAiService {
         return 'مزود الذكاء مشغول الآن (تجاوز حد الطلبات). انتظر قليلاً ثم أعد المحاولة، أو فعّل خطة أعلى لدى مزود الذكاء.';
       case 'ai_provider_unavailable':
         return 'مزود الذكاء غير متاح مؤقتاً بسبب الضغط. أعد المحاولة بعد قليل.';
+      case 'ai_provider_empty':
+        return 'لم يُرجع مزود الذكاء رداً صالحاً. أعد المحاولة بعد لحظات.';
       case 'ai_provider_notice':
         return 'مزود الذكاء المجاني وصل إلى حده المسموح حالياً. أعد المحاولة بعد قليل أو فعّل مزوداً مدفوعاً (اضبط AI_BASE_URL وAI_MODEL وAI_API_KEY في أسرار Supabase).';
       case 'ai_provider_auth_failed':
