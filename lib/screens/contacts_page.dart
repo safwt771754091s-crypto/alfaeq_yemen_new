@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../services/chat_transfer_service.dart';
+import '../services/group_join_service.dart';
 import '../services/supabase_service.dart';
 import '../widgets/chat_transfer_bubble.dart';
+import 'barcode_scanner_page.dart';
 import 'group_chat_page.dart';
+import 'group_qr_page.dart';
 import 'red_packet_page.dart';
 import 'send_red_packet_sheet.dart';
 import 'send_transfer_sheet.dart';
@@ -73,6 +76,74 @@ class _ContactsPageState extends State<ContactsPage> {
     }
   }
 
+  Future<void> _joinGroupByCode() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.qr_code_scanner),
+                title: const Text('مسح رمز المجموعة', style: TextStyle(fontWeight: FontWeight.w800)),
+                onTap: () => Navigator.pop(context, 'scan'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.link),
+                title: const Text('لصق الرابط أو الرمز', style: TextStyle(fontWeight: FontWeight.w800)),
+                onTap: () => Navigator.pop(context, 'paste'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+
+    String? raw;
+    if (choice == 'scan') {
+      raw = await Navigator.push<String>(context, MaterialPageRoute(builder: (_) => const BarcodeScannerPage()));
+    } else {
+      final controller = TextEditingController();
+      raw = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('الانضمام لمجموعة'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            minLines: 1,
+            maxLines: 3,
+            decoration: const InputDecoration(hintText: 'alfaeq://group?code=...', border: OutlineInputBorder()),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('انضمام')),
+          ],
+        ),
+      );
+    }
+    final code = GroupJoinService.extractCode(raw);
+    if (code == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على رمز مجموعة صالح.')));
+      return;
+    }
+    try {
+      final threadId = await const GroupJoinService().joinByCode(code);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الانضمام إلى المجموعة ✅')));
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => GroupChatPage(threadId: threadId, title: 'مجموعة')));
+    } on StateError catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر الانضمام: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_uid == null) return const Scaffold(body: Center(child: Text('يجب تسجيل الدخول أولاً.')));
@@ -83,6 +154,7 @@ class _ContactsPageState extends State<ContactsPage> {
         appBar: AppBar(
           title: const Text('الجهات', style: TextStyle(fontWeight: FontWeight.w900)),
           actions: [
+            IconButton(tooltip: 'الانضمام لمجموعة', icon: const Icon(Icons.qr_code_scanner), onPressed: _joinGroupByCode),
             IconButton(tooltip: 'إضافة جهة اتصال', icon: const Icon(Icons.person_add_alt), onPressed: _addByUid),
           ],
         ),
@@ -96,6 +168,14 @@ class _ContactsPageState extends State<ContactsPage> {
                 subtitle: const Text('أضف مستخدمًا بمعرّفه'),
                 trailing: const Icon(Icons.chevron_left),
                 onTap: _addByUid,
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const _Avatar(icon: Icons.qr_code_scanner),
+                title: const Text('الانضمام لمجموعة', style: TextStyle(fontWeight: FontWeight.w900)),
+                subtitle: const Text('امسح رمز المجموعة أو ألصق الرابط'),
+                trailing: const Icon(Icons.chevron_left),
+                onTap: _joinGroupByCode,
               ),
             ]),
             _sectionTitle('جهات اتصالي'),
@@ -152,7 +232,19 @@ class _ContactsPageState extends State<ContactsPage> {
               ListTile(
                 leading: const _Avatar(icon: Icons.groups_outlined),
                 title: Text((g['title'] ?? 'مجموعة').toString(), style: const TextStyle(fontWeight: FontWeight.w800)),
-                trailing: const Icon(Icons.chevron_left),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  IconButton(
+                    tooltip: 'رمز المجموعة',
+                    icon: const Icon(Icons.qr_code_2, size: 20),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => GroupQrPage(threadId: g['id'].toString(), title: (g['title'] ?? 'مجموعة').toString()),
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_left),
+                ]),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GroupChatPage(threadId: g['id'].toString(), title: (g['title'] ?? 'مجموعة').toString()))),
               ),
           ]);

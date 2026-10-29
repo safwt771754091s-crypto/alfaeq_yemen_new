@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 
 /// What a scanned code turned out to be, so the caller can route it.
-enum SmartScanKind { payment, store, product, url, search }
+enum SmartScanKind { payment, store, product, group, url, search }
 
 /// The decoded meaning of a scanned/pasted code.
 class SmartScanResult {
@@ -12,6 +12,7 @@ class SmartScanResult {
   final String? uid;
   final String? storeId;
   final String? url;
+  final String? groupCode;
   final Map<String, dynamic>? product;
 
   const SmartScanResult({
@@ -20,6 +21,7 @@ class SmartScanResult {
     this.uid,
     this.storeId,
     this.url,
+    this.groupCode,
     this.product,
   });
 }
@@ -57,6 +59,10 @@ class SmartScanService {
           final id = _idFrom(params, uri);
           final product = await _productByCode(id);
           if (product != null) return SmartScanResult(kind: SmartScanKind.product, raw: code, product: product);
+        }
+        if (host == 'group') {
+          final groupCode = (params['code'] ?? '').trim();
+          if (groupCode.isNotEmpty) return SmartScanResult(kind: SmartScanKind.group, raw: code, groupCode: groupCode);
         }
       }
     }

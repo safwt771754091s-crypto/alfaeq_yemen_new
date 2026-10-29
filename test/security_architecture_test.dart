@@ -899,5 +899,35 @@ void main() {
       // A scanned payment code opens the pay sheet for that payee.
       expect(wallet, contains('initialPayeeUid'));
     });
+
+    test('group QR join is server-side and rotates safely', () {
+      final migration = File('supabase/migrations/20261029010000_group_qr_join_v1.sql').readAsStringSync();
+      final service = File('lib/services/group_join_service.dart').readAsStringSync();
+      final page = File('lib/screens/group_qr_page.dart').readAsStringSync();
+      // Codes live on the thread, unique per group; membership stays server-side.
+      expect(migration, contains('add column if not exists join_code'));
+      expect(migration, contains('create unique index if not exists chat_threads_join_code_key'));
+      expect(migration, contains('function public.join_group_by_code'));
+      expect(migration, contains('function public.group_join_code'));
+      expect(migration, contains('security definer'));
+      expect(migration, contains('on conflict do nothing'));
+      expect(migration, contains("raise exception 'invalid_code'"));
+      expect(migration, contains('revoke all on function public.join_group_by_code'));
+      // The client only calls RPCs; it never inserts into chat_members.
+      expect(service, contains("rpc('join_group_by_code'"));
+      expect(service, contains("rpc('group_join_code'"));
+      expect(service, isNot(contains('from(\'chat_members\')')));
+      // The QR page offers copy and rotate.
+      expect(page, contains('QrImageView('));
+      expect(page, contains('GroupJoinService.payload'));
+      expect(page, contains('_rotate'));
+      // The contacts page and smart scan both expose the join entry point.
+      final contacts = File('lib/screens/contacts_page.dart').readAsStringSync();
+      expect(contacts, contains('_joinGroupByCode'));
+      expect(contacts, contains('GroupJoinService.extractCode'));
+      final scan = File('lib/services/smart_scan_service.dart').readAsStringSync();
+      expect(scan, contains('SmartScanKind.group'));
+      expect(scan, contains("host == 'group'"));
+    });
   });
 }
