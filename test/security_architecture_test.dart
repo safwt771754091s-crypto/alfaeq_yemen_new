@@ -387,6 +387,27 @@ void main() {
       expect(migration, contains("'reels'"));
     });
 
+    test('moments support inline video alongside photos', () {
+      final page = File('lib/screens/moments_page.dart').readAsStringSync();
+      expect(page, contains('class _MomentVideo'));
+      expect(page, contains('VideoPlayerController.networkUrl'));
+      expect(page, contains('_pickVideos'));
+      expect(page, contains('video_urls'));
+
+      final service = File('lib/services/moments_service.dart').readAsStringSync();
+      expect(service, contains('uploadVideo'));
+      expect(service, contains("'video_urls': videoUrls"));
+
+      final migration = File('supabase/migrations/20261028050000_moments_video_v1.sql').readAsStringSync();
+      expect(migration, contains('add column if not exists video_urls text[]'));
+      expect(migration, contains('function public.moments_feed'));
+      expect(migration, contains('video_urls text[]'));
+      expect(migration, contains("'video/mp4'"));
+      // A video-only moment must satisfy the body-or-media guard.
+      expect(migration, contains('moments_body_or_media'));
+      expect(migration, contains('array_length(video_urls, 1) is not null'));
+    });
+
     test('contacts directory mirrors WeChat Contacts', () {
       final page = File('lib/screens/contacts_page.dart').readAsStringSync();
       expect(page, contains('class ContactsPage'));

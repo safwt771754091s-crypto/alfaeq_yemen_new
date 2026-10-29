@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 import '../services/moments_service.dart';
 import '../services/supabase_service.dart';
@@ -170,6 +171,7 @@ class _MomentCard extends StatelessWidget {
     final avatar = moment['author_avatar']?.toString();
     final content = (moment['content'] ?? '').toString();
     final media = (moment['media_urls'] as List?)?.whereType<String>().toList() ?? const <String>[];
+    final videos = (moment['video_urls'] as List?)?.whereType<String>().toList() ?? const <String>[];
     final liked = moment['liked_by_me'] == true;
     final likeCount = (moment['like_count'] as num?)?.toInt() ?? 0;
     final commentCount = (moment['comment_count'] as num?)?.toInt() ?? 0;
@@ -210,6 +212,10 @@ class _MomentCard extends StatelessWidget {
             if (media.isNotEmpty) ...[
               const SizedBox(height: 10),
               _MediaGrid(urls: media),
+            ],
+            if (videos.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              for (final url in videos) _MomentVideo(url: url),
             ],
             const SizedBox(height: 6),
             Row(children: [
@@ -285,6 +291,120 @@ class _MediaGrid extends StatelessWidget {
         alignment: Alignment.center,
         child: const Icon(Icons.broken_image_outlined, color: _blue),
       );
+}
+
+/// Inline player for a video attached to a moment. It shows a play button until
+/// tapped, then streams with sound. Each card owns its controller and disposes
+/// it when the feed rebuilds, so only videos the user actually plays are fetched.
+class _MomentVideo extends StatefulWidget {
+  final String url;
+  const _MomentVideo({required this.url});
+
+  @override
+  State<_MomentVideo> createState() => _MomentVideoState();
+}
+
+class _MomentVideoState extends State<_MomentVideo> {
+  VideoPlayerController? _controller;
+  bool _initializing = false;
+  bool _failed = false;
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _ensure() async {
+    if (_controller != null || _initializing) return;
+    setState(() => _initializing = true);
+    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    try {
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      setState(() {
+        _controller = controller;
+        _initializing = false;
+      });
+    } catch (_) {
+      await controller.dispose();
+      if (mounted) {
+        setState(() {
+          _failed = true;
+          _initializing = false;
+        });
+      }
+    }
+  }
+
+  void _toggle() {
+    final controller = _controller;
+    if (controller == null) return;
+    setState(() {
+      if (controller.value.isPlaying) {
+        controller.pause();
+      } else {
+        controller.play();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_failed) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          height: 200,
+          color: const Color(0xFFF1F6FF),
+          alignment: Alignment.center,
+          child: const Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.videocam_off_outlined, color: _blue, size: 40),
+            SizedBox(height: 8),
+            Text('تعذر تشغيل الفيديو', style: TextStyle(color: _navy, fontWeight: FontWeight.w700)),
+          ]),
+        ),
+      );
+    }
+    final controller = _controller;
+    if (controller == null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Container(
+            color: Colors.black,
+            alignment: Alignment.center,
+            child: _initializing
+                ? const CircularProgressIndicator(color: Colors.white)
+                : IconButton(
+                    onPressed: _ensure,
+                    iconSize: 56,
+                    icon: const Icon(Icons.play_circle_fill, color: Colors.white),
+                  ),
+          ),
+        ),
+      );
+    }
+    final ratio = controller.value.aspectRatio;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: GestureDetector(
+        onTap: _toggle,
+        child: Stack(alignment: Alignment.center, children: [
+          AspectRatio(
+            aspectRatio: ratio == 0 ? 16 / 9 : ratio,
+            child: VideoPlayer(controller),
+          ),
+          if (!controller.value.isPlaying)
+            const Icon(Icons.play_circle_fill, size: 56, color: Colors.white70),
+        ]),
+      ),
+    );
+  }
 }
 
 class _CommentsSheet extends StatefulWidget {
@@ -422,6 +542,7 @@ class _MomentsComposerPageState extends State<MomentsComposerPage> {
   final _service = const MomentsService();
   final _controller = TextEditingController();
   final List<_PickedImage> _images = [];
+  final List<_PickedImage> _videos = [];
   String _visibility = 'public';
   bool _publishing = false;
 
@@ -441,10 +562,20 @@ class _MomentsComposerPageState extends State<MomentsComposerPage> {
     setState(() {});
   }
 
+  Future<void> _pickVideos() async {
+    final files = await FilePicker.pickFiles(type: FileType.video);
+    if (files.isEmpty) return;
+    for (final file in files) {
+      final ext = (file.extension ?? 'mp4');
+      _videos.add(_PickedImage(bytes: await file.readAsBytes(), extension: ext));
+    }
+    setState(() {});
+  }
+
   Future<void> _publish() async {
     final text = _controller.text.trim();
-    if (text.isEmpty && _images.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اكتب نصًا أو أضف صورة.')));
+    if (text.isEmpty && _images.isEmpty && _videos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اكتب نصًا أو أضف صورة أو فيديو.')));
       return;
     }
     setState(() => _publishing = true);
@@ -453,7 +584,11 @@ class _MomentsComposerPageState extends State<MomentsComposerPage> {
       for (final image in _images) {
         urls.add(await _service.uploadImage(image.bytes, image.extension));
       }
-      await _service.publish(content: text, mediaUrls: urls, visibility: _visibility);
+      final videoUrls = <String>[];
+      for (final video in _videos) {
+        videoUrls.add(await _service.uploadVideo(video.bytes, video.extension));
+      }
+      await _service.publish(content: text, mediaUrls: urls, videoUrls: videoUrls, visibility: _visibility);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -526,6 +661,53 @@ class _MomentsComposerPageState extends State<MomentsComposerPage> {
               onPressed: _publishing ? null : _pickImages,
               icon: const Icon(Icons.add_photo_alternate_outlined),
               label: Text(_images.isEmpty ? 'إضافة صور' : 'إضافة المزيد (${_images.length})'),
+            ),
+            if (_videos.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _videos.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 8, mainAxisSpacing: 8),
+                itemBuilder: (context, i) => Stack(children: [
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        color: Colors.black87,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.videocam_outlined, color: Colors.white, size: 36),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 6,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
+                      child: const Text('فيديو', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  Positioned(
+                    top: 4,
+                    left: 4,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _videos.removeAt(i)),
+                      child: Container(
+                        decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                        child: const Icon(Icons.close, color: Colors.white, size: 18),
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _publishing ? null : _pickVideos,
+              icon: const Icon(Icons.videocam_outlined),
+              label: Text(_videos.isEmpty ? 'إضافة فيديو' : 'إضافة المزيد (${_videos.length})'),
             ),
             const SizedBox(height: 16),
             const Text('من يرى المنشور؟', style: TextStyle(fontWeight: FontWeight.w800)),
