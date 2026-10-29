@@ -29,6 +29,7 @@ class MomentsService {
   Future<void> publish({
     required String content,
     required List<String> mediaUrls,
+    List<String> videoUrls = const [],
     String visibility = 'public',
   }) async {
     final uid = currentUserId;
@@ -37,6 +38,7 @@ class MomentsService {
       'author_id': uid,
       'content': content.trim(),
       'media_urls': mediaUrls,
+      'video_urls': videoUrls,
       'visibility': visibility,
     });
   }
@@ -78,6 +80,20 @@ class MomentsService {
     final ext = extension.replaceAll('.', '').toLowerCase();
     final safeExt = ext.isEmpty ? 'jpg' : ext;
     final path = '$uid/${DateTime.now().microsecondsSinceEpoch}.$safeExt';
+    await _db.storage.from(bucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(cacheControl: '31536000', upsert: false),
+        );
+    return _db.storage.from(bucket).getPublicUrl(path);
+  }
+
+  Future<String> uploadVideo(Uint8List bytes, String extension) async {
+    final uid = currentUserId;
+    if (uid == null) throw StateError('يجب تسجيل الدخول لرفع الفيديو.');
+    final ext = extension.replaceAll('.', '').toLowerCase();
+    final safeExt = ext.isEmpty ? 'mp4' : ext;
+    final path = '$uid/video_${DateTime.now().microsecondsSinceEpoch}.$safeExt';
     await _db.storage.from(bucket).uploadBinary(
           path,
           bytes,
