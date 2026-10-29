@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
 import '../widgets/chat_transfer_bubble.dart';
+import 'group_qr_page.dart';
 import 'red_packet_page.dart';
 import 'send_red_packet_sheet.dart';
 import 'send_transfer_sheet.dart';
@@ -83,6 +84,15 @@ class _GroupChatPageState extends State<GroupChatPage> {
         appBar: AppBar(
           title: Text(widget.title, style: const TextStyle(fontWeight: FontWeight.w900)),
           actions: [
+            if (widget.peerUid == null)
+              IconButton(
+                tooltip: 'رمز المجموعة',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => GroupQrPage(threadId: widget.threadId, title: widget.title)),
+                ),
+                icon: const Icon(Icons.qr_code_2),
+              ),
             IconButton(onPressed: _addMembers, tooltip: 'إضافة أعضاء', icon: const Icon(Icons.person_add_alt_1_outlined)),
           ],
         ),

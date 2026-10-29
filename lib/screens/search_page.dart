@@ -6,11 +6,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/app_sections.dart';
 import '../services/currency_service.dart';
 import '../services/catalog_service.dart';
+import '../services/group_join_service.dart';
 import '../services/smart_scan_service.dart';
 import '../services/supabase_service.dart';
 import '../services/unified_search_service.dart';
 import 'cart_page.dart';
 import 'barcode_scanner_page.dart';
+import 'group_chat_page.dart';
 import 'mini_programs_page.dart';
 import 'product_detail_page.dart';
 import 'store_detail_page.dart';
@@ -136,6 +138,18 @@ class _SearchPageState extends State<SearchPage> {
         final row = result.product;
         if (row != null) {
           await Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: CatalogDocument.fromSupabase(row))));
+        }
+      case SmartScanKind.group:
+        final code = result.groupCode ?? '';
+        try {
+          final threadId = await const GroupJoinService().joinByCode(code);
+          if (!mounted) return;
+          _snack('تم الانضمام إلى المجموعة ✅');
+          await Navigator.push(context, MaterialPageRoute(builder: (_) => GroupChatPage(threadId: threadId, title: 'مجموعة')));
+        } on StateError catch (e) {
+          _snack(e.message);
+        } catch (e) {
+          _snack('تعذر الانضمام للمجموعة: $e');
         }
       case SmartScanKind.url:
         final url = result.url;
