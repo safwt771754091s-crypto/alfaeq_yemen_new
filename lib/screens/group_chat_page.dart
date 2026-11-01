@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
+import '../widgets/chat_reaction_bar.dart';
 import '../widgets/chat_transfer_bubble.dart';
+import '../widgets/emoji_picker.dart';
 import 'group_qr_page.dart';
 import 'red_packet_page.dart';
 import 'send_red_packet_sheet.dart';
@@ -25,7 +27,87 @@ class GroupChatPage extends StatefulWidget {
 class _GroupChatPageState extends State<GroupChatPage> {
   final _message = TextEditingController();
   bool _sending = false;
+  bool _showEmoji = false;
   String? get _uid => SupabaseService.client.auth.currentUser?.id;
+
+  /// Live reactions for this thread, keyed by message id.
+  Stream<List<Map<String, dynamic>>> _reactions() => SupabaseService.client
+      .from('message_reactions')
+      .stream(primaryKey: ['id'])
+      .eq('thread_id', widget.threadId);
+
+  Future<void> _toggleReaction(String messageId, String emoji) async {
+    final uid = _uid;
+    if (uid == null) return;
+    try {
+      final existing = await SupabaseService.client
+          .from('message_reactions')
+          .select('id')
+          .eq('message_id', messageId)
+          .eq('user_id', uid)
+          .eq('emoji', emoji)
+          .limit(1);
+      if (existing.isNotEmpty) {
+        await SupabaseService.client.from('message_reactions').delete().eq('id', existing.first['id']);
+      } else {
+        await SupabaseService.client.from('message_reactions').insert({
+          'message_id': messageId,
+          'user_id': uid,
+          'emoji': emoji,
+        });
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحديث التفاعل: $e')));
+    }
+  }
+
+  Future<void> _pickReaction(String messageId) async {
+    const quick = ['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '🎉'];
+    final emoji = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
+              children: [
+                for (final e in quick)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(24),
+                    onTap: () => Navigator.pop(context, e),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F7FA),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Text(e, style: const TextStyle(fontSize: 28)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (emoji != null) await _toggleReaction(messageId, emoji);
+  }
+
+  void _insertEmoji(String emoji) {
+    final text = _message.text;
+    final selection = _message.selection;
+    final offset = selection.isValid ? selection.start : text.length;
+    final start = selection.isValid ? selection.start : text.length;
+    final end = selection.isValid ? selection.end : text.length;
+    _message.value = TextEditingValue(
+      text: text.replaceRange(start, end, emoji),
+      selection: TextSelection.collapsed(offset: offset + emoji.length),
+    );
+  }
 
   Future<void> _send() async {
     final text = _message.text.trim();
@@ -34,6 +116,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
     try {
       await SupabaseService.client.rpc('send_chat_message', params: {'p_thread_id': widget.threadId, 'p_body': text});
       _message.clear();
+      if (_showEmoji) setState(() => _showEmoji = false);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال الرسالة: $e')));
     } finally {
@@ -100,82 +183,122 @@ class _GroupChatPageState extends State<GroupChatPage> {
           children: [
             Expanded(
               child: StreamBuilder<List<Map<String, dynamic>>>(
-                stream: _messages(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) return Center(child: Text('تعذر تحميل الرسائل: ${snapshot.error}'));
-                  if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                  final messages = snapshot.data ?? const <Map<String, dynamic>>[];
-                  if (messages.isEmpty) {
-                    return const Center(child: Text('لا رسائل بعد. ابدأ المحادثة.', style: TextStyle(color: Colors.black54)));
-                  }
-                  return ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                    itemCount: messages.length,
-                    itemBuilder: (_, i) {
-                      final row = messages[i];
-                      final mine = row['sender_id']?.toString() == _uid;
-                      final sender = (row['metadata'] is Map ? (row['metadata'] as Map)['sender_name'] : null)?.toString();
-                      final meta = row['metadata'];
-                      if (meta is Map && meta['kind'] == 'transfer') {
-                        return ChatTransferBubble(meta: meta, mine: mine);
+                stream: _reactions(),
+                builder: (context, reactionsSnapshot) {
+                  final allReactions = reactionsSnapshot.data ?? const <Map<String, dynamic>>[];
+                  return StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: _messages(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) return Center(child: Text('تعذر تحميل الرسائل: ${snapshot.error}'));
+                      if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+                      final messages = snapshot.data ?? const <Map<String, dynamic>>[];
+                      if (messages.isEmpty) {
+                        return const Center(child: Text('لا رسائل بعد. ابدأ المحادثة.', style: TextStyle(color: Colors.black54)));
                       }
-                      final packetId = meta is Map ? meta['packet_id']?.toString() : null;
-                      if (packetId != null) {
-                        return Align(
-                          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-                          child: GestureDetector(
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RedPacketPage(packetId: packetId, title: 'الحزمة الحمراء 🧧'))),
-                            child: Container(
-                              constraints: const BoxConstraints(maxWidth: 300),
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(colors: [Color(0xFFE67E22), Color(0xFFC0392B)]),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Row(children: [
-                                const Icon(Icons.card_giftcard, color: Colors.white, size: 30),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text((row['body'] ?? 'حزمة حمراء 🧧').toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-                                    const SizedBox(height: 2),
-                                    Text('${meta is Map ? meta['amount'] ?? '' : ''} ${meta is Map ? meta['currency'] ?? '' : ''} • اضغط للفتح', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                                  ]),
+                      return ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                        itemCount: messages.length,
+                        itemBuilder: (_, i) {
+                          final row = messages[i];
+                          final messageId = row['id'].toString();
+                          final mine = row['sender_id']?.toString() == _uid;
+                          final sender = (row['metadata'] is Map ? (row['metadata'] as Map)['sender_name'] : null)?.toString();
+                          final meta = row['metadata'];
+                          final reactions = allReactions.where((r) => r['message_id']?.toString() == messageId).toList();
+                          final reactionBar = ChatReactionBar(
+                            reactions: reactions,
+                            myUid: _uid,
+                            onToggle: (emoji) => _toggleReaction(messageId, emoji),
+                            onAdd: () => _pickReaction(messageId),
+                          );
+                          if (meta is Map && meta['kind'] == 'transfer') {
+                            return Column(
+                              crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              children: [
+                                ChatTransferBubble(meta: meta, mine: mine),
+                                Padding(
+                                  padding: EdgeInsets.only(left: mine ? 0 : 4, right: mine ? 4 : 0),
+                                  child: reactionBar,
                                 ),
-                              ]),
+                              ],
+                            );
+                          }
+                          final packetId = meta is Map ? meta['packet_id']?.toString() : null;
+                          if (packetId != null) {
+                            return Column(
+                              crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              children: [
+                                Align(
+                                  alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+                                  child: GestureDetector(
+                                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RedPacketPage(packetId: packetId, title: 'الحزمة الحمراء 🧧'))),
+                                    child: Container(
+                                      constraints: const BoxConstraints(maxWidth: 300),
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(colors: [Color(0xFFE67E22), Color(0xFFC0392B)]),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Row(children: [
+                                        const Icon(Icons.card_giftcard, color: Colors.white, size: 30),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                            Text((row['body'] ?? 'حزمة حمراء 🧧').toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                                            const SizedBox(height: 2),
+                                            Text('${meta is Map ? meta['amount'] ?? '' : ''} ${meta is Map ? meta['currency'] ?? '' : ''} • اضغط للفتح', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                          ]),
+                                        ),
+                                      ]),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.only(left: mine ? 0 : 4, right: mine ? 4 : 0),
+                                  child: reactionBar,
+                                ),
+                              ],
+                            );
+                          }
+                          return Align(
+                            alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+                            child: Column(
+                              crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              children: [
+                                if (!mine && sender != null && sender.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 2, left: 4),
+                                    child: Text(sender, style: const TextStyle(fontSize: 11, color: Colors.black45)),
+                                  ),
+                                GestureDetector(
+                                  onLongPress: () => _pickReaction(messageId),
+                                  child: Container(
+                                    constraints: const BoxConstraints(maxWidth: 320),
+                                    margin: const EdgeInsets.only(bottom: 2),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: mine ? Theme.of(context).colorScheme.primaryContainer : Colors.grey.shade200,
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Text((row['body'] ?? '').toString()),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.only(left: mine ? 0 : 4, right: mine ? 4 : 0),
+                                  child: reactionBar,
+                                ),
+                              ],
                             ),
-                          ),
-                        );
-                      }
-                      return Align(
-                        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Column(
-                          crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                          children: [
-                            if (!mine && sender != null && sender.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 2, left: 4),
-                                child: Text(sender, style: const TextStyle(fontSize: 11, color: Colors.black45)),
-                              ),
-                            Container(
-                              constraints: const BoxConstraints(maxWidth: 320),
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: mine ? Theme.of(context).colorScheme.primaryContainer : Colors.grey.shade200,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Text((row['body'] ?? '').toString()),
-                            ),
-                          ],
-                        ),
+                          );
+                        },
                       );
                     },
                   );
                 },
               ),
             ),
+            if (_showEmoji) EmojiPicker(onEmoji: _insertEmoji),
             SafeArea(
               top: false,
               child: Padding(
@@ -192,6 +315,12 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'إيموجي',
+                    onPressed: () => setState(() => _showEmoji = !_showEmoji),
+                    icon: Icon(_showEmoji ? Icons.keyboard : Icons.emoji_emotions_outlined,
+                        color: _showEmoji ? const Color(0xFF07C160) : null),
+                  ),
                   if (widget.peerUid != null)
                     IconButton(
                       tooltip: 'تحويل مبلغ',

@@ -929,5 +929,33 @@ void main() {
       expect(scan, contains('SmartScanKind.group'));
       expect(scan, contains("host == 'group'"));
     });
+
+    test('chat reactions are membership-scoped and realtime', () {
+      final migration = File('supabase/migrations/20261029020000_chat_emoji_reactions_v1.sql').readAsStringSync();
+      // Reactions live in their own table with a denormalised thread_id.
+      expect(migration, contains('create table if not exists public.message_reactions'));
+      expect(migration, contains('unique (message_id, user_id, emoji)'));
+      expect(migration, contains('function private.is_message_member'));
+      expect(migration, contains('security definer'));
+      // RLS: members only, you can only add/remove your own reaction.
+      expect(migration, contains('alter table public.message_reactions enable row level security'));
+      expect(migration, contains('message_reactions_insert'));
+      expect(migration, contains('user_id = auth.uid()::text'));
+      expect(migration, contains('revoke all on table public.message_reactions from anon'));
+      expect(migration, contains('alter publication supabase_realtime add table public.message_reactions'));
+      // UI wires the picker and the reaction bar into the chat page.
+      final page = File('lib/screens/group_chat_page.dart').readAsStringSync();
+      expect(page, contains('ChatReactionBar('));
+      expect(page, contains('EmojiPicker('));
+      expect(page, contains("from('message_reactions')"));
+      expect(page, contains('_toggleReaction'));
+      expect(page, contains('_pickReaction'));
+      final picker = File('lib/widgets/emoji_picker.dart').readAsStringSync();
+      expect(picker, contains('class EmojiPicker'));
+      expect(picker, contains('onEmoji'));
+      final bar = File('lib/widgets/chat_reaction_bar.dart').readAsStringSync();
+      expect(bar, contains('class ChatReactionBar'));
+      expect(bar, contains('onToggle'));
+    });
   });
 }
