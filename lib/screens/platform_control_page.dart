@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 import 'admin_user_management_page.dart';
+import 'mini_program_publish_page.dart';
 import 'permissions_editor.dart';
 
 /// مركز تشغيل المنصة.
@@ -202,6 +203,11 @@ class _PlatformControlPageState extends State<PlatformControlPage> {
                                 FilledButton.icon(onPressed: _assignStaff, icon: const Icon(Icons.person_add_alt_1), label: const Text('إضافة مدير أو مشرف')),
                                 OutlinedButton.icon(onPressed: _openUserManagement, icon: const Icon(Icons.manage_accounts_outlined), label: const Text('إدارة الصلاحيات التفصيلية')),
                                 OutlinedButton.icon(onPressed: _openOwnerPermissions, icon: const Icon(Icons.verified_user_outlined), label: const Text('صلاحياتي الكاملة')),
+                                OutlinedButton.icon(
+                                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MiniProgramPublishPage())),
+                                  icon: const Icon(Icons.widgets_outlined),
+                                  label: const Text('نشر برنامج مصغّر'),
+                                ),
                               ],
                             ),
                           ],

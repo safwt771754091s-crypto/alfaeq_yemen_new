@@ -881,6 +881,44 @@ void main() {
       expect(prefs, contains('SharedPreferences'));
     });
 
+    test('mini programs are a real platform backed by a staff-gated registry', () {
+      // The launcher must read a database catalog instead of only a hard-coded
+      // list, so new mini apps can ship without a client release.
+      final page = File('lib/screens/mini_programs_page.dart').readAsStringSync();
+      expect(page, contains('MiniProgramsService'));
+      expect(page, contains('_programDestination'));
+      expect(page, contains("route.startsWith('screen:')"));
+
+      final service = File('lib/services/mini_programs_service.dart').readAsStringSync();
+      expect(service, contains("rpc('mini_programs_list'"));
+      expect(service, contains("from('mini_programs').insert"));
+      expect(service, contains('static String slugify'));
+
+      final migration = File('supabase/migrations/20261101010000_mini_programs_v1.sql').readAsStringSync();
+      expect(migration, contains('create table if not exists public.mini_programs'));
+      expect(migration, contains('private.is_platform_staff()'));
+      expect(migration, contains('create or replace function public.mini_programs_list'));
+      expect(migration, contains('grant execute on function public.mini_programs_list'));
+      expect(migration, contains('enable row level security'));
+      expect(migration, contains('on conflict (id) do update'));
+    });
+
+    test('mini-program publishing is staff-gated in UI and database', () {
+      final publish = File('lib/screens/mini_program_publish_page.dart').readAsStringSync();
+      expect(publish, contains('canOpenDeveloperCenter'));
+      expect(publish, contains('MiniProgramsService().register'));
+      expect(publish, contains('نشر البرامج المصغّرة متاح لفريق المنصة فقط'));
+
+      final control = File('lib/screens/platform_control_page.dart').readAsStringSync();
+      expect(control, contains("import 'mini_program_publish_page.dart';"));
+      expect(control, contains('MiniProgramPublishPage()'));
+
+      // The registry's write policies must be staff-only, not self-service.
+      final migration = File('supabase/migrations/20261101010000_mini_programs_v1.sql').readAsStringSync();
+      final insertPolicy = migration.substring(migration.indexOf('mini_programs_insert'), migration.indexOf('mini_programs_update'));
+      expect(insertPolicy, contains('private.is_platform_staff()'));
+    });
+
     test('smart scan routes payment, store, product and links', () {
       final service = File('lib/services/smart_scan_service.dart').readAsStringSync();
       final search = File('lib/screens/search_page.dart').readAsStringSync();

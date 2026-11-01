@@ -4,8 +4,15 @@ import '../core/app_sections.dart';
 import '../core/mini_programs_prefs.dart';
 import '../services/currency_service.dart';
 import '../services/catalog_service.dart';
+import '../services/mini_programs_service.dart';
 import '../services/supabase_service.dart';
+import 'ai_assistant_page.dart';
 import 'cart_page.dart';
+import 'contact_us_page.dart';
+import 'live_rooms_page.dart';
+import 'moments_page.dart';
+import 'reels_page.dart';
+import 'wallet_qr_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
 const _navy = Color(0xFF0A2540);
@@ -27,6 +34,12 @@ IconData miniProgramIcon(String name) {
     case 'work': return Icons.work_outline;
     case 'school': return Icons.school_outlined;
     case 'medical': return Icons.medical_services_outlined;
+    case 'play': return Icons.play_circle_outline;
+    case 'photo': return Icons.photo_library_outlined;
+    case 'live': return Icons.sensors;
+    case 'account_balance_wallet': return Icons.account_balance_wallet_outlined;
+    case 'auto_awesome': return Icons.auto_awesome;
+    case 'support_agent': return Icons.support_agent;
     default: return Icons.explore_outlined;
   }
 }
@@ -46,6 +59,7 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
   String _query = '';
   List<String> _recent = const [];
   List<String> _favorites = const [];
+  List<MiniProgram> _programs = const [];
 
   @override
   void initState() {
@@ -57,6 +71,12 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
     final recent = await MiniProgramsPrefs.recent();
     final favorites = await MiniProgramsPrefs.favorites();
     if (mounted) setState(() { _recent = recent; _favorites = favorites; });
+    try {
+      final programs = await const MiniProgramsService().list();
+      if (mounted) setState(() => _programs = programs);
+    } catch (_) {
+      // The platform catalog is best-effort; the section launcher still works.
+    }
   }
 
   List<AppSection> get _filtered {
@@ -75,6 +95,61 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
   List<AppSection> get _recentSections => _sectionsFor(_recent);
   List<AppSection> get _favoriteSections => _sectionsFor(_favorites);
 
+  /// Platform programs are independent of the built-in section list; favourites
+  /// and recents for them are tracked by their own `program:<id>` keys.
+  List<MiniProgram> get _filteredPrograms {
+    final q = _query.trim();
+    if (q.isEmpty) return _programs;
+    return _programs
+        .where((p) => p.name.contains(q) || p.description.contains(q) || p.category.contains(q))
+        .toList();
+  }
+
+  List<MiniProgram> _programsFor(List<String> keys) {
+    final wanted = {for (final k in keys) if (k.startsWith('program:')) k.substring(8)};
+    return [for (final p in _programs) if (wanted.contains(p.id)) p];
+  }
+
+  List<MiniProgram> get _recentPrograms => _programsFor(_recent);
+  List<MiniProgram> get _favoritePrograms => _programsFor(_favorites);
+
+  /// Resolves a mini program's `route` to a concrete screen. `section:<id>`
+  /// opens the built-in product surface; `screen:<name>` opens a first-party
+  /// feature page.
+  Widget? _programDestination(MiniProgram program) {
+    final route = program.route;
+    if (route.startsWith('section:')) {
+      final sectionId = route.substring(8);
+      for (final s in appSections) {
+        if (s.id == sectionId) return MiniProgramPage(section: s);
+      }
+      return null;
+    }
+    if (route.startsWith('screen:')) {
+      switch (route.substring(7)) {
+        case 'reels': return const ReelsPage();
+        case 'moments': return const MomentsPage();
+        case 'live': return const LiveLobbyPage();
+        case 'wallet': return const WalletQrPage();
+        case 'ai': return const AiAssistantPage();
+        case 'contact': return const ContactUsPage();
+      }
+    }
+    return null;
+  }
+
+  Future<void> _openProgram(MiniProgram program) async {
+    await MiniProgramsPrefs.markUsed('program:${program.id}');
+    if (!mounted) return;
+    final destination = _programDestination(program);
+    if (destination == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هذا البرنامج غير متاح على هذا الإصدار بعد.')));
+      return;
+    }
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => destination));
+    await _load();
+  }
+
   Future<void> _open(AppSection section) async {
     await MiniProgramsPrefs.markUsed(section.id);
     if (!mounted) return;
@@ -83,6 +158,11 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
 
   Future<void> _toggleFavorite(AppSection section) async {
     await MiniProgramsPrefs.toggleFavorite(section.id);
+    await _load();
+  }
+
+  Future<void> _toggleProgramFavorite(MiniProgram program) async {
+    await MiniProgramsPrefs.toggleFavorite('program:${program.id}');
     await _load();
   }
 
@@ -97,6 +177,9 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
     final favorites = _favoriteSections;
     final recents = _recentSections;
     final filtered = _filtered;
+    final programs = _filteredPrograms;
+    final favoritePrograms = _favoritePrograms;
+    final recentPrograms = _recentPrograms;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -106,7 +189,7 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
           children: [
             const Text('البرامج المصغّرة', style: TextStyle(color: _navy, fontSize: 26, fontWeight: FontWeight.w900)),
             const SizedBox(height: 6),
-            const Text('افتح خدمة الفائق كتطبيق مصغّر مستقل: تسوّق، اطلب، واحجز دون مغادرة المنصة.', style: TextStyle(color: Colors.black54)),
+            const Text('منصة تطبيقات مصغّرة: افتح أي خدمة كتطبيق مستقل، وأضفها للمفضلة، دون مغادرة الفائق يمن.', style: TextStyle(color: Colors.black54)),
             const SizedBox(height: 14),
             TextField(
               controller: _search,
@@ -119,6 +202,30 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
               ),
             ),
+            if (_programs.isNotEmpty) ...[
+              if (_query.isEmpty && favoritePrograms.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                const Text('المفضلة', style: TextStyle(color: _navy, fontSize: 18, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 10),
+                _programGrid(favoritePrograms),
+              ],
+              if (_query.isEmpty && recentPrograms.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                const Text('المستخدمة مؤخراً', style: TextStyle(color: _navy, fontSize: 18, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 10),
+                _programGrid(recentPrograms),
+              ],
+              const SizedBox(height: 18),
+              Text(_query.isEmpty ? 'منصة البرامج' : 'نتائج البرامج', style: const TextStyle(color: _navy, fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 10),
+              if (programs.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text('لا يوجد برنامج مصغّر مطابق لبحثك.', style: TextStyle(color: Colors.black54)),
+                )
+              else
+                _programGrid(programs),
+            ],
             if (_query.isEmpty && favorites.isNotEmpty) ...[
               const SizedBox(height: 18),
               const Text('المفضلة', style: TextStyle(color: _navy, fontSize: 18, fontWeight: FontWeight.w900)),
@@ -132,7 +239,7 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
               _miniGrid(recents, onLongPress: _toggleFavorite),
             ],
             const SizedBox(height: 18),
-            Text(_query.isEmpty ? 'كل البرامج' : 'نتائج البحث', style: const TextStyle(color: _navy, fontSize: 18, fontWeight: FontWeight.w900)),
+            Text(_query.isEmpty ? 'الأقسام' : 'نتائج الأقسام', style: const TextStyle(color: _navy, fontSize: 18, fontWeight: FontWeight.w900)),
             const SizedBox(height: 10),
             if (filtered.isEmpty)
               const Padding(
@@ -147,6 +254,22 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
     );
   }
 
+  Widget _programGrid(List<MiniProgram> programs) => GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: programs.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .92),
+        itemBuilder: (context, i) {
+          final program = programs[i];
+          return _MiniProgramCard.program(
+            program: program,
+            isFavorite: _favorites.contains('program:${program.id}'),
+            onTap: () => _openProgram(program),
+            onLongPress: () => _toggleProgramFavorite(program),
+          );
+        },
+      );
+
   Widget _miniGrid(List<AppSection> sections, {required Future<void> Function(AppSection) onLongPress}) => GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -154,7 +277,7 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .92),
         itemBuilder: (context, i) {
           final section = sections[i];
-          return _MiniProgramCard(
+          return _MiniProgramCard.section(
             section: section,
             isFavorite: _favorites.contains(section.id),
             onTap: () => _open(section),
@@ -165,11 +288,32 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
 }
 
 class _MiniProgramCard extends StatelessWidget {
-  final AppSection section;
+  final String title;
+  final String iconName;
   final bool isFavorite;
+  final bool verified;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
-  const _MiniProgramCard({required this.section, this.isFavorite = false, required this.onTap, required this.onLongPress});
+
+  _MiniProgramCard.section({
+    required AppSection section,
+    bool isFavorite = false,
+    required this.onTap,
+    required this.onLongPress,
+  })  : title = section.title,
+        iconName = section.icon,
+        isFavorite = isFavorite,
+        verified = false;
+
+  _MiniProgramCard.program({
+    required MiniProgram program,
+    bool isFavorite = false,
+    required this.onTap,
+    required this.onLongPress,
+  })  : title = program.name,
+        iconName = program.icon,
+        isFavorite = isFavorite,
+        verified = program.verified;
 
   @override
   Widget build(BuildContext context) => InkWell(
@@ -196,7 +340,7 @@ class _MiniProgramCard extends StatelessWidget {
                       gradient: const LinearGradient(colors: [Color(0xFFE7F0FF), Color(0xFFDCE9FF)]),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Icon(miniProgramIcon(section.icon), color: _blue, size: 28),
+                    child: Icon(miniProgramIcon(iconName), color: _blue, size: 28),
                   ),
                   if (isFavorite)
                     const Positioned(
@@ -204,10 +348,16 @@ class _MiniProgramCard extends StatelessWidget {
                       left: -4,
                       child: Icon(Icons.star, color: Colors.amber, size: 16),
                     ),
+                  if (verified)
+                    const Positioned(
+                      bottom: -4,
+                      right: -4,
+                      child: Icon(Icons.verified, color: _blue, size: 16),
+                    ),
                 ],
               ),
               const SizedBox(height: 8),
-              Text(section.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontSize: 11.5, fontWeight: FontWeight.w800)),
+              Text(title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontSize: 11.5, fontWeight: FontWeight.w800)),
             ],
           ),
         ),
