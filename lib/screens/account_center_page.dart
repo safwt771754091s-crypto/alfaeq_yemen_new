@@ -9,6 +9,7 @@ import '../services/profile_service.dart';
 import '../widgets/currency_selector.dart';
 import 'cart_page.dart';
 import 'conversations_page.dart';
+import 'contact_us_page.dart';
 import 'driver_application_page.dart';
 import 'location_picker_page.dart';
 import 'merchant_application_page.dart';
@@ -259,9 +260,20 @@ class _AccountCenterPageState extends State<AccountCenterPage> {
           content: Text(
             'منصة الفائق يمن التجارية الشاملة\n'
             'الإصدار: ${_version.isEmpty ? '—' : _version}\n'
-            'تسوّق، احجز، وادفع من مكان واحد.',
+            'تسوّق، احجز، وادفع من مكان واحد.\n\n'
+            'للتواصل: ${AlfaeqContact.displayPhone}\n'
+            'البريد: ${AlfaeqContact.email}',
           ),
-          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('حسناً'))],
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _open(const ContactUsPage());
+              },
+              child: const Text('تواصل معنا'),
+            ),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('حسناً')),
+          ],
         ),
       ),
     );
@@ -314,6 +326,7 @@ class _AccountCenterPageState extends State<AccountCenterPage> {
                 _tile(Icons.favorite_outline, 'متابعاتي', onTap: () => _open(const MyFollowsPage())),
                 _tile(Icons.auto_awesome_outlined, 'اللحظات', onTap: () => _open(const MomentsPage())),
                 _tile(Icons.support_agent_outlined, 'دعم الفائق', onTap: () => _open(const SupportChatPage())),
+                _tile(Icons.perm_phone_msg_outlined, 'تواصل معنا', subtitle: 'واتساب · هاتف · بريد إلكتروني', onTap: () => _open(const ContactUsPage())),
                 _tile(Icons.grid_view_outlined, 'كل الخدمات', onTap: () => _open(const ServicesHubPage())),
                 _tile(Icons.notifications_none, 'الإشعارات', onTap: () => _open(const NotificationsPage())),
               ]),

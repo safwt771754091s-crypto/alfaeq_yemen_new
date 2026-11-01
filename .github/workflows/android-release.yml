@@ -36,6 +36,8 @@ jobs:
           permissions = (
               '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n'
               '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
+              '    <uses-permission android:name="android.permission.CAMERA" />\n'
+              '    <uses-feature android:name="android.hardware.camera" android:required="false" />\n'
           )
           if 'android.permission.ACCESS_FINE_LOCATION' not in text:
               marker = '    <application'
@@ -115,8 +117,13 @@ jobs:
           body: |
             تحديث جديد لتطبيق الفائق يمن (ويب + أندرويد).
 
-            - رابط مشاركة وإعلان مع شعار الفائق يمن (تاجر / سائق / أصدقاء).
-            - روابط جاهزة للنسخ والمشاركة عبر واتساب.
+            - منصة البرامج المصغّرة: أصبحت البرامج المصغّرة منصة حقيقية — سجل مركزي
+              للبرامج، نشر وإدارة، مفضلة والمستخدمة مؤخراً، وفتح كل برنامج كتطبيق مستقل.
+            - البحث عن المنتجات بالصورة: اختر صورة من الملفات أو التقطها بالكاميرا،
+              وسيتعرّف الذكاء على المنتج ويعرض المطابق، مع خيار البحث في جوجل.
+            - معلومات تواصل رسمية: واتساب 00967783482882 وهاتف وبريد albyysks@gmail.com
+              عبر شاشة «تواصل معنا» مع نسخ فوري.
+            - استعادة الإيموجي والتفاعلات في المحادثات.
 
             > أُنشئ هذا الإصدار بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابة عن المالك.
           files: |

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -10,6 +11,7 @@ import '../services/group_join_service.dart';
 import '../services/smart_scan_service.dart';
 import '../services/supabase_service.dart';
 import '../services/unified_search_service.dart';
+import '../services/visual_search_service.dart';
 import 'cart_page.dart';
 import 'barcode_scanner_page.dart';
 import 'group_chat_page.dart';
@@ -39,6 +41,10 @@ class _SearchPageState extends State<SearchPage> {
   bool _loading = false;
   bool _searched = false;
   String _query = '';
+  final _visual = VisualSearchService();
+  bool _visualBusy = false;
+  Uint8List? _visualImage;
+  VisualMatchResult? _visualResult;
 
   static const _suggestions = ['أرز', 'ماء', 'خبز', 'سكر', 'صيدلية', 'مطعم', 'هاتف', 'عقار'];
 
@@ -62,7 +68,12 @@ class _SearchPageState extends State<SearchPage> {
   void _onChanged(String value) {
     _debounce?.cancel();
     final q = value.trim();
-    setState(() => _query = q);
+    setState(() {
+      _query = q;
+      // A manual edit means the user moved on from the picture result.
+      _visualResult = null;
+      _visualImage = null;
+    });
     if (q.isEmpty) {
       setState(() {
         _results = const SearchResults();
@@ -110,6 +121,114 @@ class _SearchPageState extends State<SearchPage> {
     final value = code?.trim();
     if (value == null || value.isEmpty || !mounted) return;
     await _handleScan(value);
+  }
+
+  /// Offers the three ways to look for a product by its picture: pick from the
+  /// gallery, take a photo with the camera, or open the phone's Google Lens /
+  /// image search so the picture can be looked up on the web.
+  Future<void> _startVisualSearch() async {
+    if (_visualBusy) return;
+    final source = await showModalBottomSheet<VisualSource>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 18, 20, 6),
+              child: Row(children: [
+                Icon(Icons.image_search, color: _navy),
+                SizedBox(width: 10),
+                Text('البحث عن منتج بالصورة', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: _navy)),
+              ]),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('اختر مصدر الصورة، وسنبحث لك عن المنتج.', style: TextStyle(color: Colors.black54)),
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.photo_library_outlined, color: _blue)),
+              title: const Text('من الملفات / المعرض', style: TextStyle(fontWeight: FontWeight.w800)),
+              onTap: () => Navigator.pop(context, VisualSource.gallery),
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.photo_camera_outlined, color: _blue)),
+              title: const Text('التقاط صورة بالكاميرا', style: TextStyle(fontWeight: FontWeight.w800)),
+              onTap: () => Navigator.pop(context, VisualSource.camera),
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.travel_explore, color: _blue)),
+              title: const Text('البحث في جوجل عن الصورة', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: const Text('يفتح بحث الصور في المتصفح'),
+              onTap: () {
+                Navigator.pop(context);
+                _openGoogleLens();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    await _pickAndSearch(source);
+  }
+
+  Future<void> _pickAndSearch(VisualSource source) async {
+    setState(() => _visualBusy = true);
+    try {
+      final picked = await _visual.pick(source);
+      if (picked == null) {
+        if (mounted) setState(() => _visualBusy = false);
+        return;
+      }
+      setState(() {
+        _visualImage = picked.bytes;
+        _visualResult = null;
+      });
+      final result = await _visual.search(picked.bytes, picked.extension);
+      if (!mounted) return;
+      setState(() {
+        _visualResult = result;
+        _visualBusy = false;
+      });
+      if (result.guess.isNotEmpty) {
+        _controller.text = result.guess;
+        setState(() => _query = result.guess);
+      }
+    } on VisualSearchException catch (e) {
+      if (!mounted) return;
+      setState(() => _visualBusy = false);
+      _snack(e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _visualBusy = false);
+      _snack('تعذّر البحث بالصورة: $e');
+    }
+  }
+
+  Future<void> _openGoogleLens() async {
+    // The camera-search deep link opens Google Lens directly on Android; the
+    // web upload page is the fallback on every other platform.
+    final lens = Uri.parse('https://lens.google.com/uploadbyurl');
+    const fallback = 'https://www.google.com/imghp';
+    final uri = Uri.tryParse(fallback)!;
+    if (await canLaunchUrl(lens)) {
+      await launchUrl(lens, mode: LaunchMode.externalApplication);
+    } else if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      _snack('تعذّر فتح بحث جوجل.');
+    }
+  }
+
+  void _clearVisual() {
+    setState(() {
+      _visualImage = null;
+      _visualResult = null;
+    });
   }
 
   /// Smart scan: classify the code and route it (pay / store / product / link
@@ -221,6 +340,11 @@ class _SearchPageState extends State<SearchPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
+                        tooltip: 'البحث بالصورة',
+                        icon: const Icon(Icons.photo_camera_outlined, color: _navy),
+                        onPressed: _visualBusy ? null : _startVisualSearch,
+                      ),
+                      IconButton(
                         tooltip: 'المسح الذكي',
                         icon: const Icon(Icons.qr_code_scanner, color: _navy),
                         onPressed: _scanBarcode,
@@ -236,11 +360,22 @@ class _SearchPageState extends State<SearchPage> {
                 ),
               ),
             ),
-            if (_query.isEmpty)
+            if (_visualBusy)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Row(children: [
+                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(width: 10),
+                  Text('جارٍ التعرّف على الصورة والبحث…', style: TextStyle(color: _navy, fontWeight: FontWeight.w700)),
+                ]),
+              )
+            else if (_visualResult != null || _visualImage != null)
+              _visualPanel(),
+            if (_query.isEmpty && _visualResult == null)
               Expanded(child: _suggestionsView())
             else if (_loading)
               const Expanded(child: Center(child: CircularProgressIndicator()))
-            else if (_searched && _results.isEmpty)
+            else if (_searched && _results.isEmpty && _visualResult == null)
               const Expanded(child: _EmptySearch())
             else
               Expanded(child: _resultsView()),
@@ -267,11 +402,64 @@ class _SearchPageState extends State<SearchPage> {
         ],
       );
 
+  Widget _visualPanel() {
+    final guess = _visualResult?.guess ?? '';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE3E8EF)),
+      ),
+      child: Row(
+        children: [
+          if (_visualImage != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(_visualImage!, width: 56, height: 56, fit: BoxFit.cover),
+            ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('الصورة المبحوث عنها', style: TextStyle(color: Colors.black45, fontSize: 12)),
+                const SizedBox(height: 2),
+                Text(
+                  guess.isEmpty ? 'لم يتمكّن الذكاء من تحديد الاسم' : 'تعرّفنا على: $guess',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: _navy, fontWeight: FontWeight.w900, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'بحث جوجل',
+            icon: const Icon(Icons.travel_explore, color: _blue),
+            onPressed: _openGoogleLens,
+          ),
+          IconButton(
+            tooltip: 'إزالة',
+            icon: const Icon(Icons.close, color: Colors.black38),
+            onPressed: _clearVisual,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _resultsView() {
     final r = _results;
+    final visual = _visualResult;
+    final products = visual != null ? visual.products : r.products;
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 28),
       children: [
+        if (visual != null && visual.hasGuess) ...[
+          _sectionHeader('نتائج الصورة', products.length),
+        ],
         if (r.sections.isNotEmpty) ...[
           _sectionHeader('الخدمات', r.sections.length),
           Card(
@@ -310,16 +498,26 @@ class _SearchPageState extends State<SearchPage> {
           ...r.stores.map(_storeTile),
           const SizedBox(height: 16),
         ],
-        if (r.products.isNotEmpty) ...[
-          _sectionHeader('المنتجات', r.products.length),
+        if (products.isNotEmpty) ...[
+          if (visual == null) _sectionHeader('المنتجات', products.length),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: r.products.length,
+            itemCount: products.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .78),
-            itemBuilder: (context, i) => _ProductResultCard(product: r.products[i], onAdd: () => _addToCart(r.products[i])),
+            itemBuilder: (context, i) => _ProductResultCard(product: products[i], onAdd: () => _addToCart(products[i])),
           ),
-        ],
+        ] else if (visual != null)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Column(children: [
+              Icon(Icons.search_off, size: 54, color: Colors.black26),
+              SizedBox(height: 12),
+              Text('لم نجد منتجاً مطابقاً للصورة.', style: TextStyle(color: _navy, fontWeight: FontWeight.w800)),
+              SizedBox(height: 6),
+              Text('جرّب صورة أوضح، أو ابحث بالاسم، أو استخدم «بحث جوجل».', textAlign: TextAlign.center, style: TextStyle(color: Colors.black54)),
+            ]),
+          ),
       ],
     );
   }

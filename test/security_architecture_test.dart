@@ -881,6 +881,45 @@ void main() {
       expect(prefs, contains('SharedPreferences'));
     });
 
+    test('mini programs are a real platform backed by a staff-gated registry', () {
+      // The launcher must read a database catalog instead of only a hard-coded
+      // list, so new mini apps can ship without a client release.
+      final page = File('lib/screens/mini_programs_page.dart').readAsStringSync();
+      expect(page, contains('MiniProgramsService'));
+      expect(page, contains('_programDestination'));
+      expect(page, contains("route.startsWith('screen:')"));
+
+      final service = File('lib/services/mini_programs_service.dart').readAsStringSync();
+      expect(service, contains("rpc('mini_programs_list'"));
+      expect(service, contains("rpc('mini_program_register_use'"));
+      expect(service, contains("from('mini_programs').insert"));
+      expect(service, contains('static String slugify'));
+
+      final migration = File('supabase/migrations/20261101010000_mini_programs_v1.sql').readAsStringSync();
+      expect(migration, contains('create table if not exists public.mini_programs'));
+      expect(migration, contains('private.is_platform_staff()'));
+      expect(migration, contains('create or replace function public.mini_programs_list'));
+      expect(migration, contains('grant execute on function public.mini_programs_list'));
+      expect(migration, contains('enable row level security'));
+      expect(migration, contains('on conflict (id) do update'));
+    });
+
+    test('mini-program publishing is staff-gated in UI and database', () {
+      final publish = File('lib/screens/mini_program_publish_page.dart').readAsStringSync();
+      expect(publish, contains('canOpenDeveloperCenter'));
+      expect(publish, contains('MiniProgramsService().register'));
+      expect(publish, contains('نشر البرامج المصغّرة متاح لفريق المنصة فقط'));
+
+      final control = File('lib/screens/platform_control_page.dart').readAsStringSync();
+      expect(control, contains("import 'mini_program_publish_page.dart';"));
+      expect(control, contains('MiniProgramPublishPage()'));
+
+      // The registry's write policies must be staff-only, not self-service.
+      final migration = File('supabase/migrations/20261101010000_mini_programs_v1.sql').readAsStringSync();
+      final insertPolicy = migration.substring(migration.indexOf('mini_programs_insert'), migration.indexOf('mini_programs_update'));
+      expect(insertPolicy, contains('private.is_platform_staff()'));
+    });
+
     test('smart scan routes payment, store, product and links', () {
       final service = File('lib/services/smart_scan_service.dart').readAsStringSync();
       final search = File('lib/screens/search_page.dart').readAsStringSync();
@@ -928,6 +967,72 @@ void main() {
       final scan = File('lib/services/smart_scan_service.dart').readAsStringSync();
       expect(scan, contains('SmartScanKind.group'));
       expect(scan, contains("host == 'group'"));
+    });
+
+    test('chat reactions are membership-scoped and realtime', () {
+      final migration = File('supabase/migrations/20261029020000_chat_emoji_reactions_v1.sql').readAsStringSync();
+      // Reactions live in their own table with a denormalised thread_id.
+      expect(migration, contains('create table if not exists public.message_reactions'));
+      expect(migration, contains('unique (message_id, user_id, emoji)'));
+      expect(migration, contains('function private.is_message_member'));
+      expect(migration, contains('security definer'));
+      // RLS: members only, you can only add/remove your own reaction.
+      expect(migration, contains('alter table public.message_reactions enable row level security'));
+      expect(migration, contains('message_reactions_insert'));
+      expect(migration, contains('user_id = auth.uid()::text'));
+      expect(migration, contains('revoke all on table public.message_reactions from anon'));
+      expect(migration, contains('alter publication supabase_realtime add table public.message_reactions'));
+      // UI wires the picker and the reaction bar into the chat page.
+      final page = File('lib/screens/group_chat_page.dart').readAsStringSync();
+      expect(page, contains('ChatReactionBar('));
+      expect(page, contains('EmojiPicker('));
+      expect(page, contains("from('message_reactions')"));
+      expect(page, contains('_toggleReaction'));
+      expect(page, contains('_pickReaction'));
+      final picker = File('lib/widgets/emoji_picker.dart').readAsStringSync();
+      expect(picker, contains('class EmojiPicker'));
+      expect(picker, contains('onEmoji'));
+      final bar = File('lib/widgets/chat_reaction_bar.dart').readAsStringSync();
+      expect(bar, contains('class ChatReactionBar'));
+      expect(bar, contains('onToggle'));
+    });
+
+    test('visual product search offers gallery, camera and Google, then uploads', () {
+      final service = File('lib/services/visual_search_service.dart').readAsStringSync();
+      // Three sources: gallery and camera go through image_picker.
+      expect(service, contains('enum VisualSource { gallery, camera }'));
+      expect(service, contains('ImageSource.camera'));
+      expect(service, contains('ImageSource.gallery'));
+      // The picture is uploaded to the public media bucket under the user's folder.
+      expect(service, contains("from('media').uploadBinary("));
+      // Vision request is sent to the gateway as an image_url part.
+      expect(service, contains("'type': 'image_url'"));
+      expect(service, contains("invoke('ai-gateway'"));
+      // Catalog search is status-scoped and sanitised through the shared parser.
+      expect(service, contains("from('products')"));
+      expect(service, contains("eq('status', 'active')"));
+      expect(service, contains('static String parseGuess'));
+
+      final page = File('lib/screens/search_page.dart').readAsStringSync();
+      expect(page, contains('_startVisualSearch'));
+      expect(page, contains('VisualSource.gallery'));
+      expect(page, contains('VisualSource.camera'));
+      expect(page, contains('_openGoogleLens'));
+      expect(page, contains('lens.google.com'));
+    });
+
+    test('official contact channels are WhatsApp, phone and email', () {
+      final contact = File('lib/screens/contact_us_page.dart').readAsStringSync();
+      expect(contact, contains("whatsappNumber = '967783482882'"));
+      expect(contact, contains("displayPhone = '00967783482882'"));
+      expect(contact, contains("email = 'albyysks@gmail.com'"));
+      expect(contact, contains('https://wa.me/'));
+      expect(contact, contains('tel:'));
+      expect(contact, contains('mailto:'));
+
+      final account = File('lib/screens/account_center_page.dart').readAsStringSync();
+      expect(account, contains('const ContactUsPage()'));
+      expect(account, contains('تواصل معنا'));
     });
   });
 }
