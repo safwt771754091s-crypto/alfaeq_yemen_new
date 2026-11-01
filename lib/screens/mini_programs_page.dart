@@ -146,6 +146,7 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هذا البرنامج غير متاح على هذا الإصدار بعد.')));
       return;
     }
+    await const MiniProgramsService().registerUse(program.id);
     await Navigator.push(context, MaterialPageRoute(builder: (_) => destination));
     await _load();
   }

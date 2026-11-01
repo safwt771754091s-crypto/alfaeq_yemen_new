@@ -84,6 +84,19 @@ $$;
 revoke all on function public.mini_programs_list(integer) from public, anon;
 grant execute on function public.mini_programs_list(integer) to authenticated, service_role;
 
+-- Records a launch so the catalog can rank by real popularity. Best-effort and
+-- bounded; it never fails the caller.
+create or replace function public.mini_program_register_use(p_id text)
+returns void language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  update public.mini_programs
+     set usage_count = least(usage_count + 1, 2147483647)
+   where id = p_id and status = 'active';
+end $$;
+
+revoke all on function public.mini_program_register_use(text) from public, anon;
+grant execute on function public.mini_program_register_use(text) to authenticated, service_role;
+
 -- Seed the first-party mini programs. `route` is resolved by the client to a
 -- concrete screen; ids are stable so re-running is idempotent.
 insert into public.mini_programs (id, slug, name, description, icon, route, category, verified, featured, sort_order) values

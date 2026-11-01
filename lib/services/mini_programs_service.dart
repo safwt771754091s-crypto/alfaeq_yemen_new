@@ -94,6 +94,15 @@ class MiniProgramsService {
     });
   }
 
+  /// Records a launch so the catalog can rank by popularity. Best-effort.
+  Future<void> registerUse(String id) async {
+    try {
+      await _db.rpc('mini_program_register_use', params: {'p_id': id});
+    } catch (_) {
+      // Usage telemetry must never block opening a mini program.
+    }
+  }
+
   /// Builds a URL-safe slug from a (possibly Arabic) display name. Arabic
   /// letters are preserved; everything else collapses into single dashes.
   static String slugify(String name) {

@@ -891,6 +891,7 @@ void main() {
 
       final service = File('lib/services/mini_programs_service.dart').readAsStringSync();
       expect(service, contains("rpc('mini_programs_list'"));
+      expect(service, contains("rpc('mini_program_register_use'"));
       expect(service, contains("from('mini_programs').insert"));
       expect(service, contains('static String slugify'));
 
