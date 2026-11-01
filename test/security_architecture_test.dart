@@ -957,5 +957,43 @@ void main() {
       expect(bar, contains('class ChatReactionBar'));
       expect(bar, contains('onToggle'));
     });
+
+    test('visual product search offers gallery, camera and Google, then uploads', () {
+      final service = File('lib/services/visual_search_service.dart').readAsStringSync();
+      // Three sources: gallery and camera go through image_picker.
+      expect(service, contains('enum VisualSource { gallery, camera }'));
+      expect(service, contains('ImageSource.camera'));
+      expect(service, contains('ImageSource.gallery'));
+      // The picture is uploaded to the public media bucket under the user's folder.
+      expect(service, contains("from('media').uploadBinary("));
+      // Vision request is sent to the gateway as an image_url part.
+      expect(service, contains("'type': 'image_url'"));
+      expect(service, contains("invoke('ai-gateway'"));
+      // Catalog search is status-scoped and sanitised through the shared parser.
+      expect(service, contains("from('products')"));
+      expect(service, contains("eq('status', 'active')"));
+      expect(service, contains('static String parseGuess'));
+
+      final page = File('lib/screens/search_page.dart').readAsStringSync();
+      expect(page, contains('_startVisualSearch'));
+      expect(page, contains('VisualSource.gallery'));
+      expect(page, contains('VisualSource.camera'));
+      expect(page, contains('_openGoogleLens'));
+      expect(page, contains('lens.google.com'));
+    });
+
+    test('official contact channels are WhatsApp, phone and email', () {
+      final contact = File('lib/screens/contact_us_page.dart').readAsStringSync();
+      expect(contact, contains("whatsappNumber = '967783482882'"));
+      expect(contact, contains("displayPhone = '00967783482882'"));
+      expect(contact, contains("email = 'albyysks@gmail.com'"));
+      expect(contact, contains('https://wa.me/'));
+      expect(contact, contains('tel:'));
+      expect(contact, contains('mailto:'));
+
+      final account = File('lib/screens/account_center_page.dart').readAsStringSync();
+      expect(account, contains('const ContactUsPage()'));
+      expect(account, contains('تواصل معنا'));
+    });
   });
 }
