@@ -6,6 +6,7 @@ import 'article_reader_page.dart';
 import 'mini_programs_page.dart';
 import 'official_article_form_page.dart';
 import 'official_program_form_page.dart';
+import 'program_checkout_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
 const _navy = Color(0xFF0A2540);
@@ -71,6 +72,13 @@ class _OfficialAccountDetailPageState extends State<OfficialAccountDetailPage> {
     }
     _programsService.registerUse(program.id);
     Navigator.push(context, MaterialPageRoute(builder: (_) => destination));
+  }
+
+  Future<void> _payProgram(MiniProgram program) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ProgramCheckoutPage(program: program)),
+    );
   }
 
   Future<void> _toggleFollow() async {
@@ -175,7 +183,11 @@ class _OfficialAccountDetailPageState extends State<OfficialAccountDetailPage> {
                           runSpacing: 10,
                           children: [
                             for (final program in _programs)
-                              _ProgramChip(program: program, onTap: () => _openProgram(program)),
+                              _ProgramChip(
+                                program: program,
+                                onTap: () => _openProgram(program),
+                                onPay: () => _payProgram(program),
+                              ),
                           ],
                         ),
                       if (_account?.isOwner ?? false) ...[
@@ -225,7 +237,8 @@ class _OfficialAccountDetailPageState extends State<OfficialAccountDetailPage> {
 class _ProgramChip extends StatelessWidget {
   final MiniProgram program;
   final VoidCallback onTap;
-  const _ProgramChip({required this.program, required this.onTap});
+  final VoidCallback onPay;
+  const _ProgramChip({required this.program, required this.onTap, required this.onPay});
 
   @override
   Widget build(BuildContext context) {
@@ -254,6 +267,17 @@ class _ProgramChip extends StatelessWidget {
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: _navy, fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: onPay,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 28),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                foregroundColor: _blue,
+              ),
+              child: const Text('دفع', style: TextStyle(fontWeight: FontWeight.w800)),
             ),
           ],
         ),
