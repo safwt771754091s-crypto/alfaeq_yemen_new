@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/mini_programs_service.dart';
 import '../services/official_accounts_service.dart';
+import 'account_sales_page.dart';
 import 'article_reader_page.dart';
 import 'mini_programs_page.dart';
 import 'official_article_form_page.dart';
@@ -62,6 +63,16 @@ class _OfficialAccountDetailPageState extends State<OfficialAccountDetailPage> {
       MaterialPageRoute(builder: (_) => OfficialProgramFormPage(accountId: account.id, accountName: account.name)),
     );
     if (added == true) await _load();
+  }
+
+  Future<void> _openSales() async {
+    final account = _account;
+    if (account == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AccountSalesPage(accountId: account.id, accountName: account.name)),
+    );
+    if (mounted) await _load();
   }
 
   void _openProgram(MiniProgram program) {
@@ -192,10 +203,21 @@ class _OfficialAccountDetailPageState extends State<OfficialAccountDetailPage> {
                         ),
                       if (_account?.isOwner ?? false) ...[
                         const SizedBox(height: 8),
-                        OutlinedButton.icon(
-                          onPressed: _addProgram,
-                          icon: const Icon(Icons.add),
-                          label: const Text('إضافة برنامج مصغّر'),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _addProgram,
+                              icon: const Icon(Icons.add),
+                              label: const Text('إضافة برنامج مصغّر'),
+                            ),
+                            FilledButton.icon(
+                              onPressed: _openSales,
+                              icon: const Icon(Icons.insights),
+                              label: const Text('لوحة المبيعات'),
+                            ),
+                          ],
                         ),
                       ],
                       const Padding(

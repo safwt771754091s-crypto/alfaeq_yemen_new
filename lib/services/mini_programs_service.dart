@@ -135,6 +135,12 @@ class MiniProgramsService {
     return rows.map(MiniProgram.fromRow).toList();
   }
 
+  /// Fetches a single mini program, or null if it no longer exists.
+  Future<MiniProgram?> byId(String id) async {
+    final row = await _db.from('mini_programs').select().eq('id', id).maybeSingle();
+    return row == null ? null : MiniProgram.fromRow(row);
+  }
+
   /// Records a launch so the catalog can rank by popularity. Best-effort.
   Future<void> registerUse(String id) async {
     try {
