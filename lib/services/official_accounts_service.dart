@@ -142,6 +142,16 @@ class OfficialAccountsService {
     return (article: AccountArticle.fromRow(row), body: (row['body'] ?? '').toString());
   }
 
+  /// Rebuilds a reader-ready article from a notification payload (no fetch), so
+  /// tapping an article notification opens it instantly.
+  static AccountArticle articleFromPayload(Map<String, dynamic> data) => AccountArticle(
+        id: (data['article_id'] ?? '').toString(),
+        accountId: (data['account_id'] ?? '').toString(),
+        accountName: (data['account_name'] ?? '').toString(),
+        accountAvatar: data['avatar_url']?.toString(),
+        title: (data['article_title'] ?? data['account_name'] ?? 'مقالة').toString(),
+      );
+
   Future<List<OfficialAccount>> following() async {
     final data = await _db.rpc('account_following_list');
     return _rows(data).map(OfficialAccount.fromRow).toList();
@@ -201,13 +211,13 @@ class OfficialAccountsService {
   }) async {
     final uid = currentUserId;
     if (uid == null) throw StateError('يجب تسجيل الدخول للنشر.');
-    await _db.from('account_articles').insert({
-      'account_id': accountId,
-      'author_id': uid,
-      'title': title.trim(),
-      'body': body.trim(),
-      'cover_url': coverUrl,
-      'published': published,
+    // The RPC also notifies the account's followers (公众号 إشعار المتابعين).
+    await _db.rpc('publish_account_article', params: {
+      'p_account_id': accountId,
+      'p_title': title.trim(),
+      'p_body': body.trim(),
+      'p_cover_url': coverUrl,
+      'p_published': published,
     });
   }
 

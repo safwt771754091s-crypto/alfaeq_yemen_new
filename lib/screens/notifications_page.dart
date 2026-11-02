@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../services/official_accounts_service.dart';
 import '../services/supabase_service.dart';
+import 'article_reader_page.dart';
+import 'official_account_detail_page.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
@@ -8,6 +11,25 @@ class NotificationsPage extends StatelessWidget {
     await SupabaseService.client.from('notifications').update({
       'read_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', id);
+  }
+
+  /// Opens the destination carried in a notification's `data` payload. Account
+  /// article notifications (公众号) open the article reader directly.
+  Future<void> _open(BuildContext context, Map<String, dynamic> row) async {
+    final data = (row['data'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final type = (row['type'] ?? '').toString();
+    if (type == 'account_article') {
+      final articleId = (data['article_id'] ?? '').toString();
+      final accountId = (data['account_id'] ?? '').toString();
+      if (articleId.isEmpty) {
+        if (accountId.isNotEmpty) {
+          await Navigator.push(context, MaterialPageRoute(builder: (_) => OfficialAccountDetailPage(accountId: accountId)));
+        }
+        return;
+      }
+      final article = OfficialAccountsService.articleFromPayload(data);
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => ArticleReaderPage(article: article)));
+    }
   }
 
   @override
@@ -33,7 +55,10 @@ class NotificationsPage extends StatelessWidget {
                 title: Text((row['title'] ?? 'إشعار الفائق').toString(), style: TextStyle(fontWeight: read ? FontWeight.w600 : FontWeight.w900)),
                 subtitle: Text((row['body'] ?? '').toString()),
                 trailing: read ? null : const Icon(Icons.circle, size: 9),
-                onTap: read ? null : () async { try { await _markRead(row['id'].toString()); } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحديث الإشعار: $e'))); } },
+                onTap: () async {
+                  try { if (!read) await _markRead(row['id'].toString()); } catch (_) {}
+                  if (context.mounted) await _open(context, row);
+                },
               ));
             },
           );
