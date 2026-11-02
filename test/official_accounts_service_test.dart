@@ -95,7 +95,7 @@ void main() {
       final service = File('lib/services/official_accounts_service.dart').readAsStringSync();
       expect(service, contains("rpc('official_accounts_list'"));
       expect(service, contains("rpc('account_toggle_follow'"));
-      expect(service, contains("from('account_articles').insert"));
+      expect(service, contains("rpc('publish_account_article'"));
       expect(service, contains("bucket = 'official-accounts'"));
 
       final world = File('lib/screens/world_home_page.dart').readAsStringSync();
@@ -126,6 +126,27 @@ void main() {
       expect(profile, contains('OfficialProgramFormPage'));
       expect(profile, contains('miniProgramDestination'));
       expect(File('lib/screens/official_program_form_page.dart').existsSync(), isTrue);
+    });
+
+    test('followers are notified of new account articles (公众号 إشعار)', () {
+      final migration = File('supabase/migrations/20261101040000_account_article_notifications_v1.sql').readAsStringSync();
+      expect(migration, contains('create or replace function public.publish_account_article'));
+      expect(migration, contains('create or replace function private.notify_account_article'));
+      expect(migration, contains('from public.account_followers'));
+      expect(migration, contains("'account_article'"));
+      expect(migration, contains('f.user_id is distinct from v_article.author_id'));
+      expect(migration, contains('not exists'));
+      expect(migration, contains('from public, anon'));
+      // Notification inserts reuse the shared push fan-out path.
+      expect(migration, contains('insert into public.notifications'));
+
+      final service = File('lib/services/official_accounts_service.dart').readAsStringSync();
+      expect(service, contains("rpc('publish_account_article'"));
+      expect(service, contains('articleFromPayload'));
+
+      final page = File('lib/screens/notifications_page.dart').readAsStringSync();
+      expect(page, contains("type == 'account_article'"));
+      expect(page, contains('ArticleReaderPage'));
     });
   });
 }
