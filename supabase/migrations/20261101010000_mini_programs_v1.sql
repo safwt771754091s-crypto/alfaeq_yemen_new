@@ -121,7 +121,8 @@ insert into public.mini_programs (id, slug, name, description, icon, route, cate
   ('mp-live',          'live',          'البث المباشر',     'غرف بث مباشر مع دردشة حيّة',            'live',             'screen:live',           'ترفيه',   true, false, 175),
   ('mp-wallet',        'wallet',        'محفظة الفائق',     'محفظتك الإلكترونية والحوالات',          'account_balance_wallet', 'screen:wallet',  'مالية',   true, true,  15),
   ('mp-ai',            'ai',            'ذكاء الفائق',      'مساعدك الذكي للبحث والطلب',             'auto_awesome',     'screen:ai',             'أدوات',   true, true,  8),
-  ('mp-contact',       'contact',       'تواصل معنا',       'الدعم والتواصل الرسمي',                 'support_agent',    'screen:contact',        'دعم',     true, false, 180)
+  ('mp-contact',       'contact',       'تواصل معنا',       'الدعم والتواصل الرسمي',                 'support_agent',    'screen:contact',        'دعم',     true, false, 180),
+  ('mp-accounts',      'accounts',      'الحسابات الرسمية', 'تابع الحسابات الرسمية واقرأ مقالاتها',  'article',          'screen:accounts',       'محتوى',   true, true,  9)
 on conflict (id) do update set
   slug = excluded.slug,
   name = excluded.name,

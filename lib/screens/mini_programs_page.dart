@@ -11,6 +11,7 @@ import 'cart_page.dart';
 import 'contact_us_page.dart';
 import 'live_rooms_page.dart';
 import 'moments_page.dart';
+import 'official_accounts_page.dart';
 import 'reels_page.dart';
 import 'wallet_qr_page.dart';
 
@@ -40,6 +41,7 @@ IconData miniProgramIcon(String name) {
     case 'account_balance_wallet': return Icons.account_balance_wallet_outlined;
     case 'auto_awesome': return Icons.auto_awesome;
     case 'support_agent': return Icons.support_agent;
+    case 'article': return Icons.article_outlined;
     default: return Icons.explore_outlined;
   }
 }
@@ -133,6 +135,7 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
         case 'wallet': return const WalletQrPage();
         case 'ai': return const AiAssistantPage();
         case 'contact': return const ContactUsPage();
+        case 'accounts': return const OfficialAccountsPage();
       }
     }
     return null;

@@ -21,6 +21,7 @@ import 'ai_assistant_page.dart';
 import 'conversations_page.dart';
 import 'contacts_page.dart';
 import 'mini_programs_page.dart';
+import 'official_accounts_page.dart';
 import 'moments_page.dart';
 import 'reels_page.dart';
 import 'live_rooms_page.dart';
@@ -534,6 +535,7 @@ class _ServicesEntry extends StatelessWidget {
         (Icons.auto_awesome_outlined, 'اللحظات', () => const MomentsPage()),
         (Icons.chat_bubble_outline, 'المحادثات', () => const ConversationsPage()),
         (Icons.widgets_outlined, 'البرامج المصغّرة', () => const MiniProgramsPage()),
+        (Icons.article_outlined, 'الحسابات الرسمية', () => const OfficialAccountsPage()),
         (Icons.grid_view_outlined, 'كل الخدمات', () => const ServicesHubPage()),
       ];
 
@@ -1255,6 +1257,7 @@ class DiscoverPage extends StatelessWidget {
                 _row(context, Icons.play_circle_outline, 'فيديو الفائق', 'مقاطع قصيرة من المتاجر والمستخدمين', () => const ReelsPage()),
                 _row(context, Icons.sensors, 'البث المباشر', 'شاهد بثوث المتاجر وتفاعل معها', () => const LiveLobbyPage()),
                 _row(context, Icons.widgets_outlined, 'البرامج المصغّرة', 'خدمات الفائق كتطبيقات مستقلة', () => const MiniProgramsPage()),
+                _row(context, Icons.article_outlined, 'الحسابات الرسمية', 'تابع الحسابات واقرأ مقالاتها', () => const OfficialAccountsPage()),
                 _row(context, Icons.storefront_outlined, 'المتاجر والأقسام', 'كل المتاجر المعتمدة والأقسام', () => const _DiscoverStoresPage()),
                 _row(context, Icons.grid_view_outlined, 'كل الخدمات', 'كل ما تريده من مكان واحد', () => const ServicesHubPage()),
               ]),
@@ -1316,6 +1319,7 @@ class ServicesHubPage extends StatelessWidget {
           (Icons.local_offer_outlined, 'العروض', () => const _OffersPage()),
           (Icons.storefront_outlined, 'المتاجر', () => const _StoresTab()),
           (Icons.widgets_outlined, 'البرامج المصغّرة', () => const MiniProgramsPage()),
+        (Icons.article_outlined, 'الحسابات الرسمية', () => const OfficialAccountsPage()),
         ]),
         ('طلباتي والمال', [
           (Icons.receipt_long_outlined, 'طلباتي', () => const MyOrdersPage()),
