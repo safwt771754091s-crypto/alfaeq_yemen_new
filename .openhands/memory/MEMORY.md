@@ -740,3 +740,17 @@ flutter pub get && flutter analyze && flutter test && flutter build web --releas
 - Prod project ref + anon publishable key are in `lib/services/supabase_service.dart`; prod auth mailer autoconfirms, so a signup returns a session (handy for live tests without credentials).
 - Stale PRs: 13 open PRs (#2,16,17,19,20,21,42,47,50,51,54,55,62) were 160-830 commits behind main and already superseded; closed with an explanatory comment (reversible).
 
+
+
+## Ecosystem additions (2026-10)
+- WeChat-style stack complete: chats/groups, moments, official accounts (公众号),
+  公众号↔小程序 link, account-article follower notifications, mini-programs (小程序),
+  in-mini-program wallet payments (小程序支付).
+- Wallet is single-row-per-user (wallets.uid PK). Pay flows reuse
+  private.wallet_debit_internal/wallet_credit_internal + private.fx_convert;
+  always idempotent via a unique key. wallet_ledger is source of truth.
+- Notifications: insert into public.notifications -> trigger push_on_notification
+  fans out to devices. Use private.notify_user(...) for new notification types.
+- Program receipts: program_orders (RLS: buyer/account owner/staff only).
+- Stacked PRs: merge base, then git rebase --onto <new-main> <old-base> <branch> +
+  force-push; retarget PR to main.

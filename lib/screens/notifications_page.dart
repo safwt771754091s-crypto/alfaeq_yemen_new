@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../services/mini_programs_service.dart';
 import '../services/official_accounts_service.dart';
 import '../services/supabase_service.dart';
 import 'article_reader_page.dart';
 import 'official_account_detail_page.dart';
+import 'program_checkout_page.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
@@ -29,6 +31,15 @@ class NotificationsPage extends StatelessWidget {
       }
       final article = OfficialAccountsService.articleFromPayload(data);
       await Navigator.push(context, MaterialPageRoute(builder: (_) => ArticleReaderPage(article: article)));
+      return;
+    }
+    if (type == 'program_refund') {
+      final programId = (data['program_id'] ?? '').toString();
+      final program = programId.isEmpty ? null : await MiniProgramsService().byId(programId);
+      if (program != null && context.mounted) {
+        await Navigator.push(context, MaterialPageRoute(builder: (_) => ProgramCheckoutPage(program: program)));
+      }
+      return;
     }
   }
 
