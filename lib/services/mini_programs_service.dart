@@ -17,6 +17,8 @@ class MiniProgram {
   final bool featured;
   final int usageCount;
   final int sortOrder;
+  final String? accountId;
+  final String status;
 
   const MiniProgram({
     required this.id,
@@ -31,6 +33,8 @@ class MiniProgram {
     this.featured = false,
     this.usageCount = 0,
     this.sortOrder = 100,
+    this.accountId,
+    this.status = 'active',
   });
 
   factory MiniProgram.fromRow(Map<String, dynamic> row) => MiniProgram(
@@ -46,6 +50,8 @@ class MiniProgram {
         featured: row['featured'] == true,
         usageCount: (row['usage_count'] as num?)?.toInt() ?? 0,
         sortOrder: (row['sort_order'] as num?)?.toInt() ?? 100,
+        accountId: row['account_id']?.toString(),
+        status: (row['status'] ?? 'active').toString(),
       );
 }
 
@@ -92,6 +98,41 @@ class MiniProgramsService {
       'featured': featured,
       'sort_order': sortOrder,
     });
+  }
+
+  /// Registers a mini program bound to an official account the caller owns.
+  /// Ownership is enforced by RLS; this is the 公众号 → 小程序 publishing path.
+  Future<void> registerForAccount({
+    required String accountId,
+    required String name,
+    required String description,
+    required String icon,
+    required String route,
+    String category = 'عام',
+    String? publisherName,
+  }) async {
+    final base = slugify(name);
+    final stamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    await _db.from('mini_programs').insert({
+      'id': 'mp-$base-$stamp',
+      'slug': '$base-$stamp',
+      'name': name.trim(),
+      'description': description.trim(),
+      'icon': icon,
+      'route': route.trim(),
+      'category': category,
+      'account_id': accountId,
+      'publisher_id': _db.auth.currentUser?.id,
+      'publisher_name': publisherName,
+      'sort_order': 200,
+    });
+  }
+
+  /// Lists the mini programs bound to an official account.
+  Future<List<MiniProgram>> listForAccount(String accountId) async {
+    final data = await _db.rpc('account_mini_programs', params: {'p_account_id': accountId});
+    final rows = (data as List).cast<Map<String, dynamic>>();
+    return rows.map(MiniProgram.fromRow).toList();
   }
 
   /// Records a launch so the catalog can rank by popularity. Best-effort.

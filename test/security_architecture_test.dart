@@ -886,7 +886,7 @@ void main() {
       // list, so new mini apps can ship without a client release.
       final page = File('lib/screens/mini_programs_page.dart').readAsStringSync();
       expect(page, contains('MiniProgramsService'));
-      expect(page, contains('_programDestination'));
+      expect(page, contains('miniProgramDestination'));
       expect(page, contains("route.startsWith('screen:')"));
 
       final service = File('lib/services/mini_programs_service.dart').readAsStringSync();

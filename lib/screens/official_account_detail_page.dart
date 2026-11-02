@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../services/mini_programs_service.dart';
 import '../services/official_accounts_service.dart';
 import 'article_reader_page.dart';
+import 'mini_programs_page.dart';
 import 'official_article_form_page.dart';
+import 'official_program_form_page.dart';
 
 const _blue = Color(0xFF0D6EFD);
 const _navy = Color(0xFF0A2540);
@@ -20,8 +23,10 @@ class OfficialAccountDetailPage extends StatefulWidget {
 
 class _OfficialAccountDetailPageState extends State<OfficialAccountDetailPage> {
   final _service = const OfficialAccountsService();
+  final _programsService = const MiniProgramsService();
   OfficialAccount? _account;
   List<AccountArticle> _articles = const [];
+  List<MiniProgram> _programs = const [];
   bool _loading = true;
   bool _busy = false;
 
@@ -35,11 +40,37 @@ class _OfficialAccountDetailPageState extends State<OfficialAccountDetailPage> {
     try {
       final account = await _service.accountDetail(widget.accountId);
       final articles = await _service.articles(accountId: widget.accountId);
+      List<MiniProgram> programs = const [];
+      try {
+        programs = await _programsService.listForAccount(widget.accountId);
+      } catch (_) {
+        // Programs are optional; the profile still renders without them.
+      }
       if (!mounted) return;
-      setState(() { _account = account; _articles = articles; _loading = false; });
+      setState(() { _account = account; _articles = articles; _programs = programs; _loading = false; });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _addProgram() async {
+    final account = _account;
+    if (account == null) return;
+    final added = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => OfficialProgramFormPage(accountId: account.id, accountName: account.name)),
+    );
+    if (added == true) await _load();
+  }
+
+  void _openProgram(MiniProgram program) {
+    final destination = miniProgramDestination(program);
+    if (destination == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هذا البرنامج غير متاح على هذا الإصدار بعد.')));
+      return;
+    }
+    _programsService.registerUse(program.id);
+    Navigator.push(context, MaterialPageRoute(builder: (_) => destination));
   }
 
   Future<void> _toggleFollow() async {
@@ -128,6 +159,35 @@ class _OfficialAccountDetailPageState extends State<OfficialAccountDetailPage> {
                       ),
                       const Padding(
                         padding: EdgeInsets.fromLTRB(4, 18, 4, 8),
+                        child: Text('البرامج المصغّرة', style: TextStyle(color: _navy, fontWeight: FontWeight.w900, fontSize: 17)),
+                      ),
+                      if (_programs.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Text(
+                            (_account?.isOwner ?? false) ? 'لم تُضف برامج بعد — أضف أول برنامج لحسابك.' : 'لا توجد برامج مصغّرة لهذا الحساب.',
+                            style: const TextStyle(color: Colors.black54),
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            for (final program in _programs)
+                              _ProgramChip(program: program, onTap: () => _openProgram(program)),
+                          ],
+                        ),
+                      if (_account?.isOwner ?? false) ...[
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: _addProgram,
+                          icon: const Icon(Icons.add),
+                          label: const Text('إضافة برنامج مصغّر'),
+                        ),
+                      ],
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(4, 18, 4, 8),
                         child: Text('المقالات', style: TextStyle(color: _navy, fontWeight: FontWeight.w900, fontSize: 17)),
                       ),
                       if (_articles.isEmpty)
@@ -159,4 +219,45 @@ class _OfficialAccountDetailPageState extends State<OfficialAccountDetailPage> {
           Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12)),
         ],
       );
+}
+
+/// A tappable mini-program tile shown on an account profile.
+class _ProgramChip extends StatelessWidget {
+  final MiniProgram program;
+  final VoidCallback onTap;
+  const _ProgramChip({required this.program, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 104,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE3E8EF)),
+        ),
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: const Color(0xFFE7F0FF),
+              child: Icon(miniProgramIcon(program.icon), color: _blue),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              program.name,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: _navy, fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
