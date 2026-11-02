@@ -12,6 +12,7 @@ import 'contact_us_page.dart';
 import 'live_rooms_page.dart';
 import 'moments_page.dart';
 import 'official_accounts_page.dart';
+import 'program_checkout_page.dart';
 import 'reels_page.dart';
 import 'wallet_qr_page.dart';
 
@@ -271,6 +272,7 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
             isFavorite: _favorites.contains('program:${program.id}'),
             onTap: () => _openProgram(program),
             onLongPress: () => _toggleProgramFavorite(program),
+            onPay: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProgramCheckoutPage(program: program))),
           );
         },
       );
@@ -299,6 +301,7 @@ class _MiniProgramCard extends StatelessWidget {
   final bool verified;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback? onPay;
 
   _MiniProgramCard.section({
     required AppSection section,
@@ -308,13 +311,15 @@ class _MiniProgramCard extends StatelessWidget {
   })  : title = section.title,
         iconName = section.icon,
         isFavorite = isFavorite,
-        verified = false;
+        verified = false,
+        onPay = null;
 
   _MiniProgramCard.program({
     required MiniProgram program,
     bool isFavorite = false,
     required this.onTap,
     required this.onLongPress,
+    this.onPay,
   })  : title = program.name,
         iconName = program.icon,
         isFavorite = isFavorite,
@@ -358,6 +363,20 @@ class _MiniProgramCard extends StatelessWidget {
                       bottom: -4,
                       right: -4,
                       child: Icon(Icons.verified, color: _blue, size: 16),
+                    ),
+                  if (onPay != null)
+                    Positioned(
+                      top: -6,
+                      right: -6,
+                      child: InkWell(
+                        onTap: onPay,
+                        customBorder: const CircleBorder(),
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: const BoxDecoration(color: _blue, shape: BoxShape.circle),
+                          child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 12),
+                        ),
+                      ),
                     ),
                 ],
               ),
