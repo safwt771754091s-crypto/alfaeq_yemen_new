@@ -49,6 +49,33 @@ IconData miniProgramIcon(String name) {
 /// WeChat-style mini-program launcher: every platform section is a compact,
 /// self-contained "app" that opens with its own header and product surface.
 /// The launcher adds search, favorites and a "recently used" row.
+///
+/// Resolves a mini program's `route` to a concrete screen: `section:<id>` opens
+/// the built-in product surface; `screen:<name>` opens a first-party feature
+/// page. Shared by the launcher and by account profiles (公众号 ↔ 小程序).
+Widget? miniProgramDestination(MiniProgram program) {
+  final route = program.route;
+  if (route.startsWith('section:')) {
+    final sectionId = route.substring(8);
+    for (final s in appSections) {
+      if (s.id == sectionId) return MiniProgramPage(section: s);
+    }
+    return null;
+  }
+  if (route.startsWith('screen:')) {
+    switch (route.substring(7)) {
+      case 'reels': return const ReelsPage();
+      case 'moments': return const MomentsPage();
+      case 'live': return const LiveLobbyPage();
+      case 'wallet': return const WalletQrPage();
+      case 'ai': return const AiAssistantPage();
+      case 'contact': return const ContactUsPage();
+      case 'accounts': return const OfficialAccountsPage();
+    }
+  }
+  return null;
+}
+
 class MiniProgramsPage extends StatefulWidget {
   const MiniProgramsPage({super.key});
 
@@ -115,36 +142,10 @@ class _MiniProgramsPageState extends State<MiniProgramsPage> {
   List<MiniProgram> get _recentPrograms => _programsFor(_recent);
   List<MiniProgram> get _favoritePrograms => _programsFor(_favorites);
 
-  /// Resolves a mini program's `route` to a concrete screen. `section:<id>`
-  /// opens the built-in product surface; `screen:<name>` opens a first-party
-  /// feature page.
-  Widget? _programDestination(MiniProgram program) {
-    final route = program.route;
-    if (route.startsWith('section:')) {
-      final sectionId = route.substring(8);
-      for (final s in appSections) {
-        if (s.id == sectionId) return MiniProgramPage(section: s);
-      }
-      return null;
-    }
-    if (route.startsWith('screen:')) {
-      switch (route.substring(7)) {
-        case 'reels': return const ReelsPage();
-        case 'moments': return const MomentsPage();
-        case 'live': return const LiveLobbyPage();
-        case 'wallet': return const WalletQrPage();
-        case 'ai': return const AiAssistantPage();
-        case 'contact': return const ContactUsPage();
-        case 'accounts': return const OfficialAccountsPage();
-      }
-    }
-    return null;
-  }
-
   Future<void> _openProgram(MiniProgram program) async {
     await MiniProgramsPrefs.markUsed('program:${program.id}');
     if (!mounted) return;
-    final destination = _programDestination(program);
+    final destination = miniProgramDestination(program);
     if (destination == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هذا البرنامج غير متاح على هذا الإصدار بعد.')));
       return;

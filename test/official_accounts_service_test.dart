@@ -107,5 +107,25 @@ void main() {
       final seeds = File('supabase/migrations/20261101010000_mini_programs_v1.sql').readAsStringSync();
       expect(seeds, contains("'screen:accounts'"));
     });
+
+    test('accounts can bind mini programs (公众号 ↔ 小程序)', () {
+      final migration = File('supabase/migrations/20261101030000_official_account_programs_v1.sql').readAsStringSync();
+      expect(migration, contains('add column if not exists account_id'));
+      expect(migration, contains('mini_programs_owner_insert'));
+      expect(migration, contains('mini_programs_owner_update'));
+      expect(migration, contains('mini_programs_owner_delete'));
+      expect(migration, contains('a.owner_id = auth.uid()'));
+      expect(migration, contains('create or replace function public.account_mini_programs'));
+      expect(migration, contains('from public, anon'));
+
+      final service = File('lib/services/mini_programs_service.dart').readAsStringSync();
+      expect(service, contains('registerForAccount'));
+      expect(service, contains("rpc('account_mini_programs'"));
+
+      final profile = File('lib/screens/official_account_detail_page.dart').readAsStringSync();
+      expect(profile, contains('OfficialProgramFormPage'));
+      expect(profile, contains('miniProgramDestination'));
+      expect(File('lib/screens/official_program_form_page.dart').existsSync(), isTrue);
+    });
   });
 }
