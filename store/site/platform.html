@@ -6,18 +6,24 @@
 <title>منصة الفائق يمن — سوقك الشامل ومساعدك الذكي</title>
 <meta name="description" content="منصة الفائق يمن: سوق إلكتروني، توصيل، محفظة إلكترونية، دفع QR، لحظات وفيديو، وذكاء اصطناعي عربي — في منصة واحدة تعمل على الويب وأندرويد.">
 <meta name="theme-color" content="#0B6E4F">
+<script>document.documentElement.classList.add('js');</script>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="منصة الفائق يمن">
 <meta property="og:title" content="منصة الفائق يمن — سوقك الشامل ومساعدك الذكي">
 <meta property="og:description" content="تسوّق، توصيل، محفظة، دفع QR، لحظات وفيديو، وذكاء اصطناعي عربي — في منصة واحدة.">
-<meta property="og:image" content="/alfaeq_yemen_new/store/logo.png">
+<meta property="og:image" content="https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/store/logo.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
 <meta property="og:url" content="https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/store/platform.html">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/store/logo.png">
+<link rel="canonical" href="https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/store/platform.html">
 <link rel="icon" type="image/png" href="logo.png">
 <link rel="apple-touch-icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400..700&family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400..700&family=Tajawal:wght@300;400;500;700;800;900&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400..700&family=Tajawal:wght@300;400;500;700;800;900&display=swap"></noscript>
 <style>
   :root{
     --emerald:#0B6E4F; --emerald-deep:#07412F; --emerald-lift:#128C66;
@@ -184,10 +190,12 @@
   .f-note{color:rgba(255,255,255,.55);font-size:13px}
   .f-bottom{border-top:1px solid rgba(255,255,255,.14);margin-top:36px;padding-top:20px;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;font-size:13.5px;color:rgba(255,255,255,.6)}
   @media(max-width:760px){.f-grid{grid-template-columns:1fr}}
-  /* reveal */
-  .rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
-  .rv.in{opacity:1;transform:none}
-  @media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}}
+  /* reveal — progressive enhancement: content stays visible when JS is
+     unavailable (crawlers, social previews, JS blocked/failed). Only the
+     `js` class, added before render, enables the hidden-until-scrolled state. */
+  html.js .rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
+  html.js .rv.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){html.js .rv{opacity:1;transform:none;transition:none}}
 </style>
 </head>
 <body>
@@ -404,13 +412,18 @@
   document.getElementById('y').textContent = new Date().getFullYear();
   (function(){
     var els = document.querySelectorAll('.rv');
-    if(!('IntersectionObserver' in window)){ els.forEach(function(e){e.classList.add('in')}); return; }
+    function revealAll(){ els.forEach(function(e){ e.classList.add('in'); }); }
+    if(!('IntersectionObserver' in window)){ revealAll(); return; }
     var io = new IntersectionObserver(function(entries){
       entries.forEach(function(en){
         if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
       });
     },{threshold:.12, rootMargin:'0px 0px -8% 0px'});
     els.forEach(function(e,i){ e.style.transitionDelay = Math.min(i%8*60,360)+'ms'; io.observe(e); });
+    // Failsafe: never leave content hidden if the observer is throttled or misses
+    // (embedded browsers, slow networks). Independent of `load`, which a hanging
+    // third-party resource can prevent from firing at all.
+    setTimeout(revealAll, 2200);
   })();
 </script>
 </body>
