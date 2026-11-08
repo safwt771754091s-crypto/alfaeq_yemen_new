@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>منصة الفائق يمن — سوقك الشامل ومساعدك الذكي</title>
+<meta name="description" content="منصة الفائق يمن: سوق إلكتروني، توصيل، محفظة إلكترونية، دفع QR، لحظات وفيديو، وذكاء اصطناعي عربي — في منصة واحدة تعمل على الويب وأندرويد.">
+<meta name="theme-color" content="#0B6E4F">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="منصة الفائق يمن">
+<meta property="og:title" content="منصة الفائق يمن — سوقك الشامل ومساعدك الذكي">
+<meta property="og:description" content="تسوّق، توصيل، محفظة، دفع QR، لحظات وفيديو، وذكاء اصطناعي عربي — في منصة واحدة.">
+<meta property="og:image" content="/alfaeq_yemen_new/store/logo.png">
+<meta property="og:url" content="https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/store/platform.html">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400..700&family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --emerald:#0B6E4F; --emerald-deep:#07412F; --emerald-lift:#128C66;
+    --ink:#08211B; --muted:#4E635C; --line:#E3E7E2;
+    --gold:#F2B705; --gold-soft:#FFDD75;
+    --cream:#F7F6F1; --card:#FFFFFF;
+    --radius:22px; --shadow:0 18px 50px -22px rgba(8,33,27,.35);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--cream); color:var(--ink); line-height:1.85;
+    font-family:"Tajawal","Noto Sans Arabic","Segoe UI",Tahoma,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.brand{font-family:"Reem Kufi","Tajawal","Segoe UI",Tahoma,sans-serif; line-height:1.35}
+  a{color:inherit}
+  .wrap{width:min(1140px,92vw);margin-inline:auto}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:13px;
+    letter-spacing:.2px;color:var(--emerald);
+    background:rgba(11,110,79,.09);border:1px solid rgba(11,110,79,.18);
+    padding:7px 14px;border-radius:999px;
+  }
+  /* ---------- header ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);
+    background:rgba(247,246,241,.82);border-bottom:1px solid var(--line);
+  }
+  .topbar .row{display:flex;align-items:center;gap:18px;padding:12px 0}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:19px;text-decoration:none}
+  .brand img{width:42px;height:42px;border-radius:13px;box-shadow:0 8px 20px -8px rgba(11,110,79,.6)}
+  nav.links{display:flex;gap:22px;margin-inline-start:auto;font-weight:500;font-size:15px}
+  nav.links a{text-decoration:none;color:var(--muted);transition:color .2s}
+  nav.links a:hover{color:var(--emerald)}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    padding:12px 22px;border-radius:14px;font-weight:700;font-size:15px;
+    text-decoration:none;border:1px solid transparent;transition:transform .18s,box-shadow .18s,background .18s;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--emerald);color:#fff;box-shadow:0 14px 30px -14px rgba(11,110,79,.85)}
+  .btn-primary:hover{background:#095c42;transform:translateY(-2px)}
+  .btn-gold{background:var(--gold);color:#3a2c00;box-shadow:0 14px 30px -14px rgba(242,183,5,.9)}
+  .btn-gold:hover{transform:translateY(-2px)}
+  .btn-ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+  .btn-ghost:hover{border-color:var(--emerald);color:var(--emerald)}
+  .btn-light{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35)}
+  .btn-light:hover{background:rgba(255,255,255,.24)}
+  @media(max-width:860px){nav.links{display:none}}
+  /* ---------- hero ---------- */
+  .hero{
+    position:relative;overflow:hidden;color:#fff;
+    background:
+      radial-gradient(1100px 520px at 88% -10%, rgba(242,183,5,.28), transparent 60%),
+      radial-gradient(900px 500px at 8% 110%, rgba(18,140,102,.45), transparent 62%),
+      linear-gradient(155deg,#07412F 0%, #0B6E4F 58%, #0E7C58 100%);
+  }
+  .hero::after{
+    content:"";position:absolute;inset:0;opacity:.16;pointer-events:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><g fill='none' stroke='%23ffffff' stroke-width='1.1' opacity='.7'><path d='M60 8l14 14-14 14-14-14z'/><path d='M60 84l14 14-14 14-14-14z'/><path d='M8 60l14-14 14 14-14 14z'/><path d='M84 60l14-14 14 14-14 14z'/></g></svg>");
+  }
+  .hero .wrap{position:relative;z-index:2;padding:74px 0 88px}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+  .hero h1{font-size:clamp(34px,5.2vw,58px);font-weight:700;margin:20px 0 16px}
+  .hero h1 .accent{color:var(--gold-soft)}
+  .lead{font-size:clamp(16px,2vw,19px);color:rgba(255,255,255,.9);max-width:33em}
+  .cta-row{display:flex;flex-wrap:wrap;gap:14px;margin-top:30px}
+  .trust{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+  .chip{
+    display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:500;
+    background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);
+    padding:7px 14px;border-radius:999px;color:rgba(255,255,255,.95)
+  }
+  .chip b{font-weight:800;color:#fff}
+  /* phone mock */
+  .phone{
+    width:min(330px,80vw);margin-inline:auto;background:#0A2A21;border-radius:42px;
+    padding:13px;box-shadow:0 40px 90px -30px rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.16);
+  }
+  .screen{background:#F7F9F8;border-radius:32px;overflow:hidden;color:var(--ink)}
+  .s-top{display:flex;align-items:center;gap:10px;padding:14px 15px 10px;background:#fff;border-bottom:1px solid var(--line)}
+  .s-top img{width:30px;height:30px;border-radius:9px}
+  .s-top .t{font-weight:800;font-size:14px}
+  .s-top .t small{display:block;font-weight:500;color:var(--muted);font-size:11px}
+  .s-search{margin:11px 13px;background:#EEF3F0;border-radius:12px;padding:9px 13px;font-size:12.5px;color:#71857E}
+  .s-tiles{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:0 13px}
+  .s-tile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;font-size:11.5px}
+  .s-tile .b{height:52px;border-radius:10px;margin-bottom:7px;background:linear-gradient(135deg,#DCEBE3,#C3DED1)}
+  .s-tile .p{color:var(--emerald);font-weight:800;font-size:12px}
+  .s-nav{display:flex;justify-content:space-around;padding:12px 8px 14px;margin-top:12px;background:#fff;border-top:1px solid var(--line);font-size:10px;color:var(--muted);text-align:center}
+  .s-nav span{display:block}
+  .s-nav i{display:block;font-size:16px;font-style:normal}
+  .s-nav .on{color:var(--emerald);font-weight:800}
+  /* ---------- stats ---------- */
+  .stats{background:var(--card);border-bottom:1px solid var(--line)}
+  .stats .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:26px 0}
+  .stat{text-align:center;padding:8px}
+  .stat b{display:block;font-family:"Reem Kufi",sans-serif;font-size:clamp(24px,3.4vw,34px);color:var(--emerald)}
+  .stat span{font-size:14px;color:var(--muted)}
+  @media(max-width:700px){.stats .grid{grid-template-columns:repeat(2,1fr)}}
+  /* ---------- sections ---------- */
+  section.blk{padding:78px 0}
+  .sec-head{max-width:44em;margin-bottom:40px}
+  .sec-head h2{font-size:clamp(26px,3.6vw,38px);margin:14px 0 12px}
+  .sec-head p{color:var(--muted);font-size:16.5px;margin:0}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));gap:18px}
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:26px;transition:transform .22s,box-shadow .22s,border-color .22s;
+  }
+  .card:hover{transform:translateY(-5px);box-shadow:var(--shadow);border-color:rgba(11,110,79,.35)}
+  .ic{
+    width:52px;height:52px;border-radius:15px;display:grid;place-items:center;font-size:24px;
+    background:linear-gradient(140deg,rgba(11,110,79,.14),rgba(242,183,5,.18));margin-bottom:15px
+  }
+  .card h3{font-size:19px;margin:0 0 8px}
+  .card p{margin:0;color:var(--muted);font-size:15px}
+  /* steps */
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px;position:relative}
+  .step .n{
+    width:40px;height:40px;border-radius:50%;background:var(--emerald);color:#fff;font-weight:800;
+    display:grid;place-items:center;font-family:"Reem Kufi",sans-serif;margin-bottom:14px
+  }
+  .step h3{margin:0 0 7px;font-size:17px}
+  .step p{margin:0;color:var(--muted);font-size:14.5px}
+  /* catalog band */
+  .band{
+    background:linear-gradient(150deg,#08211B,#0B6E4F);color:#fff;border-radius:28px;
+    padding:52px;display:grid;grid-template-columns:1.2fr .8fr;gap:40px;align-items:center;overflow:hidden;position:relative
+  }
+  .band h2{font-size:clamp(24px,3.2vw,34px);margin:12px 0 12px;color:#fff}
+  .band p{color:rgba(255,255,255,.88);margin:0 0 24px}
+  .band .mini{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .band .mini div{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:16px;padding:16px;text-align:center;font-size:13.5px}
+  .band .mini b{display:block;font-family:"Reem Kufi",sans-serif;font-size:26px;color:var(--gold-soft)}
+  @media(max-width:860px){.band{grid-template-columns:1fr;padding:34px}}
+  /* partners */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:30px}
+  .panel h3{font-size:21px;margin:0 0 10px}
+  .panel p{color:var(--muted);margin:0 0 18px}
+  .panel ul{margin:0 0 20px;padding-inline-start:20px;color:var(--muted);font-size:15px}
+  .panel li{margin-bottom:6px}
+  @media(max-width:760px){.split{grid-template-columns:1fr}}
+  /* install */
+  .install{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .qrbox{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:26px;text-align:center}
+  .qrbox img{width:100%;max-width:190px;background:#fff;padding:10px;border-radius:14px;border:1px solid var(--line)}
+  .qrbox h3{margin:14px 0 6px;font-size:18px}
+  .qrbox p{color:var(--muted);font-size:14px;margin:0}
+  .qrbox code{display:inline-block;background:#0A2540;color:#9fe0ff;padding:3px 9px;border-radius:7px;font-size:12.5px;direction:ltr}
+  @media(max-width:760px){.install{grid-template-columns:1fr}}
+  /* footer */
+  footer{background:#08211B;color:rgba(255,255,255,.82);padding:56px 0 34px;margin-top:20px}
+  .f-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:34px}
+  .f-grid h4{color:#fff;font-size:15px;margin:0 0 14px;font-family:"Reem Kufi",sans-serif}
+  .f-grid a{display:block;color:rgba(255,255,255,.72);text-decoration:none;font-size:14.5px;margin-bottom:9px;transition:color .2s}
+  .f-grid a:hover{color:var(--gold-soft)}
+  .f-brand{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+  .f-brand img{width:44px;height:44px;border-radius:13px}
+  .f-brand b{color:#fff;font-family:"Reem Kufi",sans-serif;font-size:18px}
+  .f-note{color:rgba(255,255,255,.55);font-size:13px}
+  .f-bottom{border-top:1px solid rgba(255,255,255,.14);margin-top:36px;padding-top:20px;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;font-size:13.5px;color:rgba(255,255,255,.6)}
+  @media(max-width:760px){.f-grid{grid-template-columns:1fr}}
+  /* reveal */
+  .rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
+  .rv.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap row">
+    <a class="brand" href="./"><img src="logo.png" alt="شعار منصة الفائق يمن"><span>منصة الفائق يمن</span></a>
+    <nav class="links">
+      <a href="#features">المزايا</a>
+      <a href="#start">كيف تبدأ</a>
+      <a href="#catalog">الكتالوج</a>
+      <a href="#partners">للتجار والمناديب</a>
+    </nav>
+    <a class="btn btn-primary" href="/alfaeq_yemen_new/">افتح المنصة</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <span class="eyebrow" style="background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff">🇾🇪 صُنعت في اليمن</span>
+        <h1>منصة واحدة<br>تجمع <span class="accent">السوق والتوصيل والمحفظة</span><br>ومساعدك الذكي.</h1>
+        <p class="lead">تسوّق من متاجر محلية موثوقة، تابع طلبك لحظة بلحظة، ادفع بالمحفظة أو رمز QR، وشاهد اللحظات والفيديو — كل ذلك في تطبيق واحد يعمل على الجوال والمتصفح.</p>
+        <div class="cta-row">
+          <a class="btn btn-gold" href="https://github.com/safwt771754091s-crypto/alfaeq_yemen_new/releases/latest/download/app-release.apk">⬇️ حمّل نسخة أندرويد</a>
+          <a class="btn btn-light" href="/alfaeq_yemen_new/">🌐 افتح نسخة الويب</a>
+        </div>
+        <div class="trust">
+          <span class="chip">🛒 <b>آلاف</b> المنتجات</span>
+          <span class="chip">💵 محفظة <b>ريال يمني · سعودي · دولار</b></span>
+          <span class="chip">📴 تعمل <b>بدون إنترنت</b> بعد أول فتح</span>
+        </div>
+      </div>
+
+      <div class="hero-visual rv">
+        <div class="phone">
+          <div class="screen">
+            <div class="s-top">
+              <img src="logo.png" alt="">
+              <div class="t">الفائق يمن<small>مساعدك الذكي جاهز 🤖</small></div>
+            </div>
+            <div class="s-search">🔎 ابحث عن منتج… «أرز»، «حليب»</div>
+            <div class="s-tiles">
+              <div class="s-tile"><div class="b"></div>أرز بسمتي ٥كجم<div class="p">٢١٫٣٨ ر.س</div></div>
+              <div class="s-tile"><div class="b"></div>زيت دوار الشمس<div class="p">١٢٫٥٠ ر.س</div></div>
+              <div class="s-tile"><div class="b"></div>تمر سكري فاخر<div class="p">١٨٫٠٠ ر.س</div></div>
+              <div class="s-tile"><div class="b"></div>شاي أحمر علبة<div class="p">٩٫٦٦ ر.س</div></div>
+            </div>
+            <div class="s-nav">
+              <span class="on"><i>🏠</i>الرئيسية</span>
+              <span><i>🛍️</i>المتاجر</span>
+              <span><i>💬</i>المحادثات</span>
+              <span><i>🛒</i>السلة</span>
+              <span><i>👤</i>حسابي</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="stats">
+  <div class="wrap grid">
+    <div class="stat"><b>+3,800</b><span>منتج في الكتالوج</span></div>
+    <div class="stat"><b>3</b><span>عملات: يمني · سعودي · دولار</span></div>
+    <div class="stat"><b>24/7</b><span>مساعد ذكي يفهم العربية</span></div>
+    <div class="stat"><b>0 ﷼</b><span>تكلفة تحميل التطبيق</span></div>
+  </div>
+</div>
+
+<section class="blk" id="features">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">لماذا الفائق يمن؟</span>
+      <h2>كل ما تحتاجه يومياً، في مكان واحد</h2>
+      <p>بُنيَت المنصة لتخدم السوق اليمني: شبكات بطيئة، أجهزة متنوعة، وعملات متعددة — مع تجربة عربية أصيلة من اليمين إلى اليسار.</p>
+    </div>
+    <div class="cards">
+      <div class="card rv"><div class="ic">🛒</div><h3>تسوّق وطلب</h3><p>تصفّح آلاف المنتجات من متاجر محلية موثوقة، وابحث بالاسم أو برمز الباركود.</p></div>
+      <div class="card rv"><div class="ic">🚚</div><h3>توصيل مع تتبّع</h3><p>اطلب ووصّل إلى بابك، مع متابعة حالة الطلب لحظة بلحظة.</p></div>
+      <div class="card rv"><div class="ic">💰</div><h3>محفظة إلكترونية</h3><p>رصيد بالريال اليمني والسعودي والدولار، مع تحويلات وقسائم تعبئة آمنة.</p></div>
+      <div class="card rv"><div class="ic">📷</div><h3>دفع برمز QR</h3><p>ادفع بسرعة وأمان برمز الاستجابة السريعة مباشرة من محفظتك.</p></div>
+      <div class="card rv"><div class="ic">🎬</div><h3>لحظات وفيديو</h3><p>مقاطع قصيرة وغرف بث مباشر مع دردشة، وحزمة حمراء 🧧 في المحادثات.</p></div>
+      <div class="card rv"><div class="ic">🤖</div><h3>ذكاء الفائق</h3><p>مساعد ذكي عربي يبحث عن المنتجات، يقرأ محفظتك وطلباتك، وينفّذ بموافقتك.</p></div>
+      <div class="card rv"><div class="ic">🧩</div><h3>برامج مصغّرة</h3><p>خدمات وأدوات داخل المنصة، مع حسابات رسمية تنشر المقالات والإشعارات.</p></div>
+      <div class="card rv"><div class="ic">🔒</div><h3>أمان وخصوصية</h3><p>حماية للبيانات وصلاحيات دقيقة، وسياسة خصوصية واضحة تحترم مستخدميها.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="blk" id="start" style="background:#fff;border-block:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">ابدأ في دقائق</span>
+      <h2>ثلاث خطوات فقط</h2>
+      <p>لا حاجة إلى بطاقة بنكية أو إعداد معقّد — افتح المنصة أو ثبّت التطبيق وابدأ فوراً.</p>
+    </div>
+    <div class="steps">
+      <div class="step rv"><div class="n">1</div><h3>حمّل أو افتح المنصة</h3><p>نزّل ملف APK لأندرويد، أو استخدم نسخة الويب مباشرة من أي متصفح دون تثبيت.</p></div>
+      <div class="step rv"><div class="n">2</div><h3>أنشئ حسابك</h3><p>سجّل بالبريد الإلكتروني، ثم عبّئ محفظتك بقسيمة تعبئة أو إيداع بنكي.</p></div>
+      <div class="step rv"><div class="n">3</div><h3>تسوّق واطلب</h3><p>اختر منتجاتك، أضفها للسلة، وادفع بالمحفظة أو عند الاستلام — وتابع التوصيل.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="blk" id="catalog">
+  <div class="wrap">
+    <div class="band rv">
+      <div>
+        <span class="eyebrow" style="background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff">كتالوج المنصة</span>
+        <h2>تصفّح الكتالوج الكامل قبل التسجيل</h2>
+        <p>اطّلع على المنتجات والأسعار والصور في صفحة كتالوج عامة سريعة، وابحث بالاسم أو بالمعرّف. الكتالوج محدَّث من بيانات المنصة الإنتاجية.</p>
+        <a class="btn btn-gold" href="/alfaeq_yemen_new/catalog/">🗂️ افتح الكتالوج</a>
+      </div>
+      <div class="mini">
+        <div><b>+3,800</b>منتج</div>
+        <div><b>993+</b>بالصور</div>
+        <div><b>بحث</b>بالاسم/المعرّف</div>
+        <div><b>عربي</b>واجهة RTL</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="blk" id="partners" style="background:#fff;border-block:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">انضم إلينا</span>
+      <h2>للتجار والمناديب</h2>
+      <p>قدّم طلبك من داخل المنصة، وبعد الموافقة تحصل على لوحة تحكم كاملة لإدارة متجرك أو طلبات التوصيل.</p>
+    </div>
+    <div class="split">
+      <div class="panel rv">
+        <div class="ic">🏪</div>
+        <h3>افتح متجرك</h3>
+        <p>أضف منتجاتك، أدر المخزون والطلبات، واستلم مدفوعاتك عبر المحفظة.</p>
+        <ul>
+          <li>لوحة تحكم للمنتجات والأقسام والمخزون</li>
+          <li>استلام الطلبات وتحديث حالتها</li>
+          <li>تسوية المبيعات في المحفظة</li>
+        </ul>
+        <a class="btn btn-ghost" href="/alfaeq_yemen_new/">قدّم طلب تاجر</a>
+      </div>
+      <div class="panel rv">
+        <div class="ic">🛵</div>
+        <h3>اعمل مندوب توصيل</h3>
+        <p>استلم مهام التوصيل، شارك موقعك المباشر، وحدّث حالة الطلب بضغطة.</p>
+        <ul>
+          <li>مركز مهام للمندوب مع التوزيع</li>
+          <li>بث الموقع أثناء العمل</li>
+          <li>تأكيد التسليم وتحديث الحالة</li>
+        </ul>
+        <a class="btn btn-ghost" href="/alfaeq_yemen_new/">قدّم طلب مندوب</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="blk" id="install">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">ثبّت التطبيق</span>
+      <h2>على الجوال وفي المتصفح</h2>
+      <p>افتح المنصة من أي جوال — كروم أو سفاري — وبعد أول فتح تُخزَّن داخل جهازك وتفتح حتى بدون إنترنت.</p>
+    </div>
+    <div class="install">
+      <div class="qrbox rv">
+        <img src="qr-app.png" alt="رمز QR لنسخة الويب">
+        <h3>نسخة الويب</h3>
+        <p>امسح الرمز بكاميرا جوالك لفتح المنصة فوراً.</p>
+        <p style="margin-top:8px"><code>safwt771754091s-crypto.github.io/alfaeq_yemen_new</code></p>
+      </div>
+      <div class="qrbox rv">
+        <img src="qr-android.png" alt="رمز QR لتحميل أندرويد">
+        <h3>نسخة أندرويد</h3>
+        <p>امسح الرمز أو اضغط للتحميل المباشر لملف APK.</p>
+        <p style="margin-top:14px"><a class="btn btn-primary" href="https://github.com/safwt771754091s-crypto/alfaeq_yemen_new/releases/latest/download/app-release.apk">⬇️ تحميل APK</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="f-grid">
+      <div>
+        <div class="f-brand"><img src="logo.png" alt="شعار منصة الفائق يمن"><b>منصة الفائق يمن</b></div>
+        <p class="f-note">منصة رقمية متكاملة تبدأ من اليمن: سوق، توصيل، محفظة، دفع QR، لحظات وفيديو، وذكاء اصطناعي عربي — في تطبيق واحد.</p>
+      </div>
+      <div>
+        <h4>المنصة</h4>
+        <a href="/alfaeq_yemen_new/">نسخة الويب</a>
+        <a href="/alfaeq_yemen_new/store/">صفحة التحميل</a>
+        <a href="/alfaeq_yemen_new/catalog/">الكتالوج</a>
+        <a href="https://github.com/safwt771754091s-crypto/alfaeq_yemen_new/releases/latest">أحدث إصدار</a>
+      </div>
+      <div>
+        <h4>معلومات</h4>
+        <a href="privacy.html">سياسة الخصوصية</a>
+        <a href="share.html">شارك التطبيق</a>
+        <a href="https://github.com/safwt771754091s-crypto/alfaeq_yemen_new">المستودع على GitHub</a>
+      </div>
+    </div>
+    <div class="f-bottom">
+      <span>© <span id="y">2026</span> الفائق يمن — جميع الحقوق محفوظة</span>
+      <span>أُنشئت هذه الصفحة بواسطة وكيل ذكاء اصطناعي (OpenHands) نيابة عن مالك المستودع.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('y').textContent = new Date().getFullYear();
+  (function(){
+    var els = document.querySelectorAll('.rv');
+    if(!('IntersectionObserver' in window)){ els.forEach(function(e){e.classList.add('in')}); return; }
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
+      });
+    },{threshold:.12, rootMargin:'0px 0px -8% 0px'});
+    els.forEach(function(e,i){ e.style.transitionDelay = Math.min(i%8*60,360)+'ms'; io.observe(e); });
+  })();
+</script>
+</body>
+</html>

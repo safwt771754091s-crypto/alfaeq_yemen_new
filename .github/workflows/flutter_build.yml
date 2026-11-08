@@ -54,12 +54,12 @@ jobs:
           python3 tools/build_product_gallery.py --out catalog || echo "::warning::gallery refresh failed, shipping the committed copy"
           mkdir -p build/web/catalog
           cp -f catalog/index.html catalog/products.json catalog/missing-images.json build/web/catalog/
-      - name: Publish store pages (download + privacy)
+      - name: Publish store pages (download + privacy + platform)
         run: |
           pip install --quiet segno || echo "::warning::segno unavailable; keeping committed QR codes"
           python3 tools/build_store_qr.py || echo "::warning::QR refresh failed; keeping committed copies"
           mkdir -p build/web/store
-          cp -f store/site/index.html store/site/privacy.html store/site/share.html store/site/icon-512.png store/site/logo.png store/site/ad-banner.png store/site/qr-app.png store/site/qr-android.png build/web/store/
+          cp -f store/site/index.html store/site/privacy.html store/site/share.html store/site/platform.html store/site/icon-512.png store/site/logo.png store/site/ad-banner.png store/site/qr-app.png store/site/qr-android.png build/web/store/
       - uses: actions/upload-artifact@v7
         with:
           name: alfaeq-yemen-web
