@@ -9,6 +9,21 @@
 ## Evidence policy
 No task is marked complete from intention or code inspection alone. Record the command/result or GitHub Actions evidence here.
 
+## Public platform page (منصة الفائق يمن) — 2026-11-07
+- Scope: add a public, Arabic RTL landing page that presents the whole platform (marketplace, delivery,
+  wallet, QR pay, moments/video, Arabic AI, mini-programs, merchant/driver onboarding) and links to the
+  existing web app, download page, catalog, and privacy policy.
+- Change: `store/site/platform.html` (new, self-contained, no build step). Published at
+  `.../alfaeq_yemen_new/store/platform.html` by adding it to the "Publish store pages" copy list in
+  `.github/workflows/flutter_build.yml`. Linked from `store/site/index.html` and from README public links.
+- Verification (local, static preview served over HTTP mirroring the Pages layout):
+  - HTML parse: no unclosed/stray tags (`html.parser` walk).
+  - Layout probe at 390px and 1440px: `overflowX=false`, all images loaded, webfonts
+    (Reem Kufi / Tajawal) reported loaded by `document.fonts.check`.
+  - Internal links 200: `/store/platform.html`, `/store/`, `/store/privacy.html`, `/store/share.html`,
+    `/catalog/`, `/`, and the three PNG assets.
+- No Flutter/lib, migration, or credential changes; engineering gates unaffected.
+
 ## Current task
 Connect order, inventory, and merchant through the production Event Bus without moving business truth out of Supabase.
 

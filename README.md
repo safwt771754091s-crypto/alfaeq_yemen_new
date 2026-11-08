@@ -10,7 +10,9 @@
 ## روابط عامة
 
 - 🌐 **نسخة الويب:** https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/
+- 🧭 **صفحة المنصة (تعرّف على الفائق يمن):** https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/store/platform.html
 - ⬇️ **صفحة التحميل (أندرويد):** https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/store/
+- 🗂️ **كتالوج المنتجات:** https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/catalog/
 - 📱 **أحدث إصدار (APK + AAB):** https://github.com/safwt771754091s-crypto/alfaeq_yemen_new/releases/latest
 - 🔒 **سياسة الخصوصية:** https://safwt771754091s-crypto.github.io/alfaeq_yemen_new/store/privacy.html
 - 📤 **دليل الرفع على Google Play:** `docs/publishing/GOOGLE_PLAY.md`
