@@ -310,13 +310,20 @@ class AuthService {
   }
 
   Future<bool> canOpenDeveloperCenter() async {
-    final c = await claims();
-    return c['owner'] == true ||
-        c['admin'] == true ||
-        c['developer'] == true ||
-        c['role'] == 'owner' ||
-        c['role'] == 'admin' ||
-        c['role'] == 'developer';
+    // Read the authoritative Supabase profile instead of relying on JWT claims
+    // that may be stale after server-side role provisioning.
+    final user = currentUser;
+    if (user == null) return false;
+    final row = await SupabaseService.client
+        .from('users')
+        .select('role,owner,admin,developer')
+        .eq('uid', user.id)
+        .maybeSingle();
+    final profile = row ?? const <String, dynamic>{};
+    return profile['owner'] == true ||
+        profile['admin'] == true ||
+        profile['developer'] == true ||
+        ['owner', 'admin', 'developer'].contains(profile['role']);
   }
 
   Future<void> _recordLoginEvent(

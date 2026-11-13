@@ -43,15 +43,17 @@ Future<void> main() async {
     }
   }
 
-  // Load the saved display currency + platform FX rates; never blocks startup.
-  try {
-    await CurrencyService.instance.load();
-  } catch (_) {/* fall back to defaults */}
-
+  // Render the app immediately after Supabase bootstrap. Reading preferences
+  // and refreshing FX rates are secondary startup tasks; a slow RPC must never
+  // hold the first Flutter frame hostage on weak mobile networks.
   runApp(AlfaeqYemenApp(
     startupError: startupError,
     startupStack: startupStack,
   ));
+
+  // CurrencyService publishes cached/default values first and updates the UI
+  // when preferences/rates arrive. Keep this work outside the critical path.
+  unawaited(CurrencyService.instance.load().catchError((Object _) {}));
 }
 
 class AlfaeqYemenApp extends StatefulWidget {
