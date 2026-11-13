@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/auth_service.dart';
-import '../services/super_alfaeq_catalog_importer.dart';
 import '../services/supabase_service.dart';
 import '../core/login_portal.dart';
 import 'admin_dashboard.dart';
@@ -36,7 +35,6 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     _authSubscription = _auth.authStateChanges.listen((user) {
       if (user != null) {
         _auth.startPresence();
-        SuperAlfaeqCatalogImporter().importIfNeeded().catchError((_) => 0);
       } else {
         _auth.stopPresence();
       }
@@ -98,7 +96,6 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         switch (role) {
           case 'owner':
           case 'admin':
-            SuperAlfaeqCatalogImporter().importIfNeeded().catchError((_) => 0);
             return const AdminDashboard();
           case 'merchant':
             return const MerchantPortalPage();
