@@ -68,9 +68,55 @@ Deno.serve(async(req)=>{
     return json({ok:r.ok,status:r.status,worker:data},r.ok?202:500);
   }
   if(action==="status"){
-    const {data:runs,error}=await admin.from("ai_agent_runs").select("id,task_id,agent_id,provider,status,repository,branch,conversation_id,error,result,created_at,updated_at").order("created_at",{ascending:false}).limit(20);
+    const {data:runs,error}=await admin.from("ai_agent_runs").select("id,task_id,agent_id,provider,status,external_run_id,repository,branch,conversation_id,error,result,created_at,updated_at").order("created_at",{ascending:false}).limit(20);
     if(error)throw error;
-    return json({ok:true,runs:runs??[]});
+
+    // OpenHands V1 starts asynchronously. Resolve the start-task ID to its
+    // conversation ID, then read execution status so the Developer Center
+    // shows real progress rather than leaving accepted tasks at "running".
+    for(const run of (runs??[]).filter((r:any)=>r.status==="running"&&r.external_run_id).slice(0,10)){
+      try{
+        let conversationId=String(run.conversation_id??"").trim();
+        if(!conversationId){
+          const raw=await oh("/api/v1/app-conversations/start-tasks?ids="+encodeURIComponent(String(run.external_run_id)),"GET");
+          const ready=Array.isArray(raw)?raw[0]:(raw?.items?.[0]??raw);
+          const startStatus=String(ready?.status??"").toUpperCase();
+          conversationId=String(ready?.app_conversation_id??"").trim();
+          if(startStatus==="ERROR"){
+            const message=String(ready?.error??"OpenHands conversation startup failed").slice(0,1500);
+            await admin.from("ai_agent_runs").update({status:"failed",error:message,completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",run.id);
+            await admin.from("ai_tasks").update({status:"backlog",metadata:{source:"developer_center",requested_by:run.result?.requested_by??null,last_error:message}}).eq("id",run.task_id);
+            continue;
+          }
+          if(conversationId){
+            await admin.from("ai_agent_runs").update({conversation_id:conversationId,result:{...(run.result??{}),start_task_status:startStatus},updated_at:new Date().toISOString()}).eq("id",run.id);
+            run.conversation_id=conversationId;
+          }
+        }
+        if(conversationId){
+          const raw=await oh("/api/v1/app-conversations?ids="+encodeURIComponent(conversationId),"GET");
+          const conv=Array.isArray(raw)?raw[0]:(raw?.items?.[0]??raw);
+          const execution=String(conv?.execution_status??"").toLowerCase();
+          const sandbox=String(conv?.sandbox_status??"").toLowerCase();
+          const terminal=execution==="finished"||execution==="error"||execution==="stuck"||execution==="waiting_for_confirmation";
+          if(terminal){
+            const status=execution==="finished"?"completed":execution==="waiting_for_confirmation"?"waiting_for_confirmation":"failed";
+            const message=execution==="finished"?null:String(conv?.error??("OpenHands execution status: "+execution)).slice(0,1500);
+            await admin.from("ai_agent_runs").update({status,error:message,completed_at:execution==="waiting_for_confirmation"?null:new Date().toISOString(),result:{...(run.result??{}),openhands_execution_status:execution,openhands_sandbox_status:sandbox,conversation_ui_url:conv?.conversation_ui_url??null},updated_at:new Date().toISOString()}).eq("id",run.id);
+            if(execution==="finished")await admin.from("ai_tasks").update({status:"completed",metadata:{source:"developer_center",requested_by:run.result?.requested_by??null,execution_status:execution}}).eq("id",run.task_id);
+            else if(execution==="error"||execution==="stuck")await admin.from("ai_tasks").update({status:"backlog",metadata:{source:"developer_center",requested_by:run.result?.requested_by??null,last_error:message}}).eq("id",run.task_id);
+          }else{
+            await admin.from("ai_agent_runs").update({result:{...(run.result??{}),openhands_execution_status:execution||null,openhands_sandbox_status:sandbox||null,conversation_ui_url:conv?.conversation_ui_url??null},updated_at:new Date().toISOString()}).eq("id",run.id);
+          }
+        }
+      }catch(_){
+        // Keep the run active on transient provider/network errors; a later
+        // refresh can retry status synchronization without losing the task.
+      }
+    }
+    const {data:refreshed,error:refreshError}=await admin.from("ai_agent_runs").select("id,task_id,agent_id,provider,status,external_run_id,repository,branch,conversation_id,error,result,created_at,updated_at").order("created_at",{ascending:false}).limit(20);
+    if(refreshError)throw refreshError;
+    return json({ok:true,runs:refreshed??[]});
   }
   if(action!=="execute_task")return json({ok:false,error:"unknown_action"},400);
   const title=String(body.title??"").trim();
