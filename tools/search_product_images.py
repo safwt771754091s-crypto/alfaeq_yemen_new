@@ -94,7 +94,7 @@ def request(url, headers, method="GET", body=None, timeout=40, retries=1):
 def load_products(base, key, limit=0, pending_only=True, offset=0, known=None):
     known = known or set()
     products, start, page = [], offset, 1000
-    headers = {"apikey": key, "Authorization": f"Bearer {key}"}
+    headers = service_headers(key)
     while True:
         flt = "&image_url=eq." if pending_only else ""
         url = (
@@ -355,7 +355,7 @@ def main():
                 known.update(json.load(handle).keys())
         except (OSError, ValueError):
             pass
-    products = load_products(args.url, args.publishable_key, args.limit,
+    products = load_products(args.url, args.service_key or args.publishable_key, args.limit,
                              pending_only=not args.overwrite, offset=args.offset,
                              known=known)
     pending = [p for p in products
