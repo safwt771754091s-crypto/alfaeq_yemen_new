@@ -176,3 +176,63 @@ Scope: inspect the whole platform and prepare it for the final release. Branch
 4. **Dead code (non-blocking)**: `location_required_page.dart` and
    `smart_dispatch_page.dart` are implemented but unreachable;
    `supabase_data_service.dart` is unreferenced. Left untouched (out of scope).
+## Security audit — privilege escalation & storefront outage — 2026-11-20
+- Scope: full audit of RLS policies, the RPC surface, and the wallet/money paths
+  against the deployed project. Migration:
+  `supabase/migrations/20261120010000_security_audit_hardening_v1.sql`.
+
+### Findings (all reproduced before the fix)
+1. **CRITICAL — self-minted wallet balance.** `wallets_self_insert`
+   (`20260927013000_owner_merchant_wallet_operations.sql`) gated INSERT only on
+   `uid = current_user_uid()`. Any signed-in user could insert their own wallet
+   with `available_balance = 999999999` and spend it through
+   `create_order_paid` / `wallet_transfer` / `pay_mini_program`.
+2. **CRITICAL — anonymous storefront outage.** `products` / `stores` /
+   `mini_programs` read policies call `private.is_platform_staff()`, which was
+   revoked from `anon`. Every logged-out read fails:
+   `curl /rest/v1/products` → `42501 permission denied for function
+   is_platform_staff` (verified live on both tables).
+3. **HIGH — customer email disclosure.** `public.product_reviews` /
+   `public.store_reviews` are granted to `anon` and fall back to
+   `split_part(u.email,'@',1)`. An anonymous visitor read `secret.person` from
+   `secret.person@example.com` on a public product page.
+4. **MEDIUM — AI control plane readable by every user.** `ai_agents`,
+   `ai_tasks`, `ai_activity_log` used `using (true)` for `authenticated`. Any
+   signed-in user read `ai_agents.adapter_config`.
+5. **MEDIUM — money primitive granted to clients.**
+   `private.wallet_credit_internal` was re-granted to `authenticated`
+   (`20260925020100_production_rpc_private_grants_v1.sql`) after the public
+   wrapper was revoked.
+
+### Fix
+- `wallets_self_insert` now requires a zero balance and zero `version` for
+  self-service inserts; staff keep unrestricted insert.
+- `grant execute on function private.is_platform_staff() to anon` — EXECUTE only
+  (no schema grant added; `anon` already has USAGE, since the live failure is
+  function-level, not schema-level). The predicate only inspects the caller's
+  own JWT/`users` row, so policies still gate correctly.
+- Review readers fall back to `full_name` / `name` metadata then `'مستخدم'`;
+  email is never used.
+- AI control plane policies replaced with `private.is_platform_staff()`.
+- `wallet_credit_internal` / `wallet_debit_internal` revoked from
+  `public, anon, authenticated` (internal callers are SECURITY DEFINER).
+
+### Evidence (local PostgreSQL 17.11 harness reproducing the deployed schema)
+Before → after, same exploit script:
+- self-insert wallet with 999,999,999 → `INSERT 0 1` (balance 999999999) → **RLS violation**.
+- wallet insert with zero balance → allowed → **allowed** (legit path intact).
+- version spoof (balance 0, version 5) → allowed → **RLS violation**.
+- anon `select from products` → `permission denied for function is_platform_staff` → **1 row**.
+- any authenticated user reads `ai_agents` → **1 row with adapter_config** → **0 rows**; staff (`app_role=owner`) → **1 row**.
+- anon `product_reviews('p1')->items[0].author_name` → `secret.person` → **`مستخدم`**.
+- `private.wallet_credit_internal(...)` as authenticated → **permission denied**.
+- Migration re-run → no errors (idempotent).
+
+### Remaining risks (not changed here)
+- `master_bank_accounts` is readable by every authenticated user. This is
+  intentional (customers must see the account to deposit into), but it means
+  deposit account numbers are public to the user base. Needs a product decision,
+  not a silent schema change.
+- Edge Functions with `verify_jwt = false` (automation-worker, ai-event-worker,
+  payment-gateway, push-dispatch, whatsapp-webhook) self-authenticate via
+  HMAC/shared secret. Reviewed and left as-is.
