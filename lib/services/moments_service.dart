@@ -71,7 +71,39 @@ class MomentsService {
   }
 
   Future<void> deleteMoment(String momentId) async {
-    await _db.from('moments').delete().eq('id', momentId);
+    final row = await _db.from('moments').select('author_id, media_urls, video_urls').eq('id', momentId).maybeSingle();
+    if (row == null) throw StateError('المنشور غير موجود.');
+    if (row['author_id'] != currentUserId) throw StateError('لا تملك صلاحية حذف هذا المنشور.');
+
+    final removed = await _db.from('moments').delete().eq('id', momentId).select('id');
+    // PostgREST answers 204/[] when RLS filters the row, so a blocked delete
+    // looks like success. Treat an empty result as a failure.
+    if (removed.isEmpty) throw StateError('تعذر حذف المنشور.');
+
+    await _removeMedia([
+      ..._storagePaths(row['media_urls']),
+      ..._storagePaths(row['video_urls']),
+    ]);
+  }
+
+  /// Deletes the given objects from the bucket. Best-effort: the row is
+  /// already gone, so a storage error must not resurrect the failure.
+  Future<void> _removeMedia(List<String> paths) async {
+    if (paths.isEmpty) return;
+    try {
+      await _db.storage.from(bucket).remove(paths);
+    } catch (_) {}
+  }
+
+  List<String> _storagePaths(dynamic value) {
+    if (value is! List) return const [];
+    final marker = '/$bucket/';
+    return value
+        .map((e) => e?.toString() ?? '')
+        .where((url) => url.contains(marker))
+        .map((url) => Uri.decodeComponent(url.split(marker).last))
+        .where((path) => path.isNotEmpty)
+        .toList();
   }
 
   Future<String> uploadImage(Uint8List bytes, String extension) async {

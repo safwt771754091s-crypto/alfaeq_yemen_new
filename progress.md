@@ -236,3 +236,66 @@ Before → after, same exploit script:
 - Edge Functions with `verify_jwt = false` (automation-worker, ai-event-worker,
   payment-gateway, push-dispatch, whatsapp-webhook) self-authenticate via
   HMAC/shared secret. Reviewed and left as-is.
+
+## Delete-path fixes — D1/D2 (2026-11-21, same PR #227)
+
+Follow-up requested alongside the security audit: fix the deletion problems
+(اشكاليات الحذف). Two defects were reproduced against the deployed project
+before any change, then fixed and re-verified.
+
+### D1 CRITICAL — reactions could be added but never removed
+`public.message_reactions` was created with `revoke all ... from anon`, but the
+shipped grant for `authenticated` was `select, insert` only — DELETE was never
+granted. Every toggle-off failed with `42501`, so a reaction was permanent once
+added.
+
+- Live reproduction: `DELETE /rest/v1/message_reactions?...` →
+  `{"code":"42501","hint":"Grant the required privileges to the current role
+  with: GRANT SELECT, DELETE ON public.message_reactions"}`.
+- Fix: `grant delete on table public.message_reactions to authenticated;`
+  The row policy already restricts deletes to `user_id = auth.uid()::text`, so
+  no new access is exposed — the policy simply could never be evaluated before.
+
+### D2 HIGH — "deleted" media stayed publicly readable
+`MomentsService.deleteMoment` and `ReelsService.deleteReel` deleted only the
+row. The photo/video objects stayed in the public `moments` / `reels` buckets,
+so a deleted post's media remained readable by anyone holding the URL.
+
+- Live reproduction: the orphaned moments object returned `HTTP 200 image/jpeg`
+  from `/storage/v1/object/public/moments/...` with no credentials, while the
+  owning row was already gone (`moments` rows: 0).
+- Fix: both services now resolve their media paths from the row and call
+  `storage.from(bucket).remove(paths)` after the row is deleted (best-effort —
+  a storage error must not resurrect an already-committed delete).
+- Migration re-creates the owner-scoped `moments_media_delete` /
+  `reels_media_delete` storage policies idempotently so the cleanup cannot
+  silently no-op if a policy was ever dropped.
+
+### Silent no-op deletes (root cause behind "الحذف لا يعمل")
+PostgREST answers `200`/`204` with an empty body when RLS filters the target
+row, so a *refused* delete looked like a successful one in the UI.
+Verified live: anon `DELETE /rest/v1/moments?id=eq.<uuid>` → `200 []`.
+
+- All four delete paths now use `.delete().eq(...).select('id')` and raise when
+  the returned list is empty, so the UI reports the refusal instead of
+  refreshing as if the row were gone: `MomentsService.deleteMoment`,
+  `ReelsService.deleteReel`, `PublicContentService.deleteUpdate`, and the
+  reaction toggle in `GroupChatPage._toggleReaction`.
+- Moment/reel deletion additionally checks the loaded row's `author_id` before
+  deleting, giving a clear message instead of a generic failure.
+
+### Evidence (local PostgreSQL 17 harness, `/tmp/vh2`)
+Same script before → after:
+- own reaction delete as `authenticated` → `ERROR: permission denied for table message_reactions` → **`DELETE 1`**.
+- remaining reactions → **1** → **0**.
+- own `moments` + `reels` storage object delete → **2 remaining** → **0 remaining**.
+- another user's object delete attempt → **still present** → **still present** (guard intact).
+- migration re-run → no errors (idempotent).
+
+### Verification
+- `flutter analyze` — no issues.
+- `flutter test` — 216 passed / 1 skipped (includes 8 new cases in
+  `test/delete_path_hardening_test.dart`).
+- `flutter build web --release` — built successfully.
+- `flutter build apk --debug` — not run locally (no Android SDK in this
+  sandbox); covered by the `build-android-debug` CI job.

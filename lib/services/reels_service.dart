@@ -83,7 +83,27 @@ class ReelsService {
   }
 
   Future<void> deleteReel(String reelId) async {
-    await _db.from('reels').delete().eq('id', reelId);
+    final row = await _db.from('reels').select('author_id, video_url, thumbnail_url').eq('id', reelId).maybeSingle();
+    if (row == null) throw StateError('الفيديو غير موجود.');
+    if (row['author_id'] != currentUserId) throw StateError('لا تملك صلاحية حذف هذا الفيديو.');
+
+    final removed = await _db.from('reels').delete().eq('id', reelId).select('id');
+    // PostgREST answers 204/[] when RLS filters the row, so a blocked delete
+    // looks like success. Treat an empty result as a failure.
+    if (removed.isEmpty) throw StateError('تعذر حذف الفيديو.');
+
+    final paths = [row['video_url'], row['thumbnail_url']]
+        .map((u) => u?.toString() ?? '')
+        .where((url) => url.contains('/$bucket/'))
+        .map((url) => Uri.decodeComponent(url.split('/$bucket/').last))
+        .where((path) => path.isNotEmpty)
+        .toList();
+    if (paths.isEmpty) return;
+    // Best-effort: the row is already gone, so a storage error must not
+    // resurrect the failure.
+    try {
+      await _db.storage.from(bucket).remove(paths);
+    } catch (_) {}
   }
 
   /// Uploads a video (or its poster image) and returns the public URL.
