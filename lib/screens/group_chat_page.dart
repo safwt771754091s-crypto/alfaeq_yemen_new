@@ -48,7 +48,14 @@ class _GroupChatPageState extends State<GroupChatPage> {
           .eq('emoji', emoji)
           .limit(1);
       if (existing.isNotEmpty) {
-        await SupabaseService.client.from('message_reactions').delete().eq('id', existing.first['id']);
+        final removed = await SupabaseService.client
+            .from('message_reactions')
+            .delete()
+            .eq('id', existing.first['id'])
+            .select('id');
+        // PostgREST answers an empty result when RLS filters the row, so a
+        // blocked delete would otherwise look like a successful toggle-off.
+        if (removed.isEmpty) throw StateError('لا تملك صلاحية إزالة هذا التفاعل.');
       } else {
         await SupabaseService.client.from('message_reactions').insert({
           'message_id': messageId,

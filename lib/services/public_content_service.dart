@@ -120,7 +120,12 @@ class PublicContentService {
     if (!SupabaseService.isInitialized) {
       throw StateError('خدمة المحتوى غير مفعلة.');
     }
-    await SupabaseService.client.from('public_site_updates').delete().eq('id', id);
+    final removed = await SupabaseService.client.from('public_site_updates').delete().eq('id', id).select('id');
+    // PostgREST returns an empty result when RLS filters the row, so a blocked
+    // delete would otherwise look like success.
+    if (removed.isEmpty) {
+      throw StateError('تعذر الحذف: لا تملك صلاحية حذف هذا التحديث.');
+    }
   }
 
   static String? _nullIfBlank(String? value) {

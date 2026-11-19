@@ -191,3 +191,126 @@ Scope: inspect the whole platform and prepare it for the final release. Branch
 4. **Dead code (non-blocking)**: `location_required_page.dart` and
    `smart_dispatch_page.dart` are implemented but unreachable;
    `supabase_data_service.dart` is unreferenced. Left untouched (out of scope).
+## Security audit — privilege escalation & storefront outage — 2026-11-20
+- Scope: full audit of RLS policies, the RPC surface, and the wallet/money paths
+  against the deployed project. Migration:
+  `supabase/migrations/20261120010000_security_audit_hardening_v1.sql`.
+
+### Findings (all reproduced before the fix)
+1. **CRITICAL — self-minted wallet balance.** `wallets_self_insert`
+   (`20260927013000_owner_merchant_wallet_operations.sql`) gated INSERT only on
+   `uid = current_user_uid()`. Any signed-in user could insert their own wallet
+   with `available_balance = 999999999` and spend it through
+   `create_order_paid` / `wallet_transfer` / `pay_mini_program`.
+2. **CRITICAL — anonymous storefront outage.** `products` / `stores` /
+   `mini_programs` read policies call `private.is_platform_staff()`, which was
+   revoked from `anon`. Every logged-out read fails:
+   `curl /rest/v1/products` → `42501 permission denied for function
+   is_platform_staff` (verified live on both tables).
+3. **HIGH — customer email disclosure.** `public.product_reviews` /
+   `public.store_reviews` are granted to `anon` and fall back to
+   `split_part(u.email,'@',1)`. An anonymous visitor read `secret.person` from
+   `secret.person@example.com` on a public product page.
+4. **MEDIUM — AI control plane readable by every user.** `ai_agents`,
+   `ai_tasks`, `ai_activity_log` used `using (true)` for `authenticated`. Any
+   signed-in user read `ai_agents.adapter_config`.
+5. **MEDIUM — money primitive granted to clients.**
+   `private.wallet_credit_internal` was re-granted to `authenticated`
+   (`20260925020100_production_rpc_private_grants_v1.sql`) after the public
+   wrapper was revoked.
+
+### Fix
+- `wallets_self_insert` now requires a zero balance and zero `version` for
+  self-service inserts; staff keep unrestricted insert.
+- `grant execute on function private.is_platform_staff() to anon` — EXECUTE only
+  (no schema grant added; `anon` already has USAGE, since the live failure is
+  function-level, not schema-level). The predicate only inspects the caller's
+  own JWT/`users` row, so policies still gate correctly.
+- Review readers fall back to `full_name` / `name` metadata then `'مستخدم'`;
+  email is never used.
+- AI control plane policies replaced with `private.is_platform_staff()`.
+- `wallet_credit_internal` / `wallet_debit_internal` revoked from
+  `public, anon, authenticated` (internal callers are SECURITY DEFINER).
+
+### Evidence (local PostgreSQL 17.11 harness reproducing the deployed schema)
+Before → after, same exploit script:
+- self-insert wallet with 999,999,999 → `INSERT 0 1` (balance 999999999) → **RLS violation**.
+- wallet insert with zero balance → allowed → **allowed** (legit path intact).
+- version spoof (balance 0, version 5) → allowed → **RLS violation**.
+- anon `select from products` → `permission denied for function is_platform_staff` → **1 row**.
+- any authenticated user reads `ai_agents` → **1 row with adapter_config** → **0 rows**; staff (`app_role=owner`) → **1 row**.
+- anon `product_reviews('p1')->items[0].author_name` → `secret.person` → **`مستخدم`**.
+- `private.wallet_credit_internal(...)` as authenticated → **permission denied**.
+- Migration re-run → no errors (idempotent).
+
+### Remaining risks (not changed here)
+- `master_bank_accounts` is readable by every authenticated user. This is
+  intentional (customers must see the account to deposit into), but it means
+  deposit account numbers are public to the user base. Needs a product decision,
+  not a silent schema change.
+- Edge Functions with `verify_jwt = false` (automation-worker, ai-event-worker,
+  payment-gateway, push-dispatch, whatsapp-webhook) self-authenticate via
+  HMAC/shared secret. Reviewed and left as-is.
+
+## Delete-path fixes — D1/D2 (2026-11-21, same PR #227)
+
+Follow-up requested alongside the security audit: fix the deletion problems
+(اشكاليات الحذف). Two defects were reproduced against the deployed project
+before any change, then fixed and re-verified.
+
+### D1 CRITICAL — reactions could be added but never removed
+`public.message_reactions` was created with `revoke all ... from anon`, but the
+shipped grant for `authenticated` was `select, insert` only — DELETE was never
+granted. Every toggle-off failed with `42501`, so a reaction was permanent once
+added.
+
+- Live reproduction: `DELETE /rest/v1/message_reactions?...` →
+  `{"code":"42501","hint":"Grant the required privileges to the current role
+  with: GRANT SELECT, DELETE ON public.message_reactions"}`.
+- Fix: `grant delete on table public.message_reactions to authenticated;`
+  The row policy already restricts deletes to `user_id = auth.uid()::text`, so
+  no new access is exposed — the policy simply could never be evaluated before.
+
+### D2 HIGH — "deleted" media stayed publicly readable
+`MomentsService.deleteMoment` and `ReelsService.deleteReel` deleted only the
+row. The photo/video objects stayed in the public `moments` / `reels` buckets,
+so a deleted post's media remained readable by anyone holding the URL.
+
+- Live reproduction: the orphaned moments object returned `HTTP 200 image/jpeg`
+  from `/storage/v1/object/public/moments/...` with no credentials, while the
+  owning row was already gone (`moments` rows: 0).
+- Fix: both services now resolve their media paths from the row and call
+  `storage.from(bucket).remove(paths)` after the row is deleted (best-effort —
+  a storage error must not resurrect an already-committed delete).
+- Migration re-creates the owner-scoped `moments_media_delete` /
+  `reels_media_delete` storage policies idempotently so the cleanup cannot
+  silently no-op if a policy was ever dropped.
+
+### Silent no-op deletes (root cause behind "الحذف لا يعمل")
+PostgREST answers `200`/`204` with an empty body when RLS filters the target
+row, so a *refused* delete looked like a successful one in the UI.
+Verified live: anon `DELETE /rest/v1/moments?id=eq.<uuid>` → `200 []`.
+
+- All four delete paths now use `.delete().eq(...).select('id')` and raise when
+  the returned list is empty, so the UI reports the refusal instead of
+  refreshing as if the row were gone: `MomentsService.deleteMoment`,
+  `ReelsService.deleteReel`, `PublicContentService.deleteUpdate`, and the
+  reaction toggle in `GroupChatPage._toggleReaction`.
+- Moment/reel deletion additionally checks the loaded row's `author_id` before
+  deleting, giving a clear message instead of a generic failure.
+
+### Evidence (local PostgreSQL 17 harness, `/tmp/vh2`)
+Same script before → after:
+- own reaction delete as `authenticated` → `ERROR: permission denied for table message_reactions` → **`DELETE 1`**.
+- remaining reactions → **1** → **0**.
+- own `moments` + `reels` storage object delete → **2 remaining** → **0 remaining**.
+- another user's object delete attempt → **still present** → **still present** (guard intact).
+- migration re-run → no errors (idempotent).
+
+### Verification
+- `flutter analyze` — no issues.
+- `flutter test` — 216 passed / 1 skipped (includes 8 new cases in
+  `test/delete_path_hardening_test.dart`).
+- `flutter build web --release` — built successfully.
+- `flutter build apk --debug` — not run locally (no Android SDK in this
+  sandbox); covered by the `build-android-debug` CI job.
