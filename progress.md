@@ -314,3 +314,80 @@ Same script before → after:
 - `flutter build web --release` — built successfully.
 - `flutter build apk --debug` — not run locally (no Android SDK in this
   sandbox); covered by the `build-android-debug` CI job.
+
+---
+
+## 2026-11-21 — Full platform audit, storefront restored, dispatch repaired (PR #229)
+
+### Live audit (production REST API, public client key)
+
+Probed every sensitive table with the `anon` role:
+
+| Result | Tables |
+|---|---|
+| `200`, zero rows (RLS correct) | `users`, `wallets`, `orders`, `order_items`, `drivers`, `wallet_transactions`, `moments`, `notifications`, `audit_logs`, `media_assets`, `user_contacts` |
+| `401 permission denied for function is_platform_staff` | `stores`, `products` |
+
+The public storefront was **unreadable for every signed-out visitor**.
+
+### Root cause — schema USAGE, not the function grant
+
+142 RLS policies are written as
+`using ((select private.is_platform_staff()) or <public visibility>)`, so
+Postgres evaluates the predicate before deciding a row is public.
+`20261120010000` granted `EXECUTE` on the function to `anon`, but `USAGE` on
+schema `private` was only ever granted to `authenticated`
+(`20260925020100`, `20261004030000`). The earlier fix could never take effect.
+
+### Fixes shipped
+
+- `20261121030000_restore_anon_storefront_v1.sql` — grants schema `USAGE` and
+  `EXECUTE` on `private.is_platform_staff()` to `anon`. No table grant is
+  added. Safe: the predicate is `STABLE`, reads only the caller's own profile
+  via `auth.uid()`, and returns `false` for `anon`, so the policy falls
+  through to its public-visibility branch.
+- `20261121020000_assign_order_driver_contract_v1.sql` — `public.assign_order_driver`
+  was `jsonb` in `20260922190300` and redefined as `boolean` with
+  `CREATE OR REPLACE` in `20260925020000`. Postgres rejects a return-type
+  change, so on a clean replay that statement aborted the file and the
+  remaining invoker wrappers were never created. The body also did
+  `::boolean` on a jsonb object, which has no cast, breaking every courier
+  assignment and auto-dispatch. The new migration drops first and returns the
+  private result unchanged as `jsonb`.
+
+### Audit results that needed no change
+
+- `SECURITY DEFINER` without a locked `search_path`: **0**
+- Tables with RLS disabled: **0** (47 tables checked; `private` was a regex
+  false positive on the schema name)
+- Net grants to `anon`: **6**, all intentional
+- Secrets in git history or tracked files: **none**. The Android keystore lives
+  only in the gitignored `.secrets-backup/` and was never committed.
+
+### Verification
+
+- `flutter analyze` — no issues.
+- `flutter test` — 223 passed / 1 skipped (7 new in
+  `test/storefront_and_dispatch_contract_test.dart`).
+- PR #229 — all 10 CI checks green (`analyze-and-test`, `build-web`,
+  `build-android-debug`, `static-security`, `contract-and-supply-chain`).
+  Merged as `fa88311c`.
+
+### BLOCKED — migrations are not applied to production
+
+`apply-migrations.yml` fails at its first step:
+`SUPABASE_DB_URL is not set`. No repo secret exists for it, so **no migration
+can reach the database from CI**. The `SUPABASE_ACCESS_TOKEN` in this
+environment is not a valid Management API token (`401 JWT could not be
+decoded`), and policy forbids using a service-role/secret key.
+
+Consequence: `20261120010000` (F1 wallet minting, F3 review email leak),
+`20261121010000` (delete paths), and both migrations above are on `main` but
+**not live**. The storefront still returns 401 and the wallet-minting fix is
+not active in production.
+
+Owner action required — either:
+1. add `SUPABASE_DB_URL` as a repo secret, then run **Actions -> Apply
+   Migrations** with the four files, or
+2. paste each file into the Supabase **SQL Editor** (they are additive and
+   idempotent, so order does not matter).
