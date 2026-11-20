@@ -39,15 +39,33 @@ jobs:
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          if [ -z "$DB_URL" ]; then
+          # Pasted values routinely carry a trailing newline, surrounding
+          # quotes, or a "psql '...'" prefix; strip those before validating
+          # instead of rejecting a correct connection string.
+          url="$DB_URL"
+          url="${url#"${url%%[![:space:]]*}"}"
+          url="${url%"${url##*[![:space:]]}"}"
+          url="${url#\'}"; url="${url%\'}"
+          url="${url#\"}"; url="${url%\"}"
+          url="${url#psql }"
+          url="${url#\'}"; url="${url%\'}"
+          url="${url#\"}"; url="${url%\"}"
+          url="${url%"${url##*[![:space:]]}"}"
+
+          if [ -z "$url" ]; then
             echo "::error::SUPABASE_DB_URL is empty for this job. Add it as a repository secret (Settings -> Secrets and variables -> Actions) or as an environment secret on 'Production'. Note this job runs in the Production environment, so a secret scoped to a different environment will not be visible."
             exit 1
           fi
-          case "$DB_URL" in
+          case "$url" in
             postgres://*|postgresql://*) ;;
-            *) echo "::error::SUPABASE_DB_URL must start with postgres:// or postgresql://."; exit 1 ;;
+            *)
+              # Never print the value; report only its shape.
+              echo "::error::SUPABASE_DB_URL does not look like a Postgres URI. It must start with postgres:// or postgresql:// and look like postgresql://postgres:PASSWORD@db.<ref>.supabase.co:5432/postgres . Got ${#url} characters starting with '$(printf '%s' "$url" | cut -c1-12)'."
+              exit 1
+              ;;
           esac
-          echo "SUPABASE_DB_URL is present."
+          echo "::add-mask::$url"
+          echo "SUPABASE_DB_URL is present and looks like a Postgres URI."
 
       - name: Validate migration paths
         env:
