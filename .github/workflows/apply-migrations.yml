@@ -58,6 +58,10 @@ jobs:
           fi
           case "$url" in
             postgres://*|postgresql://*) ;;
+            https://*|http://*)
+              echo "::error::SUPABASE_DB_URL holds a project URL ('$url'), not a database connection string. Open Supabase -> Project Settings -> Database -> Connection string -> URI and copy the value that starts with postgresql:// and contains your database password. It is not the https://<ref>.supabase.co API URL."
+              exit 1
+              ;;
             *)
               # Never print the value; report only its shape.
               echo "::error::SUPABASE_DB_URL does not look like a Postgres URI. It must start with postgres:// or postgresql:// and look like postgresql://postgres:PASSWORD@db.<ref>.supabase.co:5432/postgres . Got ${#url} characters starting with '$(printf '%s' "$url" | cut -c1-12)'."
