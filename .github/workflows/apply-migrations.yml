@@ -27,15 +27,27 @@ permissions:
 jobs:
   apply:
     runs-on: ubuntu-latest
+    # Environment-scoped secrets are only visible to a job that names the
+    # environment, so SUPABASE_DB_URL added under Settings -> Environments ->
+    # Production was invisible and the guard always failed. Repo-level secrets
+    # are still inherited; this only widens where the job looks.
+    environment: Production
     steps:
       - uses: actions/checkout@v7
 
       - name: Guard — secret present
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          if [ -z "${{ secrets.SUPABASE_DB_URL }}" ]; then
-            echo "::error::SUPABASE_DB_URL is not set. Add it under Settings -> Secrets and variables -> Actions."
+          if [ -z "$DB_URL" ]; then
+            echo "::error::SUPABASE_DB_URL is empty for this job. Add it as a repository secret (Settings -> Secrets and variables -> Actions) or as an environment secret on 'Production'. Note this job runs in the Production environment, so a secret scoped to a different environment will not be visible."
             exit 1
           fi
+          case "$DB_URL" in
+            postgres://*|postgresql://*) ;;
+            *) echo "::error::SUPABASE_DB_URL must start with postgres:// or postgresql://."; exit 1 ;;
+          esac
+          echo "SUPABASE_DB_URL is present."
 
       - name: Validate migration paths
         env:
