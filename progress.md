@@ -391,3 +391,56 @@ Owner action required — either:
    Migrations** with the four files, or
 2. paste each file into the Supabase **SQL Editor** (they are additive and
    idempotent, so order does not matter).
+
+## 2026-11-21 — migrations applied to production, storefront restored
+
+The blocked apply is resolved. The four pending migrations are now live on
+`alfaeq_yemen_prod` (region `ap-northeast-1`, Tokyo).
+
+### How it was unblocked
+
+Four `apply-migrations` dispatches failed on the *value* of `SUPABASE_DB_URL`,
+never on the SQL: a project URL (49 chars), the project ref alone (20), then the
+database password twice (88). The password was rejected by the server, so the
+workflow could not authenticate. Applied instead through the Supabase **SQL
+Editor** using `supabase/apply-all-pending.sql` — the four files wrapped in one
+`begin; ... commit;` — which returned `Success. No rows returned`.
+
+### Live verification (anon key, after apply)
+
+| Probe | Before | After |
+|---|---|---|
+| `GET /rest/v1/stores` | `401 42501` | `200`, real rows |
+| `GET /rest/v1/products` | `401 42501` | `200`, real rows |
+| `POST /rest/v1/wallets` (balance 999999) | — | `401`, RLS violation |
+| `POST /rpc/product_reviews` | — | `200`, no email in payload |
+| `POST /rpc/assign_order_driver` | `404 PGRST202` | exists; `401` for anon (correct) |
+
+Anon sweep across `users`, `wallets`, `orders`, `drivers`,
+`wallet_transactions`, `notifications`, `audit_logs`, `media_assets`,
+`user_contacts`, `ai_agents`, `ai_tasks`, `ai_activity_log`: all `200` with zero
+rows. RLS holds.
+
+`categories` returns `404 PGRST205` (table absent) — pre-existing, unrelated to
+this work.
+
+### Root cause correction
+
+The live error was `permission denied for function is_platform_staff`, not
+`... for schema private`, which means `anon` already held USAGE on schema
+`private` and only EXECUTE was missing. `20261121030000` grants both, so it holds
+either way; the comment in that file now states this correctly.
+
+### Workflow hardening (PR #230)
+
+`apply-migrations.yml` now runs in the `Production` environment (environment
+secrets were invisible to a job that names none), accepts a bare password and
+builds the URI itself, probes the project's own pooler region first, reports a
+per-host reason, and no longer echoes any part of the secret — an earlier
+message printed 12 characters of the password into the run log.
+
+### Verification
+
+- `flutter analyze` -> No issues found
+- `flutter test` -> 223 passed, 1 skipped
+- CI on PR #229 -> 10/10 green, merged `fa88311c`
