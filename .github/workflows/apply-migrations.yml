@@ -20,6 +20,10 @@ on:
         description: 'Only check connectivity, do not apply'
         type: boolean
         default: false
+      db_password:
+        description: 'Database password. Used only when SUPABASE_DB_URL is a bare password, to build the connection string. Leave empty otherwise.'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -38,6 +42,7 @@ jobs:
       - name: Guard — secret present
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DB_PASSWORD: ${{ inputs.db_password }}
         run: |
           # Pasted values routinely carry a trailing newline, surrounding
           # quotes, or a "psql '...'" prefix; strip those before validating
@@ -56,20 +61,43 @@ jobs:
             echo "::error::SUPABASE_DB_URL is empty for this job. Add it as a repository secret (Settings -> Secrets and variables -> Actions) or as an environment secret on 'Production'. Note this job runs in the Production environment, so a secret scoped to a different environment will not be visible."
             exit 1
           fi
+
           case "$url" in
-            postgres://*|postgresql://*) ;;
-            https://*|http://*)
-              echo "::error::SUPABASE_DB_URL holds a project URL ('$url'), not a database connection string. Open Supabase -> Project Settings -> Database -> Connection string -> URI and copy the value that starts with postgresql:// and contains your database password. It is not the https://<ref>.supabase.co API URL."
+            postgres://*|postgresql://*)
+              echo "::add-mask::$url"
+              {
+                echo "SUPABASE_DB_URL_RESOLVED<<EOF"
+                echo "$url"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
+              echo "SUPABASE_DB_URL holds a full connection string."
+              ;;
+            *://*)
+              echo "::error::SUPABASE_DB_URL is a URL but not a Postgres connection string. Copy the value from Supabase -> Project Settings -> Database -> Connection string -> URI."
               exit 1
               ;;
             *)
-              # Never print the value; report only its shape.
-              echo "::error::SUPABASE_DB_URL does not look like a Postgres URI. It must start with postgres:// or postgresql:// and look like postgresql://postgres:PASSWORD@db.<ref>.supabase.co:5432/postgres . Got ${#url} characters starting with '$(printf '%s' "$url" | cut -c1-12)'."
-              exit 1
+              # The secret holds only the database password (or a project ref).
+              # Keep it in an env var; the connectivity step builds the URI once
+              # it knows which host for this project actually accepts the login.
+              ref=$(grep -rhoE '[a-z0-9]{20}\.supabase\.co' lib/ | head -1 | cut -d. -f1)
+              if [ -z "$ref" ]; then
+                echo "::error::Could not read the Supabase project ref from lib/, so a bare password cannot be expanded. Set SUPABASE_DB_URL to the full postgresql:// URI instead."
+                exit 1
+              fi
+              echo "::add-mask::$url"
+              [ -n "$DB_PASSWORD" ] && echo "::add-mask::$DB_PASSWORD"
+              {
+                echo "SUPABASE_DB_REF<<EOF"
+                echo "$ref"
+                echo "EOF"
+                echo "SUPABASE_DB_PASSWORD<<EOF"
+                echo "${DB_PASSWORD:-$url}"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
+              echo "SUPABASE_DB_URL holds a bare password; the connection string will be built for project ${ref}."
               ;;
           esac
-          echo "::add-mask::$url"
-          echo "SUPABASE_DB_URL is present and looks like a Postgres URI."
 
       - name: Validate migration paths
         env:
@@ -83,6 +111,7 @@ jobs:
             fi
             case "$f" in
               supabase/migrations/*.sql) ;;
+              supabase/apply-all-pending.sql) ;;
               *) echo "::error::Refusing to apply outside supabase/migrations: $f"; exit 1 ;;
             esac
           done
@@ -93,13 +122,57 @@ jobs:
 
       - name: Connectivity check
         env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: psql "$DB_URL" -v ON_ERROR_STOP=1 -c "select version();"
+          DB_URL: ${{ env.SUPABASE_DB_URL_RESOLVED }}
+          REF: ${{ env.SUPABASE_DB_REF }}
+          PASSWORD: ${{ env.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -u
+          if [ -n "${DB_URL:-}" ]; then
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -c "select version();"
+            exit 0
+          fi
+
+          enc=$(printf '%s' "$PASSWORD" | python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read(), safe=""))')
+          echo "::add-mask::$enc"
+
+          # Direct host first, then the regional poolers. A project only answers
+          # on its own region, and the direct host may be IPv6-only, so probe
+          # until one accepts the credentials instead of guessing.
+          hosts="db.${REF}.supabase.co:5432"
+          for region in eu-central-1 eu-west-1 eu-west-2 eu-west-3 us-east-1 us-east-2 us-west-1 ap-southeast-1 ap-southeast-2 ap-south-1 ap-northeast-1 me-central-1 sa-east-1 ca-central-1; do
+            hosts="$hosts aws-0-${region}.pooler.supabase.com:5432 aws-1-${region}.pooler.supabase.com:5432"
+          done
+
+          resolved=""
+          for host in $hosts; do
+            case "$host" in
+              db.*) user="postgres" ;;
+              *)    user="postgres.${REF}" ;;
+            esac
+            candidate="postgresql://${user}:${enc}@${host}/postgres"
+            if out=$(psql "$candidate" -v ON_ERROR_STOP=1 -tAc "select 1" 2>&1) && [ "$out" = "1" ]; then
+              resolved="$candidate"
+              echo "Connected via ${host}."
+              break
+            fi
+          done
+
+          if [ -z "$resolved" ]; then
+            echo "::error::Could not connect with the supplied password on any host for project ${REF}. Check the database password in Supabase -> Project Settings -> Database (use Reset database password if unsure)."
+            exit 1
+          fi
+          echo "::add-mask::$resolved"
+          {
+            echo "SUPABASE_DB_URL_RESOLVED<<EOF"
+            echo "$resolved"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+          psql "$resolved" -v ON_ERROR_STOP=1 -c "select version();"
 
       - name: Apply migrations
         if: ${{ inputs.dry_run == false }}
         env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DB_URL: ${{ env.SUPABASE_DB_URL_RESOLVED }}
           FILES: ${{ inputs.files }}
         run: |
           set -e
