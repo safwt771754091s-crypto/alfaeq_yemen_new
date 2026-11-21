@@ -144,21 +144,47 @@ jobs:
           done
 
           resolved=""
+          auth_failed=""
           for host in $hosts; do
             case "$host" in
               db.*) user="postgres" ;;
               *)    user="postgres.${REF}" ;;
             esac
-            candidate="postgresql://${user}:${enc}@${host}/postgres"
-            if out=$(psql "$candidate" -v ON_ERROR_STOP=1 -tAc "select 1" 2>&1) && [ "$out" = "1" ]; then
+            candidate="postgresql://${user}:${enc}@${host}/postgres?connect_timeout=8"
+            out=$(psql "$candidate" -v ON_ERROR_STOP=1 -tAc "select 1" 2>&1) && [ "$out" = "1" ] && {
               resolved="$candidate"
               echo "Connected via ${host}."
               break
-            fi
+            }
+            # Distinguish "host unreachable" from "password rejected": the
+            # second one is a real answer and should stop the sweep.
+            case "$out" in
+              *"password authentication failed"*|*"authentication failed"*)
+                auth_failed="$host"
+                echo "${host}: reached the server, credentials rejected."
+                ;;
+              *"does not exist"*)
+                echo "${host}: server answered, role or database missing."
+                ;;
+              *"could not translate host name"*|*"Name or service not known"*)
+                echo "${host}: no DNS entry."
+                ;;
+              *"timeout"*|*"timed out"*|*"Timeout"*)
+                echo "${host}: connection timed out."
+                ;;
+              *)
+                echo "${host}: $(printf '%s' "$out" | head -1 | cut -c1-120)"
+                ;;
+            esac
           done
 
+          if [ -n "$auth_failed" ] && [ -z "$resolved" ]; then
+            echo "::error::The server at ${auth_failed} is reachable but rejected the password, so SUPABASE_DB_URL holds the wrong database password. Reset it in Supabase -> Project Settings -> Database -> Reset database password and update the secret."
+            exit 1
+          fi
+
           if [ -z "$resolved" ]; then
-            echo "::error::Could not connect with the supplied password on any host for project ${REF}. Check the database password in Supabase -> Project Settings -> Database (use Reset database password if unsure)."
+            echo "::error::Could not reach any database host for project ${REF}. The hosts were unreachable rather than rejecting the password; see the per-host reasons above."
             exit 1
           fi
           echo "::add-mask::$resolved"
