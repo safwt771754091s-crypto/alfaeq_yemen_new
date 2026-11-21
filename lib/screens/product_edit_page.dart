@@ -6,6 +6,7 @@ import '../core/product_units.dart';
 import '../services/currency_service.dart';
 import '../services/media_service.dart';
 import '../services/supabase_service.dart';
+import '../core/query_cache.dart';
 
 /// Edits an existing product: name, description, price, stock, sale unit,
 /// catalog section, barcode and image.
@@ -143,6 +144,7 @@ class _ProductEditPageState extends State<ProductEditPage> {
         'metadata': metadata,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', productId);
+      QueryCache.instance.invalidate('catalog.');
       if (_imageUrl.isNotEmpty) {
         await SupabaseService.client
             .from('media_assets')

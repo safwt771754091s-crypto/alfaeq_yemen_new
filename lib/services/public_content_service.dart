@@ -1,4 +1,5 @@
 import 'supabase_service.dart';
+import '../core/query_cache.dart';
 
 class PromotionDocument {
   final String id;
@@ -22,12 +23,21 @@ class PublicContentService {
     if (!SupabaseService.isInitialized) {
       throw StateError('خدمة المحتوى غير مفعلة.');
     }
+    return QueryCache.instance.remember(
+      'content.promotions.$limit',
+      () => _loadActivePromotions(limit),
+      ttl: QueryCache.contentTtl,
+    );
+  }
+
+  Future<List<PromotionDocument>> _loadActivePromotions(int limit) async {
+    final now = DateTime.now().toUtc().toIso8601String();
     final rows = await SupabaseService.client
         .from('promotions')
         .select()
         .eq('status', 'published')
-        .lte('starts_at', DateTime.now().toUtc().toIso8601String())
-        .or('ends_at.is.null,ends_at.gt.${DateTime.now().toUtc().toIso8601String()}')
+        .lte('starts_at', now)
+        .or('ends_at.is.null,ends_at.gt.$now')
         .order('starts_at', ascending: false)
         .limit(limit);
     return rows.map((row) {
@@ -41,11 +51,20 @@ class PublicContentService {
     if (!SupabaseService.isInitialized) {
       throw StateError('خدمة المحتوى غير مفعلة.');
     }
+    return QueryCache.instance.remember(
+      'content.updates.$limit',
+      () => _loadPublishedUpdates(limit),
+      ttl: QueryCache.contentTtl,
+    );
+  }
+
+  Future<List<SiteUpdateDocument>> _loadPublishedUpdates(int limit) async {
+    final now = DateTime.now().toUtc().toIso8601String();
     final rows = await SupabaseService.client
         .from('public_site_updates')
         .select()
         .eq('status', 'published')
-        .or('published_at.is.null,published_at.lte.${DateTime.now().toUtc().toIso8601String()}')
+        .or('published_at.is.null,published_at.lte.$now')
         .order('sort_order')
         .order('published_at', ascending: false)
         .limit(limit);

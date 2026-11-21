@@ -9,6 +9,36 @@
 ## Evidence policy
 No task is marked complete from intention or code inspection alone. Record the command/result or GitHub Actions evidence here.
 
+## Storefront performance and live security audit — 2026-10-03
+- Scope: full platform inspection (audit + test), fixing the storefront request storm and verifying
+  the live Supabase security posture. No schema, RLS, or event-contract changes.
+- Root causes found:
+  1. `FutureBuilder(future: _load())` inside `build()` re-fired catalog queries on every rebuild
+     (4 sections/pages). Each query costs ~0.5–1.2 s against the live project.
+  2. `select('*')` on `products` sent 265 KB per 200 rows; `metadata` alone is ~700 bytes/row.
+  3. `activeProductsPaged` walked pages **serially**: a 3 892-product section took 4 round trips.
+  4. `Image.network` decoded full-resolution images into memory with no size hint.
+  5. A failed read was cached for the full TTL, keeping callers broken after a transient error.
+- Changes: `lib/core/query_cache.dart` (new: in-flight dedupe + TTL memo, failures not cached);
+  catalog projection narrowed to columns verified against the live schema; `searchBarcode()` moves
+  the barcode lookup server-side (`metadata->>barcode`); paged reads run concurrently once the exact
+  count is known; futures hoisted into `State`; `cacheWidth` added to fixed-size thumbnails;
+  every product write path now calls `QueryCache.instance.invalidate('catalog.')`.
+- Verification evidence:
+  - `flutter analyze` → `No issues found!`
+  - `flutter test` → `233 passed / 1 skipped` (3 new suites: `query_cache_test`,
+    `catalog_projection_test`, `catalog_cache_invalidation_test`)
+  - `flutter build web --release` → `✓ Built build/web`
+  - Live payload, 200 rows: `select=*` 265 314 B → projection 103 479 B (−61 %).
+  - Live schema probe: `products.category`, `products.unit`, `products.original_price`,
+    `stores.image_url`, `stores.description`, `stores.rating` **do not exist** — selecting them
+    fails the whole request with `42703`, so they are excluded from the projections.
+  - Live barcode filter `metadata->>barcode=eq.9556023222758` returns exactly the matching product.
+  - Security probe (anon key): `users`, `wallets`, `wallet_transactions`, `orders`, `drivers`,
+    `notifications`, `audit_logs`, `user_contacts`, `ai_tasks`, `order_items` all return `[]`.
+    Anon `INSERT` into `products`/`stores` → `401 / 42501 row-level security policy`.
+    Anon upload to the `media` bucket → `403 AccessDenied`. Embedded joins leak nothing.
+
 ## Public platform page (منصة الفائق يمن) — 2026-11-07
 - Scope: add a public, Arabic RTL landing page that presents the whole platform (marketplace, delivery,
   wallet, QR pay, moments/video, Arabic AI, mini-programs, merchant/driver onboarding) and links to the

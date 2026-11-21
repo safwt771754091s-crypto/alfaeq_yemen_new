@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../core/app_sections.dart';
 import '../services/currency_service.dart';
 import '../services/supabase_service.dart';
+import '../core/query_cache.dart';
 
 class BulkProductImportPage extends StatefulWidget {
   const BulkProductImportPage({super.key});
@@ -272,6 +273,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
           'metadata': {'created_by': user.id, 'source': 'admin_bulk_import', if (row.barcode.isNotEmpty) 'barcode': row.barcode},
         }).toList();
         await SupabaseService.client.from('products').upsert(payload);
+        QueryCache.instance.invalidate('catalog.');
       }
 
       await SupabaseService.client.from('audit_logs').insert({

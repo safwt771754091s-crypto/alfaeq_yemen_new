@@ -9,6 +9,7 @@ import '../services/supabase_service.dart';
 import '../services/auth_service.dart';
 import '../services/alfaeq_event_bus_service.dart';
 import 'product_edit_page.dart';
+import '../core/query_cache.dart';
 
 class MerchantCenterPage extends StatefulWidget {
   const MerchantCenterPage({super.key});
@@ -62,6 +63,7 @@ class _MerchantCenterPageState extends State<MerchantCenterPage> {
         'location': {'latitude': position.latitude, 'longitude': position.longitude, 'source': 'device'},
         'metadata': {'created_by': user.id},
       });
+      QueryCache.instance.invalidate('catalog.');
       await _eventBus.publishStoreUpdated(storeId, data: {
         'ownerId': user.id,
         'status': 'pending',

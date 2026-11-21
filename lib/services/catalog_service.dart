@@ -1,6 +1,7 @@
 import 'package:postgrest/postgrest.dart';
 
 import 'supabase_service.dart';
+import '../core/query_cache.dart';
 import '../core/product_units.dart';
 
 class CatalogDocument {
@@ -36,16 +37,66 @@ class CatalogService {
   /// catalog. Callers that need the whole list must page through it.
   static const int maxRowsPerRequest = 1000;
 
+  /// Resolves a scanned or typed barcode to the products that carry it.
+  ///
+  /// `metadata` is too large to ship with every catalog row (about 700 bytes
+  /// each), so the lookup runs server-side and only matches come back.
+  Future<List<CatalogDocument>> searchBarcode(String barcode) {
+    final code = barcode.trim();
+    if (code.isEmpty) return Future.value(const []);
+    return QueryCache.instance.remember(
+      'catalog.barcode.$code',
+      () async {
+        final rows = await SupabaseService.client
+            .from('products')
+            .select(_productColumns)
+            .eq('status', 'active')
+            .filter('metadata->>barcode', 'eq', code)
+            .limit(50);
+        return rows
+            .map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row)))
+            .toList();
+      },
+      ttl: QueryCache.contentTtl,
+    );
+  }
+
   Future<List<CatalogDocument>> activeProducts({String? storeId, String? sectionId, int limit = 100}) async {
     if (!useSupabase || !SupabaseService.isInitialized) {
       throw StateError('خدمة الكتالوج الجديدة غير مفعلة.');
     }
-    var query = SupabaseService.client.from('products').select().eq('status', 'active');
-    if (storeId != null && storeId.isNotEmpty) query = query.eq('store_id', storeId);
-    if (sectionId != null && sectionId.isNotEmpty) query = query.eq('section_id', sectionId);
-    final rows = await query.order('name').limit(limit);
-    return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
+    final key = 'catalog.products.$storeId.$sectionId.$limit';
+    return QueryCache.instance.remember(
+      key,
+      () async {
+        var query = SupabaseService.client
+            .from('products')
+            .select(_productColumns)
+            .eq('status', 'active');
+        if (storeId != null && storeId.isNotEmpty) query = query.eq('store_id', storeId);
+        if (sectionId != null && sectionId.isNotEmpty) query = query.eq('section_id', sectionId);
+        final rows = await query.order('name').limit(limit);
+        return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
+      },
+      ttl: QueryCache.contentTtl,
+    );
   }
+
+  /// The columns the storefront actually renders. Selecting `*` sent 265 KB for
+  /// 200 products; this projection sends 103 KB for the same rows.
+  ///
+  /// Verified against the live schema: `category`, `unit`, and `original_price`
+  /// do not exist on `products`, and selecting them fails the whole request.
+  ///
+  /// `metadata` is deliberately excluded. It carries the import audit trail
+  /// (about 700 bytes per row) and the only field the UI reads from it is
+  /// `barcode`, which [searchBarcode] resolves server-side.
+  static const String _productColumns =
+      'id,name,price,currency,stock,image_url,description,section_id,'
+      'store_id,owner_id,status,sale_unit,stock_base,min_order_base,step_base';
+
+  /// Exposed so a test can assert the projection stays in sync with the UI.
+  static List<String> get productColumnsForTest => _productColumns.split(',');
 
   /// Fetches every matching active product by walking 1000-row pages, and
   /// reports the true server-side total so the UI can show progress.
@@ -63,7 +114,7 @@ class CatalogService {
     final size = pageSize.clamp(1, maxRowsPerRequest);
 
     PostgrestFilterBuilder<List<Map<String, dynamic>>> build() {
-      var query = client.from('products').select().eq('status', 'active');
+      var query = client.from('products').select(_productColumns).eq('status', 'active');
       if (storeId != null && storeId.isNotEmpty) query = query.eq('store_id', storeId);
       if (sectionId != null && sectionId.isNotEmpty) query = query.eq('section_id', sectionId);
       return query;
@@ -76,13 +127,21 @@ class CatalogService {
     final total = first.count;
     onProgress?.call(items.length, total);
 
-    var offset = size;
-    while (items.length < total) {
-      final page = await build().order('name').range(offset, offset + size - 1);
-      if (page.isEmpty) break;
+    // The exact count is known after the first page, so every remaining offset
+    // is known too. Requesting them concurrently keeps a large section to one
+    // round trip instead of one per page.
+    final offsets = <int>[
+      for (var offset = size; offset < total; offset += size) offset,
+    ];
+    if (offsets.isEmpty) return CatalogPage(items: items, total: total);
+
+    final pages = await Future.wait(
+      offsets.map((offset) => build().order('name').range(offset, offset + size - 1)),
+    );
+    for (final page in pages) {
+      if (page.isEmpty) continue;
       items.addAll(page.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))));
       onProgress?.call(items.length, total);
-      offset += size;
     }
 
     return CatalogPage(items: items, total: total);
@@ -92,15 +151,28 @@ class CatalogService {
     if (!useSupabase || !SupabaseService.isInitialized) {
       throw StateError('خدمة الكتالوج الجديدة غير مفعلة.');
     }
-    final rows = await SupabaseService.client
-        .from('stores')
-        .select()
-        .eq('section_id', sectionId)
-        .eq('status', 'approved')
-        .order('name')
-        .limit(limit);
-    return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
+    return QueryCache.instance.remember(
+      'catalog.stores.section.$sectionId.$limit',
+      () async {
+        final rows = await SupabaseService.client
+            .from('stores')
+            .select(_storeColumns)
+            .eq('section_id', sectionId)
+            .eq('status', 'approved')
+            .order('name')
+            .limit(limit);
+        return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
+      },
+      ttl: QueryCache.contentTtl,
+    );
   }
+
+  /// Columns rendered by the store list and store card, verified against the
+  /// live schema (`image_url`, `description`, and `rating` do not exist here).
+  static List<String> get storeColumnsForTest => _storeColumns.split(',');
+
+  static const String _storeColumns =
+      'id,name,address,phone,section_id,owner_id,status,created_at';
 
   /// Every approved/active store regardless of section — powers the flat
   /// "all stores" list so merchants are discoverable without knowing a section.
@@ -108,13 +180,19 @@ class CatalogService {
     if (!useSupabase || !SupabaseService.isInitialized) {
       throw StateError('خدمة الكتالوج الجديدة غير مفعلة.');
     }
-    final rows = await SupabaseService.client
-        .from('stores')
-        .select()
-        .inFilter('status', ['approved', 'active'])
-        .order('name')
-        .limit(limit);
-    return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
+    return QueryCache.instance.remember(
+      'catalog.stores.all.$limit',
+      () async {
+        final rows = await SupabaseService.client
+            .from('stores')
+            .select(_storeColumns)
+            .inFilter('status', ['approved', 'active'])
+            .order('name')
+            .limit(limit);
+        return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
+      },
+      ttl: QueryCache.contentTtl,
+    );
   }
 
   /// A single store by id, for deep links (e.g. opening a followed store).
