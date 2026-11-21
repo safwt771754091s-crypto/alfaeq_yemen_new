@@ -139,7 +139,9 @@ jobs:
           # on its own region, and the direct host may be IPv6-only, so probe
           # until one accepts the credentials instead of guessing.
           hosts="db.${REF}.supabase.co:5432"
-          for region in eu-central-1 eu-west-1 eu-west-2 eu-west-3 us-east-1 us-east-2 us-west-1 ap-southeast-1 ap-southeast-2 ap-south-1 ap-northeast-1 me-central-1 sa-east-1 ca-central-1; do
+          # ap-northeast-1 first: it is the only pooler that answers for this
+          # project, and every other region returns ENOTFOUND for the tenant.
+          for region in ap-northeast-1 eu-central-1 eu-west-1 eu-west-2 us-east-1 ap-southeast-1; do
             hosts="$hosts aws-0-${region}.pooler.supabase.com:5432 aws-1-${region}.pooler.supabase.com:5432"
           done
 
