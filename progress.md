@@ -38,6 +38,15 @@ No task is marked complete from intention or code inspection alone. Record the c
     `notifications`, `audit_logs`, `user_contacts`, `ai_tasks`, `order_items` all return `[]`.
     Anon `INSERT` into `products`/`stores` → `401 / 42501 row-level security policy`.
     Anon upload to the `media` bucket → `403 AccessDenied`. Embedded joins leak nothing.
+- Shipped: PR #231, squash-merged as `25646163`.
+  - PR checks: analyze-and-test, build-web, build-android-debug, static-security,
+    contract-and-supply-chain → all success.
+  - Post-merge `main` checks: build, build-web, build-android-debug, android-release,
+    analyze-and-test, deploy-web, web-smoke, smoke-critical-path → all success.
+  - Live: `.../alfaeq_yemen_new/` → 200, `main.dart.js` → 200 (4 831 635 B).
+  - Known pre-existing failure, unrelated to this change: `Supabase Preview` fails on
+    `main` with "Remote migration versions not found in local migrations directory"
+    (same failure at the previous commit `96018146`). It is skipped on pull requests.
 
 ## Public platform page (منصة الفائق يمن) — 2026-11-07
 - Scope: add a public, Arabic RTL landing page that presents the whole platform (marketplace, delivery,

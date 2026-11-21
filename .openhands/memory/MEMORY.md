@@ -1147,3 +1147,50 @@ which is how orphaned (deleted-row) media leaks were confirmed.
   jsonb object also raises. Fixed by `20261121020000` (drop then recreate as jsonb).
 - Flutter SDK is at `/workspace/flutter_sdk/bin` (not on PATH by default).
 - `flutter test` baseline after this work: 223 passed / 1 skipped.
+
+## Production migrations APPLIED (2026-11-21) — storefront restored
+- The four pending migrations are live on `alfaeq_yemen_prod`. Verified with the
+  anon key: `stores`/`products` 401 -> 200 with real rows; `POST /wallets` with a
+  balance still 401 (RLS); `assign_order_driver` exists (401 for anon, not 404);
+  all sensitive tables return 200 with zero rows.
+- **Project facts**: region `ap-northeast-1` (Tokyo). `db.<ref>.supabase.co` is
+  IPv6-only and unreachable from GitHub Actions. Only
+  `aws-0-ap-northeast-1.pooler.supabase.com` answers for this tenant; every other
+  pooler region returns `FATAL: (ENOTFOUND) tenant not found`.
+- **`SUPABASE_DB_URL` still holds a wrong value** — the Tokyo pooler is reachable
+  and rejects it. Needs `Reset database password`, then update the secret with the
+  password alone (PR #230's workflow builds the URI itself).
+- **Applying via SQL Editor works and needs no password.**
+  `supabase/apply-all-pending.sql` wraps the four migrations in one
+  `begin;...commit;` and returns "Success. No rows returned". This is what
+  actually unblocked production.
+- **Root cause correction**: the live error was `permission denied for function
+  is_platform_staff`, NOT `... for schema private`. So `anon` already had USAGE on
+  schema `private`; only EXECUTE was missing. Granting both is still correct.
+- **Lesson**: environment-scoped GitHub secrets are invisible to a job that does
+  not name the environment. `environment: Production` is required.
+- **Security lesson**: never interpolate a secret into a `run:` block or echo any
+  prefix of it — an earlier guard printed 12 chars of the DB password into a
+  public run log. Read via `env:` and `::add-mask::` before any diagnostic.
+
+## Storefront request storm + payload (2026-10-03, PR #231 → main `25646163`)
+- **Root cause of "المنصة بطيئة" on this repo**: `FutureBuilder(future: _load())` created
+  *inside* `build()` re-fires the query on every rebuild. Hoist the future into `State`.
+  `lib/core/query_cache.dart` now dedupes in-flight reads and memoises with a TTL, and
+  deliberately does NOT cache failures (a cached error would keep callers broken).
+- **Payload**: `select('*')` on `products` = 265 314 B / 200 rows → explicit projection
+  103 479 B (−61 %). `metadata` alone is ~700 B/row; only `barcode` was ever read from it,
+  so it is excluded and barcode lookup moved server-side
+  (`filter('metadata->>barcode','eq',code)` in `CatalogService.searchBarcode`).
+- **Verified non-existent columns** (selecting them fails the whole request, 42703):
+  `products.category`, `products.unit`, `products.original_price`, `stores.image_url`,
+  `stores.description`, `stores.rating`.
+- **Caching gotcha**: any TTL cache must be invalidated on write. All four product write
+  paths (`product_edit_page` update, `bulk_product_import_page` upsert, `admin_data_entry`
+  insert, `merchant_center_page` insert) call `QueryCache.instance.invalidate('catalog.')`;
+  `test/catalog_cache_invalidation_test.dart` fails if a new write path forgets it.
+- **PostgREST** caps a response at 1000 rows — a single `.limit()` silently truncates a
+  3 892-row catalog. `activeProductsPaged` now requests the remaining offsets concurrently
+  once `count` is known.
+- **CI note**: `Supabase Preview` fails on `main` with "Remote migration versions not found
+  in local migrations directory" — pre-existing, skipped on PRs, unrelated to app code.
