@@ -222,7 +222,7 @@ class _ArticleTile extends StatelessWidget {
                 if ((article.coverUrl ?? '').isNotEmpty)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.network(article.coverUrl!, width: 84, height: 84, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                    child: Image.network(article.coverUrl!, cacheWidth: 252, width: 84, height: 84, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
                   )
                 else
                   Container(width: 84, height: 84, decoration: BoxDecoration(color: const Color(0xFFE7F0FF), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.article_outlined, color: _blue)),

@@ -28,6 +28,8 @@ class _ProductsPageState extends State<ProductsPage> {
   final _search = TextEditingController();
   String _query = '';
   String _sectionId = 'all';
+  List<CatalogDocument> _barcodeHits = const [];
+  int _barcodeRequest = 0;
   Map<String, ({double average, int count})> _ratings = const {};
   int _loaded = 0;
   int _total = 0;
@@ -41,6 +43,27 @@ class _ProductsPageState extends State<ProductsPage> {
     _loadProducts();
     _subscribeToStock();
     _loadRatings();
+  }
+
+  /// Barcodes live in `metadata`, which is not part of the catalog projection,
+  /// so a query that looks like a barcode is resolved server-side and merged
+  /// into the filtered list.
+  void _onQueryChanged(String value) {
+    final code = value.trim();
+    setState(() => _query = code);
+    if (code.length < 6) {
+      if (_barcodeHits.isNotEmpty) setState(() => _barcodeHits = const []);
+      return;
+    }
+    final request = ++_barcodeRequest;
+    CatalogService().searchBarcode(code).then((hits) {
+      if (!mounted || request != _barcodeRequest) return;
+      setState(() => _barcodeHits = hits);
+    }).catchError((Object _) {
+      if (mounted && request == _barcodeRequest) {
+        setState(() => _barcodeHits = const []);
+      }
+    });
   }
 
   void _loadProducts() {
@@ -122,7 +145,7 @@ class _ProductsPageState extends State<ProductsPage> {
             children: [
               TextField(
                 controller: _search,
-                onChanged: (v) => setState(() => _query = v.trim()),
+                onChanged: _onQueryChanged,
                 decoration: InputDecoration(
                   hintText: 'ابحث عن منتج...',
                   prefixIcon: const Icon(Icons.search),
@@ -171,12 +194,12 @@ class _ProductsPageState extends State<ProductsPage> {
                   }
                   if (_query.isNotEmpty) {
                     final q = _query.toLowerCase();
-                    products = products.where((p) {
-                      final name = (p.data['name'] ?? '').toString().toLowerCase();
-                      final meta = p.data['metadata'];
-                      final barcode = (meta is Map ? (meta['barcode'] ?? '') : '').toString().toLowerCase();
-                      return name.contains(q) || barcode.contains(q);
-                    }).toList();
+                    final seen = {for (final p in products) p.id};
+                    products = [
+                      ...products.where((p) =>
+                          (p.data['name'] ?? '').toString().toLowerCase().contains(q)),
+                      ..._barcodeHits.where((p) => !seen.contains(p.id)),
+                    ];
                   }
                   if (products.isEmpty) {
                     return const Text('لا توجد منتجات مطابقة.', style: TextStyle(color: Colors.black54));

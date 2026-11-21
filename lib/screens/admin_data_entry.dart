@@ -11,6 +11,7 @@ import '../services/supabase_service.dart';
 import 'bulk_product_import_page.dart';
 import 'location_picker_page.dart';
 import 'store_map_page.dart';
+import '../core/query_cache.dart';
 
 class AdminDataEntry extends StatefulWidget {
   const AdminDataEntry({super.key});
@@ -207,6 +208,7 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
         'status': 'active',
         'metadata': {'created_by': user.id, 'source': 'admin_data_entry'},
       });
+      QueryCache.instance.invalidate('catalog.');
       if (imageUrl.isNotEmpty) {
         await SupabaseService.client
             .from('media_assets')
@@ -461,7 +463,7 @@ class _AdminDataEntryState extends State<AdminDataEntry> {
                 child: ListTile(
                   leading: img.isEmpty
                       ? const CircleAvatar(child: Icon(Icons.inventory_2_outlined))
-                      : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(img, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(child: Icon(Icons.broken_image_outlined)))),
+                      : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(img, cacheWidth: 144, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(child: Icon(Icons.broken_image_outlined)))),
                   title: Text('${data['name'] ?? 'صنف'}', style: const TextStyle(fontWeight: FontWeight.w800)),
                   subtitle: Text('${data['description'] ?? ''}\nالمخزون: ${data['stock'] ?? 0} • ${section ?? 'بدون قسم'} • الحالة: ${data['status'] ?? 'active'}', maxLines: 3, overflow: TextOverflow.ellipsis),
                   isThreeLine: true,

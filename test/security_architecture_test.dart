@@ -93,8 +93,11 @@ void main() {
     test('section page search box filters products', () {
       final home = File('lib/screens/world_home_page.dart').readAsStringSync();
       expect(home, contains('class _WorldSectionPageState'));
-      expect(home, contains('onChanged: (v) => setState(() => _query = v)'));
-      expect(home, contains("metadata") , reason: 'section filter reads product metadata for barcode');
+      expect(home, contains('onChanged: _onQueryChanged'));
+      // The catalog projection drops `metadata`, so a barcode query is
+      // resolved server-side instead of filtering an in-memory blob.
+      expect(home, contains('searchBarcode('),
+          reason: 'section filter resolves barcodes server-side');
       expect(home, contains('_productsFuture'));
     });
 

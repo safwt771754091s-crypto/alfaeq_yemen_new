@@ -660,12 +660,21 @@ Future<List<(CatalogDocument, int)>> _promotionDeals() async {
   return deals;
 }
 
-class _OffersSection extends StatelessWidget {
+class _OffersSection extends StatefulWidget {
   final Future<void> Function(CatalogDocument) onAddToCart;
   const _OffersSection({required this.onAddToCart});
   @override
+  State<_OffersSection> createState() => _OffersSectionState();
+}
+
+class _OffersSectionState extends State<_OffersSection> {
+  // Held in state: a future created inside build() re-runs the query on every
+  // rebuild, and each query costs about half a second.
+  late final Future<List<(CatalogDocument, int)>> _deals = _promotionDeals();
+
+  @override
   Widget build(BuildContext context) => FutureBuilder<List<(CatalogDocument, int)>>(
-    future: _promotionDeals(),
+    future: _deals,
     builder: (context, snapshot) {
       final deals = (snapshot.data ?? const <(CatalogDocument, int)>[]).take(8).toList();
       return Column(children: [
@@ -679,7 +688,7 @@ class _OffersSection extends StatelessWidget {
         else if (deals.isEmpty) const _Info(title: 'العروض جاهزة للظهور', text: 'عند نشر عرض مرتبط بصنف سيظهر تلقائياً هنا.')
         else SizedBox(height: 238, child: ListView.separated(
           scrollDirection: Axis.horizontal, itemCount: deals.length, separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (context, i) { final (product, discount) = deals[i]; return _OfferCard(product: product, discount: discount, onAdd: () => onAddToCart(product)); },
+          itemBuilder: (context, i) { final (product, discount) = deals[i]; return _OfferCard(product: product, discount: discount, onAdd: () => widget.onAddToCart(product)); },
         )),
       ]);
     },
@@ -705,13 +714,20 @@ class _OfferCard extends StatelessWidget {
   }
 }
 
-class _OffersPage extends StatelessWidget {
+class _OffersPage extends StatefulWidget {
   const _OffersPage();
+  @override
+  State<_OffersPage> createState() => _OffersPageState();
+}
+
+class _OffersPageState extends State<_OffersPage> {
+  late final Future<List<(CatalogDocument, int)>> _deals = _promotionDeals();
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('العروض المميزة', style: TextStyle(fontWeight: FontWeight.w900))),
     body: FutureBuilder<List<(CatalogDocument, int)>>(
-      future: _promotionDeals(),
+      future: _deals,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         if (snapshot.hasError) return const Center(child: _Info(title: 'تعذر تحميل العروض', text: 'تحقق من الاتصال والصلاحيات.'));
@@ -836,11 +852,19 @@ class _FeaturedProductCard extends StatelessWidget {
   }
 }
 
-class _PublicUpdatesSection extends StatelessWidget {
+class _PublicUpdatesSection extends StatefulWidget {
   const _PublicUpdatesSection();
   @override
+  State<_PublicUpdatesSection> createState() => _PublicUpdatesSectionState();
+}
+
+class _PublicUpdatesSectionState extends State<_PublicUpdatesSection> {
+  late final Future<List<SiteUpdateDocument>> _updates =
+      const PublicContentService().publishedUpdates(limit: 6);
+
+  @override
   Widget build(BuildContext context) => FutureBuilder<List<SiteUpdateDocument>>(
-    future: const PublicContentService().publishedUpdates(limit: 6),
+    future: _updates,
     builder: (context, snapshot) {
       final updates = snapshot.data ?? const <SiteUpdateDocument>[];
       if (snapshot.connectionState == ConnectionState.waiting && updates.isEmpty) {
@@ -905,14 +929,22 @@ class _BenefitsBar extends StatelessWidget {
   }
 }
 
-class _StoresTab extends StatelessWidget {
+class _StoresTab extends StatefulWidget {
   final bool showTitle;
   const _StoresTab({this.showTitle = true});
+  @override
+  State<_StoresTab> createState() => _StoresTabState();
+}
+
+class _StoresTabState extends State<_StoresTab> {
+  late final Future<List<CatalogDocument>> _stores =
+      const CatalogService().allApprovedStores(limit: 200);
+
   @override
   Widget build(BuildContext context) => ListView(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
         children: [
-          if (showTitle) ...[
+          if (widget.showTitle) ...[
             const Text('المتاجر', style: TextStyle(color: _navy, fontSize: 28, fontWeight: FontWeight.w900)),
             const SizedBox(height: 6),
             const Text('متاجر الفائق المعتمدة ومنتجاتها الحقيقية.', style: TextStyle(color: Colors.black54)),
@@ -921,7 +953,7 @@ class _StoresTab extends StatelessWidget {
           const Text('كل المتاجر المعتمدة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
           const SizedBox(height: 9),
           FutureBuilder<List<CatalogDocument>>(
-            future: CatalogService().allApprovedStores(limit: 200),
+            future: _stores,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
               if (snapshot.hasError) return const _Info(title: 'تعذر تحميل المتاجر', text: 'تحقق من اتصال قاعدة البيانات.');
@@ -989,6 +1021,8 @@ class _WorldSectionPageState extends State<WorldSectionPage> {
   String _query = '';
   int _loaded = 0;
   int _total = 0;
+  List<CatalogDocument> _barcodeHits = const [];
+  int _barcodeRequest = 0;
   late final Future<CatalogPage> _productsFuture;
   late final Future<List<CatalogDocument>> _storesFuture;
 
@@ -1012,14 +1046,34 @@ class _WorldSectionPageState extends State<WorldSectionPage> {
     super.dispose();
   }
 
+  void _onQueryChanged(String value) {
+    setState(() => _query = value);
+    final code = value.trim();
+    if (code.length < 6) {
+      if (_barcodeHits.isNotEmpty) setState(() => _barcodeHits = const []);
+      return;
+    }
+    final request = ++_barcodeRequest;
+    CatalogService().searchBarcode(code).then((hits) {
+      if (!mounted || request != _barcodeRequest) return;
+      setState(() => _barcodeHits = hits);
+    }).catchError((Object _) {
+      // A failed lookup only means name search applies; never surface it.
+      if (mounted && request == _barcodeRequest) setState(() => _barcodeHits = const []);
+    });
+  }
+
   List<CatalogDocument> _filter(List<CatalogDocument> products) {
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return products;
-    return products.where((p) {
-      final name = (p.data['name'] ?? '').toString().toLowerCase();
-      final barcode = (p.data['metadata'] is Map ? (p.data['metadata'] as Map)['barcode'] : null)?.toString().toLowerCase() ?? '';
-      return name.contains(q) || barcode.contains(q);
-    }).toList();
+    // Barcodes are not part of the catalog projection, so the scan results are
+    // merged in from a server-side lookup instead of filtering on metadata.
+    final seen = {for (final p in products) p.id};
+    final extra = _barcodeHits.where((p) => !seen.contains(p.id));
+    return [
+      ...products.where((p) => (p.data['name'] ?? '').toString().toLowerCase().contains(q)),
+      ...extra,
+    ];
   }
 
   @override
@@ -1055,7 +1109,7 @@ class _WorldSectionPageState extends State<WorldSectionPage> {
               const SizedBox(height: 14),
               TextField(
                 controller: _searchController,
-                onChanged: (v) => setState(() => _query = v),
+                onChanged: _onQueryChanged,
                 decoration: InputDecoration(hintText: 'ابحث في ${section.title}...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none)),
               ),
               const SizedBox(height: 18),
@@ -1123,7 +1177,7 @@ class _SectionProductTile extends StatelessWidget {
     final stock = p['stock_base'] ?? p['stock'];
     final leading = imageUrl.isEmpty
         ? const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.inventory_2_outlined, color: _blue))
-        : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(imageUrl, width: 52, height: 52, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(child: Icon(Icons.broken_image_outlined))));
+        : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(imageUrl, cacheWidth: 156, width: 52, height: 52, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(child: Icon(Icons.broken_image_outlined))));
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 8),
@@ -1142,12 +1196,21 @@ class _SectionProductTile extends StatelessWidget {
   }
 }
 
-class _StoreCard extends StatelessWidget {
+class _StoreCard extends StatefulWidget {
   final CatalogDocument store;
   const _StoreCard({required this.store});
 
   @override
+  State<_StoreCard> createState() => _StoreCardState();
+}
+
+class _StoreCardState extends State<_StoreCard> {
+  late final Future<List<CatalogDocument>> _preview =
+      const CatalogService().activeProducts(storeId: widget.store.id, limit: 24);
+
+  @override
   Widget build(BuildContext context) {
+    final store = widget.store;
     final data = store.data;
     return Card(
       elevation: 0,
@@ -1176,7 +1239,7 @@ class _StoreCard extends StatelessWidget {
           FutureBuilder<List<CatalogDocument>>(
             // Only the first few products are previewed here; the full catalog
             // lives on the store page (which pages past the 1000-row cap).
-            future: CatalogService().activeProducts(storeId: store.id, limit: 24),
+            future: _preview,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) return const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator());
               if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(16), child: Text('تعذر تحميل الأصناف.'));
@@ -1190,7 +1253,7 @@ class _StoreCard extends StatelessWidget {
                 final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? p['image'] ?? '').toString();
                             final leading = imageUrl.isEmpty
                     ? const CircleAvatar(backgroundColor: Color(0xFFF1F6FF), child: Icon(Icons.inventory_2_outlined, color: _blue))
-                    : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(imageUrl, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(child: Icon(Icons.broken_image_outlined))));
+                    : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(imageUrl, cacheWidth: 144, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const CircleAvatar(child: Icon(Icons.broken_image_outlined))));
                 final priceText = CurrencyService.instance.formatProduct(p);
                 final stock = p['stock_base'] ?? p['stock'];
                 return ListTile(
