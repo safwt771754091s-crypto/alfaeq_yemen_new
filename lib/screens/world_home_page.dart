@@ -5,7 +5,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_sections.dart';
 import '../core/money.dart';
-import '../core/product_units.dart';
 import '../services/catalog_service.dart';
 import '../services/currency_service.dart';
 import '../services/order_service.dart';
@@ -770,12 +769,13 @@ class _FeaturedProductsSectionState extends State<_FeaturedProductsSection> {
   late final Future<List<CatalogDocument>> _future = _load();
 
   Future<List<CatalogDocument>> _load() async {
-    final products = await const CatalogService().activeProducts(limit: 200);
-    final inStock = products.where((p) {
-      final stock = ProductUnit.stockBase(p.data);
-      return stock > 0;
-    }).toList();
-    return (inStock.isEmpty ? products : inStock).take(12).toList();
+    // The grid shows 12 cards. Fetching 200 rows to pick 12 cost 103 KB and a
+    // longer query on every home page visit.
+    final products = await const CatalogService().activeProducts(
+      limit: 12,
+      inStockOnly: true,
+    );
+    return products.take(12).toList();
   }
 
   @override
