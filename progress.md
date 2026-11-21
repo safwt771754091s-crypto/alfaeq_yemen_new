@@ -48,6 +48,39 @@ No task is marked complete from intention or code inspection alone. Record the c
     `main` with "Remote migration versions not found in local migrations directory"
     (same failure at the previous commit `96018146`). It is skipped on pull requests.
 
+### Follow-up: home page over-fetch — 2026-10-03
+- The featured grid renders **12** cards but requested **200** rows and discarded 188 in Dart.
+- Fix: `activeProducts(inStockOnly: true)` pushes the filter into Postgres as
+  `stock_base=gt.0` (a real column, verified), and the call now asks for `limit: 12`.
+- Measured live against the production project, same projection:
+
+  | request | bytes | time |
+  |---|---|---|
+  | 200 rows (before) | 103 479 | 0.41 s |
+  | 12 rows (after) | 12 408 | 0.24 s |
+
+  **88 % smaller** on the heaviest storefront read.
+- Safety check on the filter: all 3 892 active rows have `stock_base > 0` and none is null,
+  so the server-side filter returns the same set the Dart filter did. The previous code had a
+  fallback to the unfiltered list when everything was out of stock; with 3 892 in stock that
+  branch was already dead, and it is now gone rather than left to mislead.
+- Guards added: `catalog_projection_test.dart` pins the limit and the server-side filter, and
+  `security_architecture_test.dart` no longer asserts the old `limit: 200`. Proven by reverting
+  the fix — the new test fails, so it is a real guard and not a tautology.
+- Verified: `flutter analyze` clean, **235 tests passed** / 1 skipped,
+  `flutter build web --release` built, and a live query returns 12 active in-stock rows.
+
+### Investigated and rejected: image thumbnails
+- Supabase on-the-fly resizing (`/storage/v1/render/image`) returns
+  `403 FeatureNotEnabled — feature not enabled for this tenant`. Image transformation is a paid
+  add-on and is off, so thumbnails cannot be produced server-side.
+- Pre-generating thumbnails was rejected for now: it needs a schema change plus a backfill
+  across 2 341 active images, and the current upload paths do not set a durable
+  `cache-control`, so the gain would be partly undone by re-downloads.
+- Also measured: 1 551 of 3 892 active products (40 %) have an **empty string** `image_url`
+  (not NULL). The storefront already renders a placeholder for that case, so it is not a bug,
+  but it is worth a data-quality pass in the merchant flow.
+
 ## Public platform page (منصة الفائق يمن) — 2026-11-07
 - Scope: add a public, Arabic RTL landing page that presents the whole platform (marketplace, delivery,
   wallet, QR pay, moments/video, Arabic AI, mini-programs, merchant/driver onboarding) and links to the

@@ -61,11 +61,19 @@ class CatalogService {
     );
   }
 
-  Future<List<CatalogDocument>> activeProducts({String? storeId, String? sectionId, int limit = 100}) async {
+  /// [inStockOnly] pushes the stock filter into Postgres instead of downloading
+  /// rows to discard them. The home page needs 12 cards; fetching 200 rows to
+  /// find them cost 103 KB per visit.
+  Future<List<CatalogDocument>> activeProducts({
+    String? storeId,
+    String? sectionId,
+    int limit = 100,
+    bool inStockOnly = false,
+  }) async {
     if (!useSupabase || !SupabaseService.isInitialized) {
       throw StateError('خدمة الكتالوج الجديدة غير مفعلة.');
     }
-    final key = 'catalog.products.$storeId.$sectionId.$limit';
+    final key = 'catalog.products.$storeId.$sectionId.$limit.$inStockOnly';
     return QueryCache.instance.remember(
       key,
       () async {
@@ -75,6 +83,7 @@ class CatalogService {
             .eq('status', 'active');
         if (storeId != null && storeId.isNotEmpty) query = query.eq('store_id', storeId);
         if (sectionId != null && sectionId.isNotEmpty) query = query.eq('section_id', sectionId);
+        if (inStockOnly) query = query.gt('stock_base', 0);
         final rows = await query.order('name').limit(limit);
         return rows.map((row) => CatalogDocument.fromSupabase(Map<String, dynamic>.from(row))).toList();
       },
