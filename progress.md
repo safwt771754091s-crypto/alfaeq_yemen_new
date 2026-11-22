@@ -112,6 +112,9 @@ the price is one round trip per image, not a re-download. Real but smaller than 
 - every `uploadBinary` must pass `cacheControl`
 
 Verified: `flutter analyze` clean, **237 tests passed** / 1 skipped, `flutter build web --release`.
+Merged as PR #234 -> `3600235a`. All CI green on `main` except the pre-existing `Supabase Preview`
+failure; live deploy run succeeded at that SHA and the served `main.dart.js` changed size
+(4 831 863 -> 4 831 898 B), confirming the new build is live.
 
 ### Investigated and rejected: image thumbnails
 - Supabase on-the-fly resizing (`/storage/v1/render/image`) returns
