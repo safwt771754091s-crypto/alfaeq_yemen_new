@@ -1194,3 +1194,59 @@ which is how orphaned (deleted-row) media leaks were confirmed.
   once `count` is known.
 - **CI note**: `Supabase Preview` fails on `main` with "Remote migration versions not found
   in local migrations directory" — pre-existing, skipped on PRs, unrelated to app code.
+
+## Home page over-fetch (2026-10-03, PR #233 → main `36df530f`)
+- **Pattern to look for everywhere**: a widget renders N cards but its loader fetches many more
+  and filters in Dart. `_FeaturedProductsSection` fetched 200 rows to show 12 — 103 KB per
+  visit. Fixed with `activeProducts(limit: 12, inStockOnly: true)`; now **12 KB (−88 %)**.
+- `activeProducts` gained `inStockOnly`, which pushes `stock_base=gt.0` into PostgREST.
+  Default `false`, and the flag is part of the QueryCache key so a cached unfiltered list can
+  never answer an in-stock request.
+- **Verified before moving a filter to the server**: all 3 892 active rows have
+  `stock_base > 0` and none is null, so the SQL filter is equivalent to the Dart one. Always
+  check this — a filter that silently changes the result set is worse than a slow one.
+- **Supabase image transformation is OFF on this tenant**: `/storage/v1/render/image/...`
+  returns `403 FeatureNotEnabled`. Thumbnails must be pre-generated, not derived at request time.
+- **Public storage objects return `cache-control: private, no-cache`** unless the upload sets
+  `FileOptions(cacheControl: ...)`. Most product images were uploaded without it, so browsers
+  revalidate every view. `visual_search_service` is the one place that gets it right — copy
+  that when adding any new upload path.
+- **Data quality**: 1 551 of 3 892 active products (40 %) have `image_url = ''` (empty string,
+  not NULL). The UI already falls back to a placeholder, so it is not a bug — but it is worth a
+  merchant-flow pass.
+- Test-guard habit that paid off: after adding a source-grep test, revert the fix and confirm the
+  test fails. Otherwise the assertion is a tautology.
+
+## Image delivery (2026-10-03, PR #234 → main `3600235a`, evidence #235)
+- **The decode-size cost dwarfs the bandwidth cost.** A 1080x1080 product image is ~80 KB on the
+  wire but **4.45 MB as decoded RGBA**. Product grids render at ~150 px, so `Image.network`
+  without `cacheWidth` allocates the full buffer per card. Only 4 of 21 sites had it.
+  All 21 now do: 8 sampled cards **19.7 MB → 6.5 MB** decoded (−67 %); 12-card home grid of
+  1080 px images **53 MB → 10.5 MB**. Sizes matched to layout (grids 480, thumbs 144–162,
+  hero 720–1200) so nothing upscales and looks soft.
+- **`cache-control: private, no-cache` is NOT a re-download.** Conditional GETs return
+  **304 with 0 bytes in 67–117 ms**, so the cost is one round trip per image. Say this plainly;
+  do not oversell header fixes as bandwidth wins.
+- `official_accounts_service.uploadImage` was the one uploader of nine setting no `cacheControl`;
+  fixed to `31536000`. **Existing objects keep their stored metadata** — fixing them needs a
+  re-upload, and anon credentials cannot write (`403 AccessDenied`, "new row violates row-level
+  security policy"). Needs a service-role script run by the owner, or accept cache gains only
+  for new images.
+- Guards live in `test/image_decode_size_test.dart`: every `Image.network` must pass
+  `cacheWidth`, every `uploadBinary` must pass `cacheControl`. Both verified to fail on revert.
+- **PRODUCTION WRITE CREDENTIALS ARE DEAD (verified 2026-11-22).**
+  `SUPABASE_SERVICE_ROLE_KEY` in GitHub secrets is a 20-char placeholder (`esvljorjy...`):
+  REST returns `401 Invalid API key`, storage returns `403 Invalid Compact JWS`. A real key is
+  `eyJ...` (JWT, 200+ chars) or `sb_secret_...`. `SUPABASE_DB_URL` is also dead — "password
+  authentication failed". The Oct 2026 `product-images-apply` run did write successfully, so the
+  secret was later replaced. **The agent cannot write to production storage/DB.** The ambient
+  `SUPABASE_ACCESS_TOKEN` is likewise a 20-char placeholder. Diagnose with
+  `diagnose-supabase-key.yml` (read-only; prints length/prefix/JWT claims, never the key).
+- Storage header reality: **all 985** product-image objects are `private, no-cache` (262 MB);
+  1356 of 2341 product images are external hosts whose headers are not ours. Backfill needs
+  re-upload with `x-upsert` + `max-age` (`tools/fix_storage_cache_control.py`, workflow
+  `fix-storage-cache.yml`, dry-run default). URLs unchanged.
+- **Live-bundle verification gotcha**: grepping the deployed `main.dart.js` for `cacheWidth:480`
+  finds nothing — the minifier rewrites the named arg, and the only `cacheWidth` hits are Dart
+  SDK type signatures. Prove a deploy with the Actions run at the merge SHA plus a changed
+  bundle size, not with a symbol grep.
