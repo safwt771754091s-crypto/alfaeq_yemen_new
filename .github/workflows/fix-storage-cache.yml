@@ -1,0 +1,58 @@
+name: Fix Storage Cache Control
+
+# Objects uploaded before the client set cacheControl are served with
+# `Cache-Control: private, no-cache`, so every product image costs a conditional
+# request on every view. Supabase has no metadata-only update, so the fix
+# re-uploads identical bytes to the same path with a cache-control header. URLs
+# do not change. The service-role key is read from repository secrets and is
+# never printed.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max objects to rewrite (0 = all). Use a small number to test first."
+        required: false
+        default: "2"
+      dry_run:
+        description: "true = report only, no writes"
+        required: false
+        default: "true"
+      bucket:
+        description: "Only this bucket (blank = every bucket referenced by products)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fix-storage-cache
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Guard - service-role key must be present
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SERVICE_KEY" ]; then
+            echo "::error::Add repository secret SUPABASE_SERVICE_ROLE_KEY (Supabase -> Project Settings -> API)."
+            exit 1
+          fi
+
+      - name: Rewrite cache headers
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python3 tools/fix_storage_cache_control.py \
+            --limit "${{ inputs.limit }}" \
+            --bucket "${{ inputs.bucket }}" \
+            ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
