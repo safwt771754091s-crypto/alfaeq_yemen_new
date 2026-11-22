@@ -702,7 +702,7 @@ class _OfferCard extends StatelessWidget {
     final data = product.data; final original = data['originalPrice'] ?? data['original_price'];
     final imageUrl = (data['imageUrl'] ?? data['image_url'] ?? data['image'] ?? '').toString();
     return Container(width: 178, padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE3E8EF))), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      ClipRRect(borderRadius: BorderRadius.circular(11), child: imageUrl.isEmpty ? Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.image_outlined, size: 42, color: Colors.black26)) : Image.network(imageUrl, height: 108, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.broken_image_outlined)))),
+      ClipRRect(borderRadius: BorderRadius.circular(11), child: imageUrl.isEmpty ? Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.image_outlined, size: 42, color: Colors.black26)) : Image.network(imageUrl, cacheWidth: 534, height: 108, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 108, color: const Color(0xFFF0F3F7), child: const Icon(Icons.broken_image_outlined)))),
       const SizedBox(height: 7), Text(data['name']?.toString() ?? 'صنف', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _navy, fontWeight: FontWeight.w800)),
       const SizedBox(height: 3), Row(children: [
         Expanded(child: Text(CurrencyService.instance.formatProduct(data), style: const TextStyle(color: _navy, fontWeight: FontWeight.w900))),
@@ -829,7 +829,7 @@ class _FeaturedProductCard extends StatelessWidget {
               borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
               child: imageUrl.isEmpty
                   ? Container(color: const Color(0xFFF0F3F7), child: const Icon(Icons.image_outlined, size: 40, color: Colors.black26))
-                  : Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF0F3F7), child: const Icon(Icons.broken_image_outlined))),
+                  : Image.network(imageUrl, cacheWidth: 480, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF0F3F7), child: const Icon(Icons.broken_image_outlined))),
             ),
           ),
           Padding(

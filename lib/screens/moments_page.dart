@@ -271,7 +271,7 @@ class _MediaGrid extends StatelessWidget {
     if (urls.length == 1) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: Image.network(urls.first, fit: BoxFit.cover, width: double.infinity, height: 220, errorBuilder: _broken),
+        child: Image.network(urls.first, cacheWidth: 1200, fit: BoxFit.cover, width: double.infinity, height: 220, errorBuilder: _broken),
       );
     }
     return GridView.builder(
@@ -281,7 +281,7 @@ class _MediaGrid extends StatelessWidget {
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 6, mainAxisSpacing: 6),
       itemBuilder: (context, i) => ClipRRect(
         borderRadius: BorderRadius.circular(10),
-        child: Image.network(urls[i], fit: BoxFit.cover, errorBuilder: _broken),
+        child: Image.network(urls[i], cacheWidth: 480, fit: BoxFit.cover, errorBuilder: _broken),
       ),
     );
   }

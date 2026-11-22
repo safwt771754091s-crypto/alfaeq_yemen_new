@@ -70,6 +70,49 @@ No task is marked complete from intention or code inspection alone. Record the c
 - Verified: `flutter analyze` clean, **235 tests passed** / 1 skipped,
   `flutter build web --release` built, and a live query returns 12 active in-stock rows.
 
+### Image delivery: decode size and storage cache headers — 2026-10-03
+- Supabase image transformation is off on this tenant (`403 FeatureNotEnabled`), so thumbnails
+  cannot be derived per request. Two levers were available instead.
+
+**1. Decode at display size (the larger win).** Measured real dimensions from the live bucket:
+
+| image | bytes | decoded RGBA |
+|---|---|---|
+| 1080x1080 webp | 80 240 | **4.45 MB** |
+| 1080x1080 webp | 80 700 | 4.45 MB |
+| 1000x950 jpeg | 69 227 | 3.71 MB |
+| 962x961 jpeg | 84 936 | 3.61 MB |
+
+A grid cell renders at roughly 150 px, so a 4.45 MB buffer was being allocated per card.
+Only 4 of 21 `Image.network` sites passed `cacheWidth`; the other 17 decoded at full size.
+Added `cacheWidth` to all 17, sized to the rendered box (grids 480, list thumbs 144-162,
+hero/detail 720-1200):
+
+- 8 sampled product cards: **19.7 MB -> 6.5 MB** decoded (**-67 %**)
+- worst single image: **4.45 MB -> 0.88 MB**
+- 12-card home grid of 1080 px images: **53 MB -> 10.5 MB**
+
+**2. Storage cache headers.** Sampled 60 live product images:
+
+| cache-control | count |
+|---|---|
+| none | 21 |
+| `private, no-cache` | 18 |
+| cacheable (`max-age`, public) | 8 |
+
+Measured the cost of `no-cache`: conditional GETs return **304 with 0 bytes** in 67-117 ms, so
+the price is one round trip per image, not a re-download. Real but smaller than the decode win.
+- `official_accounts_service.uploadImage` was the one uploader of nine setting **no**
+  `cacheControl`; it now sets `31536000`. New covers will be served cacheable.
+- Objects already uploaded keep their stored metadata; changing them needs a re-upload, which
+  is not possible from the client with anon credentials (RLS denies writes). Not attempted.
+
+**Guards** (`test/image_decode_size_test.dart`, both proven to fail on regression):
+- every `Image.network` must pass `cacheWidth`
+- every `uploadBinary` must pass `cacheControl`
+
+Verified: `flutter analyze` clean, **237 tests passed** / 1 skipped, `flutter build web --release`.
+
 ### Investigated and rejected: image thumbnails
 - Supabase on-the-fly resizing (`/storage/v1/render/image`) returns
   `403 FeatureNotEnabled — feature not enabled for this tenant`. Image transformation is a paid

@@ -378,7 +378,7 @@ class _BulkProductImportPageState extends State<BulkProductImportPage> {
               const Text('معاينة قبل الحفظ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 8),
               ..._preview.take(50).map((row) => Card(child: ListTile(
-                leading: row.imageUrl.isEmpty ? const Icon(Icons.inventory_2_outlined) : Image.network(row.imageUrl, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined)),
+                leading: row.imageUrl.isEmpty ? const Icon(Icons.inventory_2_outlined) : Image.network(row.imageUrl, cacheWidth: 144, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined)),
                 title: Text('${row.name} • ${row.barcode.isNotEmpty ? row.barcode : row.reference}', style: const TextStyle(fontWeight: FontWeight.w800)),
                 subtitle: Text('الكمية: ${row.stock} • السعر: ${row.price} ${CurrencyService.symbolFor(_priceCurrency)} • الوحدة: ${row.unitLabel.isEmpty ? 'حبة' : row.unitLabel}\nالمتجر: ${row.storeId}'),
                 isThreeLine: true,

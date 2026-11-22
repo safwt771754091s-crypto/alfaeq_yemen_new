@@ -157,7 +157,7 @@ class _RoomCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   if (cover.isNotEmpty)
-                    Image.network(cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder())
+                    Image.network(cover, cacheWidth: 720, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder())
                   else
                     _placeholder(),
                   Positioned(

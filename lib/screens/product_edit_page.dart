@@ -243,7 +243,7 @@ class _ProductEditPageState extends State<ProductEditPage> {
             borderRadius: BorderRadius.circular(12),
             child: _imageUrl.isEmpty
                 ? Container(height: 170, color: const Color(0xFFF0F3F7), child: const Center(child: Icon(Icons.image_outlined, size: 56, color: Colors.black26)))
-                : Image.network(_imageUrl, height: 170, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 170, color: const Color(0xFFF0F3F7), child: const Center(child: Icon(Icons.broken_image_outlined, size: 56))),),
+                : Image.network(_imageUrl, cacheWidth: 1200, height: 170, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 170, color: const Color(0xFFF0F3F7), child: const Center(child: Icon(Icons.broken_image_outlined, size: 56))),),
           ),
           const SizedBox(height: 10),
           Row(children: [

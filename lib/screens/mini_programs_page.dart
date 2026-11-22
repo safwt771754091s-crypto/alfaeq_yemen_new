@@ -597,7 +597,7 @@ class _ProgramProductCard extends StatelessWidget {
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               child: imageUrl.isEmpty
                   ? Container(color: const Color(0xFFF1F6FF), child: const Icon(Icons.inventory_2_outlined, color: _blue, size: 34))
-                  : Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF1F6FF), child: const Icon(Icons.broken_image_outlined))),
+                  : Image.network(imageUrl, cacheWidth: 156, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF1F6FF), child: const Icon(Icons.broken_image_outlined))),
             ),
           ),
           Padding(

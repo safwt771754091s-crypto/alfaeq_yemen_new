@@ -362,7 +362,7 @@ class _ReelViewState extends State<_ReelView> {
       );
     }
     if (poster.isNotEmpty) {
-      return Image.network(poster, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink());
+      return Image.network(poster, cacheWidth: 720, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink());
     }
     return const SizedBox.shrink();
   }

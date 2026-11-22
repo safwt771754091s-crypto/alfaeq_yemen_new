@@ -237,7 +237,11 @@ class OfficialAccountsService {
     await _db.storage.from(bucket).uploadBinary(
           path,
           bytes,
-          fileOptions: FileOptions(contentType: 'image/$extension', upsert: true),
+          fileOptions: FileOptions(
+            contentType: 'image/$extension',
+            cacheControl: '31536000',
+            upsert: true,
+          ),
         );
     return _db.storage.from(bucket).getPublicUrl(path);
   }

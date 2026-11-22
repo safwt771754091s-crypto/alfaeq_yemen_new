@@ -236,7 +236,7 @@ class _OfficialAccountDetailPageState extends State<OfficialAccountDetailPage> {
                               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ArticleReaderPage(article: article))),
                               leading: (article.coverUrl ?? '').isEmpty
                                   ? const CircleAvatar(backgroundColor: Color(0xFFE7F0FF), child: Icon(Icons.article_outlined, color: _blue))
-                                  : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(article.coverUrl!, width: 48, height: 48, fit: BoxFit.cover)),
+                                  : ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(article.coverUrl!, cacheWidth: 144, width: 48, height: 48, fit: BoxFit.cover)),
                               title: Text(article.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
                               subtitle: Text(article.excerpt, maxLines: 1, overflow: TextOverflow.ellipsis),
                             ),

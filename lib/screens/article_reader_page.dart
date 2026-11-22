@@ -63,7 +63,7 @@ class _ArticleReaderPageState extends State<ArticleReaderPage> {
               const SizedBox(height: 16),
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.network(article.coverUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                child: Image.network(article.coverUrl!, cacheWidth: 1200, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
               ),
             ],
             const SizedBox(height: 18),
