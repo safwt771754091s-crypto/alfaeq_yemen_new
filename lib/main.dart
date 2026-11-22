@@ -546,6 +546,7 @@ class _StoreCatalogCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(10),
                             child: Image.network(
                               imageUrl,
+                              cacheWidth: 162,
                               width: 54,
                               height: 54,
                               fit: BoxFit.cover,

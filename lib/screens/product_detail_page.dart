@@ -158,7 +158,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               aspectRatio: 1.1,
               child: _imageUrl.isEmpty
                   ? Container(color: const Color(0xFFF1F6FF), child: const Icon(Icons.inventory_2_outlined, color: _blue, size: 72))
-                  : Image.network(_imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF1F6FF), child: const Icon(Icons.broken_image_outlined, color: _blue, size: 72))),
+                  : Image.network(_imageUrl, cacheWidth: 1200, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF1F6FF), child: const Icon(Icons.broken_image_outlined, color: _blue, size: 72))),
             ),
             Padding(
               padding: const EdgeInsets.all(16),

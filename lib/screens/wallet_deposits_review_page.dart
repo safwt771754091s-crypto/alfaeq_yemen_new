@@ -113,7 +113,7 @@ class _WalletDepositsReviewPageState extends State<WalletDepositsReviewPage> {
     showDialog<void>(
       context: context,
       builder: (_) => Dialog(
-        child: InteractiveViewer(child: Image.network(url, fit: BoxFit.contain)),
+        child: InteractiveViewer(child: Image.network(url, cacheWidth: 1200, fit: BoxFit.contain)),
       ),
     );
   }
