@@ -562,3 +562,40 @@ message printed 12 characters of the password into the run log.
 - `flutter analyze` -> No issues found
 - `flutter test` -> 223 passed, 1 skipped
 - CI on PR #229 -> 10/10 green, merged `fa88311c`
+
+## Storage cache backfill — blocked on invalid production credentials (2026-11-22)
+
+Audited every storage object referenced by a product row, not a sample:
+
+```
+products with a non-empty image_url : 2341
+  served from our Supabase storage   :  985
+  served from external hosts         : 1356   (headers not ours to change)
+cache-control on all 985 objects     : private, no-cache   (100%, 262 MB total)
+```
+
+So the header problem is total, not partial. Shipped `tools/fix_storage_cache_control.py`
+plus `.github/workflows/fix-storage-cache.yml` (dry-run default, `limit` default 2) to
+re-upload identical bytes with `x-upsert: true` and `max-age=31536000`. URLs are unchanged.
+Merged as PR #236 -> `2e8b39fa`.
+
+**The workflow cannot write: the service-role secret is a placeholder.** Diagnostic run
+(PR #237, workflow `diagnose-supabase-key.yml`) reports:
+
+```
+present: True | length: 20
+prefix: esvljorjy...
+REST status: 401  {"message":"Invalid API key"}
+storage admin: 400 {"statusCode":"403","message":"Invalid Compact JWS"}
+```
+
+A real key is a JWT (`eyJ...`, 200+ chars) or `sb_secret_...`. `SUPABASE_DB_URL` is also
+dead — `apply-migrations.yml` fails with "password authentication failed".
+
+The Oct 2026 `product-images-apply` runs DID write (`DONE applied=109 ... failed=0`), so the
+secret was valid then and has since been replaced with a placeholder. The GitHub token has no
+admin scope, so secret timestamps cannot be listed (403).
+
+Nothing in the backfill has run against production. When the secret is replaced with a real
+service-role key, run the workflow with `limit=2` first, confirm those two URLs return
+`max-age=31536000`, then `limit=0` for the remaining 983.
