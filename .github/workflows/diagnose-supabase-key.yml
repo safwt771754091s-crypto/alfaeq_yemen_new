@@ -1,0 +1,79 @@
+name: Diagnose Supabase Key
+
+# Read-only diagnostic. Prints only non-secret facts about the configured key:
+# its shape, and (for a JWT) the public claims - project ref, role, expiry.
+# The key itself is never printed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Inspect key shape and claims
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, urllib.request, urllib.error, datetime
+          key = os.environ.get("SERVICE_KEY", "")
+          print("present:", bool(key), "| length:", len(key))
+          print("prefix:", key[:9] + "..." if key else "(empty)")
+          if key.startswith("eyJ"):
+              payload = key.split(".")[1]
+              payload += "=" * (-len(payload) % 4)
+              claims = json.loads(base64.urlsafe_b64decode(payload))
+              print("type: JWT")
+              print("  role:", claims.get("role"))
+              print("  ref :", claims.get("ref"))
+              exp = claims.get("exp")
+              if exp:
+                  when = datetime.datetime.utcfromtimestamp(exp)
+                  print("  exp :", when.isoformat(), "| expired:", when < datetime.datetime.utcnow())
+          elif key.startswith("sb_secret_"):
+              print("type: new-style secret key")
+          else:
+              print("type: unknown")
+          PY
+
+      - name: Probe REST with the key
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, urllib.request, urllib.error
+          src = open("lib/services/supabase_service.dart", encoding="utf-8").read()
+          url = re.search(r"projectUrl[\s\S]*?defaultValue:\s*'(https://[^']+)'", src).group(1)
+          key = os.environ["SERVICE_KEY"]
+          print("project:", url)
+          req = urllib.request.Request(
+              url + "/rest/v1/products?select=id&limit=1",
+              headers={"apikey": key, "Authorization": f"Bearer {key}"},
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=45) as r:
+                  print("REST status:", r.status, "| body:", r.read()[:120])
+          except urllib.error.HTTPError as e:
+              print("REST status:", e.code, "| body:", e.read()[:200])
+          # Storage admin endpoint, the one the backfill needs.
+          req = urllib.request.Request(
+              url + "/storage/v1/bucket",
+              headers={"apikey": key, "Authorization": f"Bearer {key}"},
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=45) as r:
+                  buckets = json.load(r)
+                  print("storage buckets visible:", len(buckets))
+                  for b in buckets:
+                      print("  ", b.get("name"), "| public:", b.get("public"))
+          except urllib.error.HTTPError as e:
+              print("storage admin status:", e.code, "| body:", e.read()[:200])
+          PY
