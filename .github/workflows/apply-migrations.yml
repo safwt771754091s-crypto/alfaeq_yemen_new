@@ -20,6 +20,10 @@ on:
         description: 'Only check connectivity, do not apply'
         type: boolean
         default: false
+      db_password:
+        description: 'Database password. Used only when SUPABASE_DB_URL is a bare password, to build the connection string. Leave empty otherwise.'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -27,15 +31,73 @@ permissions:
 jobs:
   apply:
     runs-on: ubuntu-latest
+    # Environment-scoped secrets are only visible to a job that names the
+    # environment, so SUPABASE_DB_URL added under Settings -> Environments ->
+    # Production was invisible and the guard always failed. Repo-level secrets
+    # are still inherited; this only widens where the job looks.
+    environment: Production
     steps:
       - uses: actions/checkout@v7
 
       - name: Guard — secret present
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DB_PASSWORD: ${{ inputs.db_password }}
         run: |
-          if [ -z "${{ secrets.SUPABASE_DB_URL }}" ]; then
-            echo "::error::SUPABASE_DB_URL is not set. Add it under Settings -> Secrets and variables -> Actions."
+          # Pasted values routinely carry a trailing newline, surrounding
+          # quotes, or a "psql '...'" prefix; strip those before validating
+          # instead of rejecting a correct connection string.
+          url="$DB_URL"
+          url="${url#"${url%%[![:space:]]*}"}"
+          url="${url%"${url##*[![:space:]]}"}"
+          url="${url#\'}"; url="${url%\'}"
+          url="${url#\"}"; url="${url%\"}"
+          url="${url#psql }"
+          url="${url#\'}"; url="${url%\'}"
+          url="${url#\"}"; url="${url%\"}"
+          url="${url%"${url##*[![:space:]]}"}"
+
+          if [ -z "$url" ]; then
+            echo "::error::SUPABASE_DB_URL is empty for this job. Add it as a repository secret (Settings -> Secrets and variables -> Actions) or as an environment secret on 'Production'. Note this job runs in the Production environment, so a secret scoped to a different environment will not be visible."
             exit 1
           fi
+
+          case "$url" in
+            postgres://*|postgresql://*)
+              echo "::add-mask::$url"
+              {
+                echo "SUPABASE_DB_URL_RESOLVED<<EOF"
+                echo "$url"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
+              echo "SUPABASE_DB_URL holds a full connection string."
+              ;;
+            *://*)
+              echo "::error::SUPABASE_DB_URL is a URL but not a Postgres connection string. Copy the value from Supabase -> Project Settings -> Database -> Connection string -> URI."
+              exit 1
+              ;;
+            *)
+              # The secret holds only the database password (or a project ref).
+              # Keep it in an env var; the connectivity step builds the URI once
+              # it knows which host for this project actually accepts the login.
+              ref=$(grep -rhoE '[a-z0-9]{20}\.supabase\.co' lib/ | head -1 | cut -d. -f1)
+              if [ -z "$ref" ]; then
+                echo "::error::Could not read the Supabase project ref from lib/, so a bare password cannot be expanded. Set SUPABASE_DB_URL to the full postgresql:// URI instead."
+                exit 1
+              fi
+              echo "::add-mask::$url"
+              [ -n "$DB_PASSWORD" ] && echo "::add-mask::$DB_PASSWORD"
+              {
+                echo "SUPABASE_DB_REF<<EOF"
+                echo "$ref"
+                echo "EOF"
+                echo "SUPABASE_DB_PASSWORD<<EOF"
+                echo "${DB_PASSWORD:-$url}"
+                echo "EOF"
+              } >> "$GITHUB_ENV"
+              echo "SUPABASE_DB_URL holds a bare password; the connection string will be built for project ${ref}."
+              ;;
+          esac
 
       - name: Validate migration paths
         env:
@@ -49,6 +111,7 @@ jobs:
             fi
             case "$f" in
               supabase/migrations/*.sql) ;;
+              supabase/apply-all-pending.sql) ;;
               *) echo "::error::Refusing to apply outside supabase/migrations: $f"; exit 1 ;;
             esac
           done
@@ -59,13 +122,85 @@ jobs:
 
       - name: Connectivity check
         env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: psql "$DB_URL" -v ON_ERROR_STOP=1 -c "select version();"
+          DB_URL: ${{ env.SUPABASE_DB_URL_RESOLVED }}
+          REF: ${{ env.SUPABASE_DB_REF }}
+          PASSWORD: ${{ env.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -u
+          if [ -n "${DB_URL:-}" ]; then
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -c "select version();"
+            exit 0
+          fi
+
+          enc=$(printf '%s' "$PASSWORD" | python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read(), safe=""))')
+          echo "::add-mask::$enc"
+
+          # Direct host first, then the regional poolers. A project only answers
+          # on its own region, and the direct host may be IPv6-only, so probe
+          # until one accepts the credentials instead of guessing.
+          hosts="db.${REF}.supabase.co:5432"
+          # ap-northeast-1 first: it is the only pooler that answers for this
+          # project, and every other region returns ENOTFOUND for the tenant.
+          for region in ap-northeast-1 eu-central-1 eu-west-1 eu-west-2 us-east-1 ap-southeast-1; do
+            hosts="$hosts aws-0-${region}.pooler.supabase.com:5432 aws-1-${region}.pooler.supabase.com:5432"
+          done
+
+          resolved=""
+          auth_failed=""
+          for host in $hosts; do
+            case "$host" in
+              db.*) user="postgres" ;;
+              *)    user="postgres.${REF}" ;;
+            esac
+            candidate="postgresql://${user}:${enc}@${host}/postgres?connect_timeout=8"
+            out=$(psql "$candidate" -v ON_ERROR_STOP=1 -tAc "select 1" 2>&1) && [ "$out" = "1" ] && {
+              resolved="$candidate"
+              echo "Connected via ${host}."
+              break
+            }
+            # Distinguish "host unreachable" from "password rejected": the
+            # second one is a real answer and should stop the sweep.
+            case "$out" in
+              *"password authentication failed"*|*"authentication failed"*)
+                auth_failed="$host"
+                echo "${host}: reached the server, credentials rejected."
+                ;;
+              *"does not exist"*)
+                echo "${host}: server answered, role or database missing."
+                ;;
+              *"could not translate host name"*|*"Name or service not known"*)
+                echo "${host}: no DNS entry."
+                ;;
+              *"timeout"*|*"timed out"*|*"Timeout"*)
+                echo "${host}: connection timed out."
+                ;;
+              *)
+                echo "${host}: $(printf '%s' "$out" | head -1 | cut -c1-120)"
+                ;;
+            esac
+          done
+
+          if [ -n "$auth_failed" ] && [ -z "$resolved" ]; then
+            echo "::error::The server at ${auth_failed} is reachable but rejected the password, so SUPABASE_DB_URL holds the wrong database password. Reset it in Supabase -> Project Settings -> Database -> Reset database password and update the secret."
+            exit 1
+          fi
+
+          if [ -z "$resolved" ]; then
+            echo "::error::Could not reach any database host for project ${REF}. The hosts were unreachable rather than rejecting the password; see the per-host reasons above."
+            exit 1
+          fi
+          echo "::add-mask::$resolved"
+          {
+            echo "SUPABASE_DB_URL_RESOLVED<<EOF"
+            echo "$resolved"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+          psql "$resolved" -v ON_ERROR_STOP=1 -c "select version();"
 
       - name: Apply migrations
         if: ${{ inputs.dry_run == false }}
         env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DB_URL: ${{ env.SUPABASE_DB_URL_RESOLVED }}
           FILES: ${{ inputs.files }}
         run: |
           set -e
